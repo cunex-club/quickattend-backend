@@ -3,8 +3,9 @@ package database
 import (
 	"database/sql/driver"
 	"fmt"
-	"gorm.io/datatypes"
 	"strings"
+
+	"gorm.io/datatypes"
 )
 
 // ====================================================
@@ -150,4 +151,56 @@ type EventAllowedFaculties struct {
 	ID        datatypes.UUID
 	EventID   datatypes.UUID ``
 	FacultyNO int8
+}
+
+type Point struct {
+	X float64
+	Y float64
+}
+
+func (p *Point) Scan(val any) error {
+	var point string
+	switch v := val.(type) {
+	case []byte:
+		point = string(v)
+	case string:
+		point = v
+	default:
+		return fmt.Errorf("cannot convert %T to GeometryPoint", val)
+	}
+
+	_, err := fmt.Sscanf(point, "POINT(%f %f)", &p.X, &p.Y)
+	return err
+}
+
+func (p Point) Value() (driver.Value, error) {
+	return fmt.Sprintf("POINT(%f %f)", p.X, p.Y), nil
+}
+
+type EventAgenda struct {
+	gorm.Model
+	ID           datatypes.UUID `gorm:"default:uuid_generate_v4();primarykey"`
+	EventID      datatypes.UUID // foreign key to `ID` of table `Events`
+	ActivityName string
+	StartTime    time.Time
+	EndTime      time.Time
+
+	Event Event `gorm:"foreignKey:EventID;references:ID"`
+}
+
+type EventParticipants struct {
+	gorm.Model
+	ID               datatypes.UUID `gorm:"default:uuid_generate_v4();primarykey"`
+	EventID          datatypes.UUID // foreign key to `ID` of table `Event`
+	CheckinTimestamp time.Time
+	ParticipantRefId uint8
+	UserRefID        uint8 // foreign key to `RefID` of table `User`
+	FirstName        string
+	SurName          string
+	Organization     string
+	ScannedLocation  Point
+	ScannerID        datatypes.UUID
+
+	Event Event `gorm:"foreignKey:EventID;references:ID"` // For column `EventID`, refer to `ID` of `Event` table
+	User  User  `gorm:"foreignKey:UserRefID;references:RefID"`
 }
