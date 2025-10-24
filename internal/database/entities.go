@@ -184,8 +184,8 @@ type EventAgenda struct {
 	ID           datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
 	EventID      datatypes.UUID // foreign key
 	ActivityName string
-	StartTime    time.Time
-	EndTime      time.Time
+	StartTime    datatypes.Time
+	EndTime      datatypes.Time
 
 	Event Event `gorm:"foreignKey:EventID;references:ID"`
 }
