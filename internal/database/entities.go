@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"strings"
+	"time"
 
 	"gorm.io/datatypes"
 )
@@ -108,8 +109,34 @@ func (pf participant_field) Value() (driver.Value, error) {
 
 // ====================================================
 
+type Point struct {
+	X float64
+	Y float64
+}
+
+func (p *Point) Scan(val any) error {
+	var point string
+	switch v := val.(type) {
+	case []byte:
+		point = string(v)
+	case string:
+		point = v
+	default:
+		return fmt.Errorf("cannot convert %T to Point", val)
+	}
+
+	_, err := fmt.Sscanf(point, "(%f,%f)", &p.X, &p.Y)
+	return err
+}
+
+func (p Point) Value() (driver.Value, error) {
+	return fmt.Sprintf("(%f,%f)", p.X, p.Y), nil
+}
+
+// ====================================================
+
 type User struct {
-	ID          datatypes.UUID
+	ID          datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
 	RefID       uint8
 	FirstnameTH string
 	SurnameTH   string
@@ -120,14 +147,14 @@ type User struct {
 }
 
 type EventUsers struct {
-	ID      datatypes.UUID
-	role    role `gorm:"type:role"`
+	ID      datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
+	role    role           `gorm:"type:role"`
 	UserID  datatypes.UUID
 	EventID datatypes.UUID
 }
 
 type Event struct {
-	ID             datatypes.UUID
+	ID             datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
 	Name           string
 	Organizer      string
 	Description    string
@@ -142,45 +169,20 @@ type Event struct {
 }
 
 type EventWhitelist struct {
-	ID            datatypes.UUID
+	ID            datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
 	EventID       datatypes.UUID
 	AttendeeRefID datatypes.UUID
 }
 
 type EventAllowedFaculties struct {
-	ID        datatypes.UUID
-	EventID   datatypes.UUID ``
+	ID        datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
+	EventID   datatypes.UUID
 	FacultyNO int8
 }
 
-type Point struct {
-	X float64
-	Y float64
-}
-
-func (p *Point) Scan(val any) error {
-	var point string
-	switch v := val.(type) {
-	case []byte:
-		point = string(v)
-	case string:
-		point = v
-	default:
-		return fmt.Errorf("cannot convert %T to GeometryPoint", val)
-	}
-
-	_, err := fmt.Sscanf(point, "POINT(%f %f)", &p.X, &p.Y)
-	return err
-}
-
-func (p Point) Value() (driver.Value, error) {
-	return fmt.Sprintf("POINT(%f %f)", p.X, p.Y), nil
-}
-
 type EventAgenda struct {
-	gorm.Model
-	ID           datatypes.UUID `gorm:"default:uuid_generate_v4();primarykey"`
-	EventID      datatypes.UUID // foreign key to `ID` of table `Events`
+	ID           datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
+	EventID      datatypes.UUID // foreign key
 	ActivityName string
 	StartTime    time.Time
 	EndTime      time.Time
@@ -189,18 +191,18 @@ type EventAgenda struct {
 }
 
 type EventParticipants struct {
-	gorm.Model
-	ID               datatypes.UUID `gorm:"default:uuid_generate_v4();primarykey"`
-	EventID          datatypes.UUID // foreign key to `ID` of table `Event`
+	ID               datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
+	EventID          datatypes.UUID // foreign key
 	CheckinTimestamp time.Time
-	ParticipantRefId uint8
-	UserRefID        uint8 // foreign key to `RefID` of table `User`
+	ParticipantRefID uint8
+	UserRefID        uint8 // foreign key
 	FirstName        string
 	SurName          string
 	Organization     string
-	ScannedLocation  Point
-	ScannerID        datatypes.UUID
+	ScannedLocation  Point          `gorm:"type:point"`
+	ScannerID        datatypes.UUID // foreign key
 
-	Event Event `gorm:"foreignKey:EventID;references:ID"` // For column `EventID`, refer to `ID` of `Event` table
-	User  User  `gorm:"foreignKey:UserRefID;references:RefID"`
+	Event                      Event `gorm:"foreignKey:EventID;references:ID"` // For column `EventID`, refer to `ID` of `Event` table
+	ParticipantRefIDForeignKey User  `gorm:"foreignKey:UserRefID;references:RefID"`
+	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:RefID"`
 }
