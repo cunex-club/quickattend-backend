@@ -204,5 +204,5 @@ type EventParticipants struct {
 
 	Event                      Event `gorm:"foreignKey:EventID;references:ID"` // For column `EventID`, refer to `ID` of `Event` table
 	ParticipantRefIDForeignKey User  `gorm:"foreignKey:UserRefID;references:RefID"`
-	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:RefID"`
+	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:ID"`
 }
