@@ -1,4 +1,4 @@
-package database
+package entity
 
 import (
 	"database/sql/driver"
@@ -8,25 +8,6 @@ import (
 
 	"gorm.io/datatypes"
 )
-
-// ====================================================
-
-type role string
-
-const (
-	OWNER   role = "OWNER"
-	STAFF   role = "STAFF"
-	MANAGER role = "MANAGER"
-)
-
-func (r *role) Scan(value any) error {
-	*r = role(value.(string))
-	return nil
-}
-
-func (r role) Value() (driver.Value, error) {
-	return string(r), nil
-}
 
 // ====================================================
 
@@ -134,24 +115,6 @@ func (p Point) Value() (driver.Value, error) {
 }
 
 // ====================================================
-
-type User struct {
-	ID          datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
-	RefID       uint8
-	FirstnameTH string
-	SurnameTH   string
-	TitleTH     string
-	FirstnameEN string
-	SurnameEN   string
-	TitleEN     string
-}
-
-type EventUsers struct {
-	ID      datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
-	role    role           `gorm:"type:role"`
-	UserID  datatypes.UUID
-	EventID datatypes.UUID
-}
 
 type Event struct {
 	ID             datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
