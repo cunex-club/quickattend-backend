@@ -117,55 +117,59 @@ func (p Point) Value() (driver.Value, error) {
 // ====================================================
 
 type Event struct {
-	ID             datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
-	Name           string
-	Organizer      string
-	Description    string
-	Date           datatypes.Date
-	StartTime      datatypes.Time
-	EndTime        datatypes.Time
-	Location       string
-	AttendenceType attendence_type `gorm:"type:attendence_type"`
-	AllowAllToScan bool
-	EvaluationForm string
-	RevealedField  participant_field `gorm:"type:[]participant_data"`
+	ID             datatypes.UUID    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	Name           string            `gorm:"type:text;not null" json:"name"`
+	Organizer      string            `gorm:"type:text;not null" json:"organizer"`
+	Description    string            `gorm:"type:text" json:"description"`
+	Date           datatypes.Date    `gorm:"type:timestamp;not null" json:"date"`
+	StartTime      datatypes.Time    `gorm:"type:time;not null" json:"start_time"`
+	EndTime        datatypes.Time    `gorm:"type:time;not null" json:"end_time"`
+	Location       string            `gorm:"type:text;not null" json:"location"`
+	AttendenceType attendence_type   `gorm:"type:attendence_type;not null" json:"attendance_type"`
+	AllowAllToScan bool              `gorm:"type:bool;not null" json:"allow_all_to_scan"`
+	EvaluationForm string            `gorm:"type:text" json:"evaluation_form"`
+	RevealedFields participant_field `gorm:"type:[]participant_data;not null" json:"revealed_fields"`
 }
 
 type EventWhitelist struct {
-	ID            datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
-	EventID       datatypes.UUID
-	AttendeeRefID datatypes.UUID
+	ID            datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	EventID       datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
+	AttendeeRefID datatypes.UUID `gorm:"type:uuid;not null" json:"attendee_ref_id"`
+
+	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	User  User  `gorm:"foreignKey:AttendeeRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type EventAllowedFaculties struct {
-	ID        datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
-	EventID   datatypes.UUID
-	FacultyNO int8
+	ID        datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	EventID   datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
+	FacultyNO uint8          `gorm:"type:int8;not null" json:"faculty_no"`
+
+	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type EventAgenda struct {
-	ID           datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
-	EventID      datatypes.UUID // foreign key
-	ActivityName string
-	StartTime    datatypes.Time
-	EndTime      datatypes.Time
+	ID           datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	EventID      datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
+	ActivityName string         `gorm:"type:text;not null" json:"activity_name"`
+	StartTime    datatypes.Time `gorm:"type:time;not null" json:"start_time"`
+	EndTime      datatypes.Time `gorm:"type:time;not null" json:"end_time"`
 
-	Event Event `gorm:"foreignKey:EventID;references:ID"`
+	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type EventParticipants struct {
-	ID               datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
-	EventID          datatypes.UUID // foreign key
-	CheckinTimestamp time.Time
-	ParticipantRefID uint8
-	UserRefID        uint8 // foreign key
-	FirstName        string
-	SurName          string
-	Organization     string
-	ScannedLocation  Point          `gorm:"type:point"`
-	ScannerID        datatypes.UUID // foreign key
+	ID               datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	EventID          datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
+	CheckinTimestamp time.Time      `gorm:"type:timestamptz;not null" json:"checkin_timestamp"`
+	ParticipantRefID uint64         `gorm:"type:bigint;not null" json:"participant_ref_id"`
+	FirstName        string         `gorm:"type:text;not null" json:"first_name"`
+	SurName          string         `gorm:"type:text;not null" json:"last_name"`
+	Organization     string         `gorm:"type:text;not null" json:"organization"`
+	ScannedLocation  Point          `gorm:"type:point;not null" json:"scanned_location"`
+	ScannerID        datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
 
-	Event                      Event `gorm:"foreignKey:EventID;references:ID"` // For column `EventID`, refer to `ID` of `Event` table
-	ParticipantRefIDForeignKey User  `gorm:"foreignKey:UserRefID;references:RefID"`
-	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:ID"`
+	Event                      Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ParticipantRefIDForeignKey User  `gorm:"foreignKey:UserRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 }

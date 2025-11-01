@@ -27,7 +27,7 @@ func (r role) Value() (driver.Value, error) {
 
 type User struct {
 	ID          datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	RefID       int8           `gorm:"not null" json:"ref_id"`
+	RefID       uint64         `gorm:"type:bigint;not null" json:"ref_id"`
 	FirstnameTH string         `gorm:"type:text;not null" json:"firstname_th"`
 	SurnameTH   string         `gorm:"type:text;not null" json:"surname_th"`
 	TitleTH     string         `gorm:"type:text;not null" json:"title_th"`
@@ -36,9 +36,12 @@ type User struct {
 	TitleEN     string         `gorm:"type:text;not null" json:"title_en"`
 }
 
-type EventUsers struct {
-	ID      datatypes.UUID `gorm:"default:uuid_generate_v4();primaryKey"`
-	role    role           `gorm:"type:role"`
-	UserID  datatypes.UUID
-	EventID datatypes.UUID
+type EventUser struct {
+	ID      datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	Role    role           `gorm:"type:role;not null" json:"role"`
+	UserID  datatypes.UUID `gorm:"type:uuid;not null" json:"user_id"`
+	EventID datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
+
+	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	User  User  `gorm:"foreignKey:UserID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
