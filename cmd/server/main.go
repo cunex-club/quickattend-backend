@@ -3,10 +3,10 @@ package main
 import (
 	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/database"
-	"github.com/cunex-club/quickattend-backend/internal/handler"
-	"github.com/cunex-club/quickattend-backend/internal/logger"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/handler"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/router"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/logger"
 	"github.com/cunex-club/quickattend-backend/internal/repository"
-	"github.com/cunex-club/quickattend-backend/internal/router"
 	"github.com/cunex-club/quickattend-backend/internal/service"
 	"github.com/gofiber/fiber/v2"
 

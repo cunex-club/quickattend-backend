@@ -3,6 +3,7 @@ package handler
 import (
 	"time"
 
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -16,11 +17,14 @@ func (h *Handler) HealthCheck(c *fiber.Ctx) error {
 	status, err := h.Service.HealthCheck.CheckSystem()
 	status.ResponseTime = float64(time.Since(start).Milliseconds())
 
-	httpStatus := fiber.StatusOK
 	if err != nil {
 		h.Logger.Error().Err(err).Msg("Database health check failed")
-		httpStatus = fiber.StatusInternalServerError
+		return response.SendError(
+			c,
+			fiber.StatusInternalServerError,
+			response.ErrInternalError,
+			"Database connection failed",
+		)
 	}
-
-	return c.Status(httpStatus).JSON(status)
+	return response.OK(c, status)
 }

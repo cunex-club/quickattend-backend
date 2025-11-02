@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/cunex-club/quickattend-backend/internal/handler"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/handler"
 	"github.com/gofiber/fiber/v2"
 )
 
