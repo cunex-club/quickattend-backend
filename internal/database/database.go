@@ -12,7 +12,7 @@ import (
 
 var logger = log.With().Str("module", "database").Logger()
 
-func Connect(config config.DatabaseConfig) *gorm.DB {
+func Connect(config config.DatabaseConfig) (*gorm.DB, error) {
 
 	// TODO: Change GORM to preferred library
 	dsn := fmt.Sprintf(
@@ -24,8 +24,8 @@ func Connect(config config.DatabaseConfig) *gorm.DB {
 	})
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to connect to database")
-		return nil
+		return nil, err
 	}
 
-	return db
+	return db, nil
 }

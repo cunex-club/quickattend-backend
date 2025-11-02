@@ -21,9 +21,9 @@ func main() {
 	cfg := config.Load()
 	log.Logger = logger.SetupLogger(cfg.AppEnv)
 
-	db := database.Connect(cfg.DatabaseConfig)
-	if db == nil {
-		log.Fatal().Msg("Database connection failed")
+	db, err := database.Connect(cfg.DatabaseConfig)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Database connection failed")
 	}
 	log.Info().Msg("Successfully connected to the database")
 
