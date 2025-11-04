@@ -3,7 +3,12 @@ package main
 import (
 	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/database"
-	"github.com/cunex-club/quickattend-backend/internal/logger"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/handler"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/router"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/logger"
+	"github.com/cunex-club/quickattend-backend/internal/repository"
+	"github.com/cunex-club/quickattend-backend/internal/service"
+	"github.com/gofiber/fiber/v2"
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
@@ -12,16 +17,25 @@ import (
 func main() {
 	_ = godotenv.Load()
 
+	// Load config
 	cfg := config.Load()
 	log.Logger = logger.SetupLogger(cfg.AppEnv)
 
-	db := database.Connect(cfg.DatabaseConfig)
-
+	db, err := database.Connect(cfg.DatabaseConfig)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Database connection failed")
+	}
 	log.Info().Msg("Successfully connected to the database")
 
-	// Application logic here...
-	i, _ := db.DB()
+	repos := repository.NewRepository(db)
+	services := service.NewService(repos)
+	handlers := handler.NewHandler(&services, &log.Logger)
 
-	i.Ping()
-	log.Debug().Msg("Pinged database")
+	app := fiber.New()
+
+	router.SetupRoutes(app, handlers)
+	log.Info().Msg("Starting server on :8000")
+	if err := app.Listen(":8000"); err != nil {
+		log.Fatal().Err(err).Msg("Server failed to start")
+	}
 }
