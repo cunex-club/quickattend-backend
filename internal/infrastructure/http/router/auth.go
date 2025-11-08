@@ -5,9 +5,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func SetupRoutes(app *fiber.App, h *handler.AllOfHandler) {
-	api := app.Group("/api")
+func AuthRoutes(r fiber.Router, h *handler.AllOfHandler) {
+	health := r.Group("/auth")
 
-	HealthCheckRoutes(api, h)
-	AuthRoutes(api, h)
+	health.Get("/cunex", h.AuthHandler.AuthCunex)
 }
