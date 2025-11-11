@@ -14,7 +14,8 @@ type AuthHandler interface {
 }
 
 func validateToken(c *fiber.Ctx, token string) error {
-	url := "https://jsonplaceholder.typicode.com/todos/1"
+	// TODO: LLE api url
+	url := ""
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
@@ -22,6 +23,7 @@ func validateToken(c *fiber.Ctx, token string) error {
 		return response.SendError(c, 500, response.ErrInternalError, "failed to create token validation request")
 	}
 
+	// TODO: ClientId & ClientSecret env var
 	req.Header.Set("Content-type", "application/json")
 	req.Header.Set("ClientId", "")
 	req.Header.Set("ClientSecret", "")
@@ -62,20 +64,28 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 		return err
 	}
 
+	// TODO: Create user if haven't and claim uuid in jwt
+
 	var (
 		key []byte
 		t   *jwt.Token
 		s   string
 	)
 
-	key = []byte("HELLO")
-	t = jwt.New(jwt.SigningMethodHS256)
+	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
+		jwt.MapClaims{
+			"uuid": "",
+		})
+		
+
+	// TODO: key env var
+	key = []byte("")
 	s, err = t.SignedString(key)
 	if err != nil {
 		return response.SendError(c, 500, "JWT_SIGN_FAIL", "failed to sign token")
 	}
 
 	return response.OK(c, map[string]string{
-		"token": s,
+		"access_token": s,
 	})
 }

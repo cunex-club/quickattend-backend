@@ -7,7 +7,9 @@ import (
 
 type Config struct {
 	AppEnv         string
+	JwtKey         string
 	DatabaseConfig DatabaseConfig
+	LLEConfig      LLEConfig
 }
 
 type DatabaseConfig struct {
@@ -19,9 +21,15 @@ type DatabaseConfig struct {
 	Schema   string
 }
 
+type LLEConfig struct {
+	ClientId     string
+	ClientSecret string
+}
+
 func Load() *Config {
 	return &Config{
 		AppEnv: getEnv("APP_ENV", "development"),
+		JwtKey: getEnv("JwtKey", ""),
 		DatabaseConfig: DatabaseConfig{
 			Host:     getEnv("POSTGRES_HOST", "localhost"),
 			Port:     getEnvAsInt("POSTGRES_PORT", 5432),
@@ -29,6 +37,10 @@ func Load() *Config {
 			Password: getEnv("POSTGRES_PASSWORD", "postgres"),
 			Name:     getEnv("POSTGRES_DB", "quickattend-db"),
 			Schema:   getEnv("POSTGRES_SCHEMA", "public"),
+		},
+		LLEConfig: LLEConfig{
+			ClientId:     getEnv("ClientId", ""),
+			ClientSecret: getEnv("ClientSecret", ""),
 		},
 	}
 }
