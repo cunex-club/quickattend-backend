@@ -8,6 +8,7 @@ type repository struct {
 
 type AllRepo struct {
 	HealthCheck HealthCheckRepository
+	Auth        AuthRepository
 }
 
 func NewRepository(db *gorm.DB) AllRepo {

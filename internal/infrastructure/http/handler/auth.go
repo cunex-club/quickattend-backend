@@ -11,6 +11,7 @@ import (
 
 type AuthHandler interface {
 	AuthCunex(c *fiber.Ctx) error
+	AuthUser(c *fiber.Ctx) error
 }
 
 func validateToken(c *fiber.Ctx, token string) error {
@@ -88,4 +89,21 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 	return response.OK(c, map[string]string{
 		"access_token": s,
 	})
+}
+
+func (h *Handler) AuthUser(c *fiber.Ctx) error {
+
+	header := c.Get("Authorization")
+	if !strings.HasPrefix(header, "Bearer ") {
+		return response.SendError(c, 401, response.ErrUnauthorized, "missing Authorization header")
+	}
+
+	tokenStr := strings.TrimPrefix(header, "Bearer ")
+	results, err := h.Service.Auth.GetUserService(tokenStr)
+
+	if err != nil {
+		return response.SendError(c, err.Status, err.Code, err.Message)
+	}
+
+	return response.OK(c, results)
 }
