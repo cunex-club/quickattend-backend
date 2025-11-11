@@ -9,4 +9,5 @@ func AuthRoutes(r fiber.Router, h *handler.AllOfHandler) {
 	health := r.Group("/auth")
 
 	health.Get("/cunex", h.AuthHandler.AuthCunex)
+	health.Get("/user", h.AuthHandler.AuthUser)
 }

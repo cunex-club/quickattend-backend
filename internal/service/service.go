@@ -8,6 +8,7 @@ type service struct {
 
 type AllOfService struct {
 	HealthCheck HealthCheckService
+	Auth        AuthService
 }
 
 func NewService(repo repository.AllRepo) AllOfService {
