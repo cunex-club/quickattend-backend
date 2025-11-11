@@ -89,7 +89,7 @@ func (h *Handler) AuthUser(c *fiber.Ctx) error {
 	}
 
 	tokenStr := strings.TrimPrefix(header, "Bearer ")
-	results, err := h.Service.Auth.GetUserService(c, tokenStr)
+	results, err := h.Service.Auth.GetUserService(tokenStr)
 
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)

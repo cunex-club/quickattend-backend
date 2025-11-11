@@ -6,16 +6,15 @@ import (
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
-	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 )
 
 type AuthService interface {
-	GetUserService(*fiber.Ctx, string) (*entity.User, *response.APIError)
+	GetUserService(string) (*entity.User, *response.APIError)
 }
 
-func (s *service) GetUserService(c *fiber.Ctx, tokenStr string) (*entity.User, *response.APIError) {
+func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIError) {
 	var secretKey, _ = os.LookupEnv("JWT_KEY")
 
 	result, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
