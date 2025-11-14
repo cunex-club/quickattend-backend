@@ -28,12 +28,13 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 		return response.SendError(c, 400, "TOKEN_REQUIRED", "token is required")
 	}
 
-	err := h.Service.Auth.ValidateToken(data.Token)
+	_, err := h.Service.Auth.ValidateCUNEXToken(data.Token)
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
 
 	// TODO: Create user if haven't and claim uuid in jwt
+
 
 	var (
 		key []byte
