@@ -2,8 +2,10 @@ package handler
 
 import (
 	"os"
+	"strconv"
 	"strings"
 
+	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
@@ -28,13 +30,29 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 		return response.SendError(c, 400, "TOKEN_REQUIRED", "token is required")
 	}
 
-	_, err := h.Service.Auth.ValidateCUNEXToken(data.Token)
+	userResponse, err := h.Service.Auth.ValidateCUNEXToken(data.Token)
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
 
-	// TODO: Create user if haven't and claim uuid in jwt
+	convRefId, convErr := strconv.ParseUint(userResponse.RefId, 10, 64)
+	if convErr != nil {
+		return response.SendError(c, 500, response.ErrInternalError, "failed to convert RefId")
+	}
 
+	user := entity.User{
+		RefID: convRefId,
+		FirstnameTH: userResponse.FirstNameTH,
+		SurnameTH: userResponse.LastNameTH,
+		TitleTH: "",
+		FirstnameEN: userResponse.FirstnameEN,
+		SurnameEN: userResponse.LastNameEN,
+		TitleEN: "",
+	}
+	createdUser, createUserErr := h.Service.Auth.CreateUserIfNotExists(&user)
+	if createUserErr != nil {
+		return response.SendError(c, createUserErr.Status, createUserErr.Code, createUserErr.Message)
+	}
 
 	var (
 		key []byte
@@ -43,7 +61,7 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"uuid": "",
+			"uuid": createdUser.ID,
 		})
 
 	JwtKey, JwtKeyExists := os.LookupEnv("JwtKey")

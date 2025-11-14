@@ -15,6 +15,7 @@ import (
 type AuthService interface {
 	GetUserService(string) (*entity.User, *response.APIError)
 	ValidateCUNEXToken(string) (*entity.CUNEXUserResponse, *response.APIError)
+	CreateUserIfNotExists(*entity.User) (*entity.User, *response.APIError)
 }
 
 func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIError) {
@@ -140,4 +141,35 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 	}
 
 	return &data, nil
+}
+
+func (s *service) CreateUserIfNotExists(user *entity.User) (*entity.User, *response.APIError) {
+	foundUser, err := s.repo.Auth.GetUser(user.RefID)
+	if err == nil {
+		return &foundUser, nil
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "internal db error",
+			Status:  500,
+		}
+	}
+
+	createdUser, createErr := s.repo.Auth.CreateUser(user)
+	if createErr != nil {
+		if errors.Is(createErr, gorm.ErrDuplicatedKey) {
+			existingUser, _ := s.repo.Auth.GetUser(user.RefID)
+			return &existingUser, nil
+		}
+
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "failed to create user",
+			Status:  500,
+		}
+	}
+
+	return createdUser, nil
 }
