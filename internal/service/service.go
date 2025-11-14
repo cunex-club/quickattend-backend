@@ -17,5 +17,6 @@ func NewService(repo repository.AllRepo) AllOfService {
 	}
 	return AllOfService{
 		HealthCheck: srv,
+		Auth: srv,
 	}
 }

@@ -15,5 +15,6 @@ func NewRepository(db *gorm.DB) AllRepo {
 	repo := &repository{db: db}
 	return AllRepo{
 		HealthCheck: repo,
+		Auth: repo,
 	}
 }

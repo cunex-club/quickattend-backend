@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"os"
 	"strings"
 
@@ -13,46 +12,6 @@ import (
 type AuthHandler interface {
 	AuthCunex(c *fiber.Ctx) error
 	AuthUser(c *fiber.Ctx) error
-}
-
-func validateToken(c *fiber.Ctx, token string) error {
-	url := ""
-
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return response.SendError(c, 500, response.ErrInternalError, "failed to create token validation request")
-	}
-
-	ClientId, ClientIdExists := os.LookupEnv("ClientId")
-	if !ClientIdExists {
-		return response.SendError(c, 500, "ClientId_NOT_FOUND", "ClientId not configured")
-	}
-
-	ClientSecret, ClientSecretExists := os.LookupEnv("ClientSecret")
-	if !ClientSecretExists {
-		return response.SendError(c, 500, "ClientSecret_NOT_FOUND", "ClientSecret not configured")
-	}
-
-	req.Header.Set("Content-type", "application/json")
-	req.Header.Set("ClientId", ClientId)
-	req.Header.Set("ClientSecret", ClientSecret)
-
-	q := req.URL.Query()
-	q.Add("token", token)
-	req.URL.RawQuery = q.Encode()
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return response.SendError(c, 500, response.ErrInternalError, "failed to call external token validation API")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return response.SendError(c, resp.StatusCode, response.ErrUnauthorized, "invalid token")
-	}
-
-	return nil
 }
 
 func (h *Handler) AuthCunex(c *fiber.Ctx) error {
@@ -69,9 +28,9 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 		return response.SendError(c, 400, "TOKEN_REQUIRED", "token is required")
 	}
 
-	err := validateToken(c, data.Token)
+	err := h.Service.Auth.ValidateToken(data.Token)
 	if err != nil {
-		return err
+		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
 
 	// TODO: Create user if haven't and claim uuid in jwt
@@ -79,7 +38,6 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 	var (
 		key []byte
 		t   *jwt.Token
-		s   string
 	)
 
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
@@ -93,13 +51,13 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 	}
 
 	key = []byte(JwtKey)
-	s, err = t.SignedString(key)
-	if err != nil {
+	access_token, signErr := t.SignedString(key)
+	if signErr != nil {
 		return response.SendError(c, 500, "JWT_SIGN_FAIL", "failed to sign token")
 	}
 
 	return response.OK(c, map[string]string{
-		"access_token": s,
+		"access_token": access_token,
 	})
 }
 

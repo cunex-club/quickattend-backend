@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"net/http"
 	"os"
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
@@ -12,6 +13,7 @@ import (
 
 type AuthService interface {
 	GetUserService(string) (*entity.User, *response.APIError)
+	ValidateToken(string) *response.APIError
 }
 
 func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIError) {
@@ -68,4 +70,64 @@ func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIEr
 		Message: "Invalid jwt token",
 		Status:  401,
 	}
+}
+
+func ValidateToken(token string) *response.APIError {
+	url := ""
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return &response.APIError{
+			Code: response.ErrInternalError,
+			Message: "failed to create token validation request",
+			Status: 500,
+		}
+	}
+
+	ClientId, ClientIdExists := os.LookupEnv("ClientId")
+	if !ClientIdExists {
+		return &response.APIError{
+			Code: "ClientId_NOT_FOUND",
+			Message: "ClientId not configured",
+			Status: 500,
+		}
+	}
+
+	ClientSecret, ClientSecretExists := os.LookupEnv("ClientSecret")
+	if !ClientSecretExists {
+		return &response.APIError{
+			Code: "ClientSecret_NOT_FOUND",
+			Message: "ClientSecret not configured",
+			Status: 500,
+		}
+	}
+
+	req.Header.Set("Content-type", "application/json")
+	req.Header.Set("ClientId", ClientId)
+	req.Header.Set("ClientSecret", ClientSecret)
+
+	q := req.URL.Query()
+	q.Add("token", token)
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return &response.APIError{
+			Code: response.ErrInternalError,
+			Message: "failed to call external token validation API",
+			Status: 500,
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return &response.APIError{
+			Code: response.ErrUnauthorized,
+			Message: "invalid token",
+			Status: resp.StatusCode,
+		}
+	}
+
+	return nil
 }
