@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
@@ -15,7 +16,6 @@ type AuthHandler interface {
 }
 
 func validateToken(c *fiber.Ctx, token string) error {
-	// TODO: LLE api url
 	url := ""
 
 	client := &http.Client{}
@@ -24,10 +24,19 @@ func validateToken(c *fiber.Ctx, token string) error {
 		return response.SendError(c, 500, response.ErrInternalError, "failed to create token validation request")
 	}
 
-	// TODO: ClientId & ClientSecret env var
+	ClientId, ClientIdExists := os.LookupEnv("ClientId")
+	if !ClientIdExists {
+		return response.SendError(c, 500, "ClientId_NOT_FOUND", "ClientId not configured")
+	}
+
+	ClientSecret, ClientSecretExists := os.LookupEnv("ClientSecret")
+	if !ClientSecretExists {
+		return response.SendError(c, 500, "ClientSecret_NOT_FOUND", "ClientSecret not configured")
+	}
+
 	req.Header.Set("Content-type", "application/json")
-	req.Header.Set("ClientId", "")
-	req.Header.Set("ClientSecret", "")
+	req.Header.Set("ClientId", ClientId)
+	req.Header.Set("ClientSecret", ClientSecret)
 
 	q := req.URL.Query()
 	q.Add("token", token)
@@ -77,10 +86,13 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 		jwt.MapClaims{
 			"uuid": "",
 		})
-		
 
-	// TODO: key env var
-	key = []byte("")
+	JwtKey, JwtKeyExists := os.LookupEnv("JwtKey")
+	if !JwtKeyExists {
+		return response.SendError(c, 500, "JWT_SIGN_KEY_NOT_FOUND", "JWT signing key not configured")
+	}
+
+	key = []byte(JwtKey)
 	s, err = t.SignedString(key)
 	if err != nil {
 		return response.SendError(c, 500, "JWT_SIGN_FAIL", "failed to sign token")
