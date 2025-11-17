@@ -41,13 +41,13 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 	}
 
 	user := entity.User{
-		RefID: convRefId,
+		RefID:       convRefId,
 		FirstnameTH: userResponse.FirstNameTH,
-		SurnameTH: userResponse.LastNameTH,
-		TitleTH: "",
+		SurnameTH:   userResponse.LastNameTH,
+		TitleTH:     "",
 		FirstnameEN: userResponse.FirstnameEN,
-		SurnameEN: userResponse.LastNameEN,
-		TitleEN: "",
+		SurnameEN:   userResponse.LastNameEN,
+		TitleEN:     "",
 	}
 	createdUser, createUserErr := h.Service.Auth.CreateUserIfNotExists(&user)
 	if createUserErr != nil {

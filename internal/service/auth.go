@@ -75,7 +75,7 @@ func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIEr
 }
 
 func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *response.APIError) {
-	url := ""
+	url := "https://jsonplaceholder.typicode.com/todos/1"
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
@@ -139,6 +139,16 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 			Status:  500,
 		}
 	}
+
+	// data := entity.CUNEXUserResponse{
+	// 	UserId: "9999999",
+	// 	UserType: "student",
+	// 	RefId: "12345",
+	// 	FirstnameEN: "Ratanon",
+	// 	LastNameEN: "Khamrong",
+	// 	FirstNameTH: "dddd",
+	// 	LastNameTH: "eeee",
+	// }
 
 	return &data, nil
 }

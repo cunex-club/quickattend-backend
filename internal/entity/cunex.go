@@ -7,5 +7,5 @@ type CUNEXUserResponse struct {
 	FirstNameTH string `json:"firstNameTH"`
 	LastNameTH  string `json:"lastNameTH"`
 	FirstnameEN string `json:"firstNameEN"`
-	LastNameEN   string `json:"lastNameEN"`
+	LastNameEN  string `json:"lastNameEN"`
 }
