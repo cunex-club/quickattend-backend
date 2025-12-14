@@ -5,8 +5,6 @@ import (
 	"errors"
 	"net/http"
 
-	"os"
-
 	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
@@ -21,7 +19,14 @@ type AuthService interface {
 }
 
 func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIError) {
-	var secretKey, _ = os.LookupEnv("JWT_KEY")
+	var secretKey = config.Load().JwtKey
+	if secretKey == "" {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "JWT key not found",
+			Status:  500,
+		}
+	}
 
 	result, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
