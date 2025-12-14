@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
 	"os"
 
+	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/golang-jwt/jwt/v5"
@@ -87,8 +89,8 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 		}
 	}
 
-	ClientId, ClientIdExists := os.LookupEnv("ClientId")
-	if !ClientIdExists {
+	ClientId := config.Load().LLEConfig.ClientId
+	if ClientId == "" {
 		return nil, &response.APIError{
 			Code:    "ClientId_NOT_FOUND",
 			Message: "ClientId not configured",
@@ -96,8 +98,8 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 		}
 	}
 
-	ClientSecret, ClientSecretExists := os.LookupEnv("ClientSecret")
-	if !ClientSecretExists {
+	ClientSecret := config.Load().LLEConfig.ClientSecret
+	if ClientSecret == "" {
 		return nil, &response.APIError{
 			Code:    "ClientSecret_NOT_FOUND",
 			Message: "ClientSecret not configured",
@@ -123,7 +125,7 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode == http.StatusExpectationFailed {
 		return nil, &response.APIError{
 			Code:    response.ErrUnauthorized,
 			Message: "invalid token",
@@ -140,12 +142,13 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 		}
 	}
 
+	// MOCK USER DATA
 	// data := entity.CUNEXUserResponse{
 	// 	UserId: "9999999",
 	// 	UserType: "student",
 	// 	RefId: "12345",
-	// 	FirstnameEN: "Ratanon",
-	// 	LastNameEN: "Khamrong",
+	// 	FirstnameEN: "Somchai",
+	// 	LastNameEN: "Sawasdee",
 	// 	FirstNameTH: "dddd",
 	// 	LastNameTH: "eeee",
 	// }

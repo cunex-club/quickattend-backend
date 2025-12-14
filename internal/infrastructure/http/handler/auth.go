@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"os"
 	"strconv"
 	"strings"
 
+	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/gofiber/fiber/v2"
@@ -61,11 +61,11 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"uuid": createdUser.ID,
+			"ref_id": createdUser.RefID,
 		})
 
-	JwtKey, JwtKeyExists := os.LookupEnv("JwtKey")
-	if !JwtKeyExists {
+	JwtKey := config.Load().JwtKey
+	if JwtKey == "" {
 		return response.SendError(c, 500, "JWT_SIGN_KEY_NOT_FOUND", "JWT signing key not configured")
 	}
 
