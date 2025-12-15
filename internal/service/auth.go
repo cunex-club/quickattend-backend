@@ -19,7 +19,7 @@ type AuthService interface {
 }
 
 func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIError) {
-	var secretKey = config.Load().JwtKey
+	var secretKey = config.Load().JWTSecret
 	if secretKey == "" {
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,

@@ -64,7 +64,7 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 			"ref_id": createdUser.RefID,
 		})
 
-	JwtKey := config.Load().JwtKey
+	JwtKey := config.Load().JWTSecret
 	if JwtKey == "" {
 		return response.SendError(c, 500, "JWT_SIGN_KEY_NOT_FOUND", "JWT signing key not configured")
 	}
