@@ -4,6 +4,7 @@ import (
 	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/database"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/handler"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/middleware"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/router"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/logger"
 	"github.com/cunex-club/quickattend-backend/internal/repository"
@@ -33,7 +34,15 @@ func main() {
 
 	app := fiber.New()
 
-	router.SetupRoutes(app, handlers)
+	mw := middleware.NewMiddleware(cfg)
+	app.Use(
+		mw.Recover(),
+		mw.RequestID(),
+		mw.CORS(),
+		mw.RequestLogger(),
+	)
+
+	router.SetupRoutes(app, handlers, mw)
 	log.Info().Msg("Starting server on :8000")
 	if err := app.Listen(":8000"); err != nil {
 		log.Fatal().Err(err).Msg("Server failed to start")
