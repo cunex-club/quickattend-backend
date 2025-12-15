@@ -82,16 +82,19 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 
 func (h *Handler) AuthUser(c *fiber.Ctx) error {
 
-	header := c.Get("Authorization")
-	if !strings.HasPrefix(header, "Bearer ") {
-		return response.SendError(c, 401, response.ErrUnauthorized, "missing Authorization header")
+	refIDStr, ok := c.Locals("ref_id").(string)
+	if !ok {
+		return response.SendError(c, 500, response.ErrInternalError, "Failed to assert ref_id as string")
 	}
 
-	tokenStr := strings.TrimPrefix(header, "Bearer ")
-	results, err := h.Service.Auth.GetUserService(tokenStr)
-
+	refID, err := strconv.ParseUint(refIDStr, 10, 64)
 	if err != nil {
-		return response.SendError(c, err.Status, err.Code, err.Message)
+		return response.SendError(c, 500, response.ErrInternalError, "Could not convert ref_id from string to uint64")
+	}
+
+	results, getUserErr := h.Service.Auth.GetUserService(refID)
+	if getUserErr != nil {
+		return response.SendError(c, getUserErr.Status, getUserErr.Code, getUserErr.Message)
 	}
 
 	return response.OK(c, results)
