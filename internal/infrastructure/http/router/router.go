@@ -9,11 +9,6 @@ import (
 func SetupRoutes(app *fiber.App, h *handler.AllOfHandler, mw *middleware.Middleware) {
 	api := app.Group("/api")
 
-	// Public routes
-	public := api.Group("")
-	public.Get("/health-check", h.HealthCheckHandler.HealthCheck)
-	public.Post("/auth/cunex", h.AuthHandler.AuthCunex)
-
-	auth := api.Group("/auth", mw.AuthRequired())
-	auth.Get("/user", h.AuthHandler.AuthUser)
+	AuthRoutes(api, h, mw)
+	HealthCheckRoutes(api, h)
 }
