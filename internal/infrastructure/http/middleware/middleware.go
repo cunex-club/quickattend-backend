@@ -40,7 +40,7 @@ func (m *Middleware) CORS() fiber.Handler {
 		AllowOrigins:     allowedOrigins,
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
-		AllowCredentials: true,
+		AllowCredentials: false,
 	})
 }
 
