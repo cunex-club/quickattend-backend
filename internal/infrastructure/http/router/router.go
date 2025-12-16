@@ -12,7 +12,9 @@ func SetupRoutes(app *fiber.App, h *handler.AllOfHandler, mw *middleware.Middlew
 	// Public routes
 	public := api.Group("")
 	public.Get("/health-check", h.HealthCheckHandler.HealthCheck)
+	public.Post("/auth/cunex", h.AuthHandler.AuthCunex)
 
+	// // Protected routes
 	protected := api.Group("", mw.AuthRequired())
-	protected.Get("/me", nil) // example route
+	protected.Get("/auth/user", h.AuthHandler.AuthCunex)
 }
