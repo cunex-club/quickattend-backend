@@ -11,7 +11,7 @@ type AuthRepository interface {
 
 func (r *repository) GetUserByRefId(refId uint64) (entity.User, error) {
 	var user entity.User
-	err := r.db.Where(&entity.User{RefID: refId}).First(&user).Error
+	err := r.db.First(&user, &entity.User{RefID: refId}).Error
 	return user, err
 }
 
