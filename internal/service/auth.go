@@ -27,6 +27,7 @@ func (s *service) GetUserService(refID uint64) (*entity.User, *response.APIError
 		}
 	}
 	if err != nil {
+		s.logger.Error().Err(err).Msg("Internal DB error")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "Internal DB error",
