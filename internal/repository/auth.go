@@ -5,11 +5,11 @@ import (
 )
 
 type AuthRepository interface {
-	GetUser(uint64) (entity.User, error)
+	GetUserByRefId(uint64) (entity.User, error)
 	CreateUser(*entity.User) (*entity.User, error)
 }
 
-func (r *repository) GetUser(refId uint64) (entity.User, error) {
+func (r *repository) GetUserByRefId(refId uint64) (entity.User, error) {
 	var user entity.User
 	err := r.db.Where(&entity.User{RefID: refId}).First(&user).Error
 	return user, err

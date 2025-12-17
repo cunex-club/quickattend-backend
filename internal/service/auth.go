@@ -18,7 +18,7 @@ type AuthService interface {
 }
 
 func (s *service) GetUserService(refID uint64) (*entity.User, *response.APIError) {
-	user, err := s.repo.Auth.GetUser(refID)
+	user, err := s.repo.Auth.GetUserByRefId(refID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, &response.APIError{
 			Code:    response.ErrNotFound,
@@ -119,7 +119,7 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 }
 
 func (s *service) CreateUserIfNotExists(user *entity.User) (*entity.User, *response.APIError) {
-	foundUser, err := s.repo.Auth.GetUser(user.RefID)
+	foundUser, err := s.repo.Auth.GetUserByRefId(user.RefID)
 	if err == nil {
 		return &foundUser, nil
 	}
@@ -135,7 +135,7 @@ func (s *service) CreateUserIfNotExists(user *entity.User) (*entity.User, *respo
 	createdUser, createErr := s.repo.Auth.CreateUser(user)
 	if createErr != nil {
 		if errors.Is(createErr, gorm.ErrDuplicatedKey) {
-			existingUser, _ := s.repo.Auth.GetUser(user.RefID)
+			existingUser, _ := s.repo.Auth.GetUserByRefId(user.RefID)
 			return &existingUser, nil
 		}
 
