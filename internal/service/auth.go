@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -16,12 +17,12 @@ import (
 )
 
 type AuthService interface {
-	GetUserService(string) (*entity.User, *response.APIError)
-	VerifyCUNEXToken(string) (*dtoRes.VerifyTokenRes, *response.APIError)
-	CreateUserIfNotExists(*entity.User) (*entity.User, *response.APIError)
+	GetUserService(string, context.Context) (*entity.User, *response.APIError)
+	VerifyCUNEXToken(string, context.Context) (*dtoRes.VerifyTokenRes, *response.APIError)
+	CreateUserIfNotExists(*entity.User, context.Context) (*entity.User, *response.APIError)
 }
 
-func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIError) {
+func (s *service) GetUserService(tokenStr string, ctx context.Context) (*entity.User, *response.APIError) {
 	var secretKey = s.cfg.JWTSecret
 
 	result, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
@@ -51,7 +52,7 @@ func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIEr
 			}
 		}
 
-		user, err := s.repo.Auth.GetUserByRefId(ref_id)
+		user, err := s.repo.Auth.GetUserByRefId(ref_id, ctx)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, &response.APIError{
 				Code:    response.ErrNotFound,
@@ -77,8 +78,8 @@ func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIEr
 	}
 }
 
-func (s *service) CreateUserIfNotExists(user *entity.User) (*entity.User, *response.APIError) {
-	foundUser, err := s.repo.Auth.GetUserByRefId(user.RefID)
+func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) (*entity.User, *response.APIError) {
+	foundUser, err := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
 	if err == nil {
 		return &foundUser, nil
 	}
@@ -91,11 +92,10 @@ func (s *service) CreateUserIfNotExists(user *entity.User) (*entity.User, *respo
 		}
 	}
 
-
-	createdUser, createErr := s.repo.Auth.CreateUser(user)
+	createdUser, createErr := s.repo.Auth.CreateUser(user, ctx)
 	if createErr != nil {
 		if errors.Is(createErr, gorm.ErrDuplicatedKey) {
-			existingUser, _ := s.repo.Auth.GetUserByRefId(user.RefID)
+			existingUser, _ := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
 			return &existingUser, nil
 		}
 
@@ -109,7 +109,7 @@ func (s *service) CreateUserIfNotExists(user *entity.User) (*entity.User, *respo
 	return createdUser, nil
 }
 
-func (s *service) VerifyCUNEXToken(token string) (*dtoRes.VerifyTokenRes, *response.APIError) {
+func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.VerifyTokenRes, *response.APIError) {
 	if strings.TrimSpace(token) == "" {
 		return nil, &response.APIError{
 			Code:    "TOKEN_REQUIRED",
@@ -214,7 +214,7 @@ func (s *service) VerifyCUNEXToken(token string) (*dtoRes.VerifyTokenRes, *respo
 	// 	TitleEN:     "JJJJ",
 	// }
 
-	createdUser, createdUserErr := s.CreateUserIfNotExists(&User)
+	createdUser, createdUserErr := s.CreateUserIfNotExists(&User, ctx)
 	if createdUserErr != nil {
 		return nil, &response.APIError{
 			Code:    createdUserErr.Code,
@@ -222,7 +222,6 @@ func (s *service) VerifyCUNEXToken(token string) (*dtoRes.VerifyTokenRes, *respo
 			Status:  createdUserErr.Status,
 		}
 	}
-
 
 	var (
 		key []byte

@@ -21,7 +21,8 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 		return response.SendError(c, 400, response.ErrBadRequest, "invalid JSON body")
 	}
 
-	res, err := h.Service.Auth.VerifyCUNEXToken(req.Token)
+	ctx := c.UserContext()
+	res, err := h.Service.Auth.VerifyCUNEXToken(req.Token, ctx)
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
@@ -36,8 +37,9 @@ func (h *Handler) AuthUser(c *fiber.Ctx) error {
 		return response.SendError(c, 401, response.ErrUnauthorized, "missing Authorization header")
 	}
 
+	ctx := c.UserContext()
 	tokenStr := strings.TrimPrefix(header, "Bearer ")
-	results, err := h.Service.Auth.GetUserService(tokenStr)
+	results, err := h.Service.Auth.GetUserService(tokenStr, ctx)
 
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
