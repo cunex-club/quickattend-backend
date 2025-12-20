@@ -1,24 +1,29 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
-	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
+	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
+
+	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 )
 
 type AuthService interface {
-	GetUserService(uint64) (*entity.User, *response.APIError)
-	ValidateCUNEXToken(string) (*entity.CUNEXUserResponse, *response.APIError)
-	CreateUserIfNotExists(*entity.User) (*entity.User, *response.APIError)
+	GetUserService(uint64, context.Context) (*entity.User, *response.APIError)
+	VerifyCUNEXToken(string, context.Context) (*dtoRes.VerifyTokenRes, *response.APIError)
+	CreateUserIfNotExists(*entity.User, context.Context) (*entity.User, *response.APIError)
 }
 
-func (s *service) GetUserService(refID uint64) (*entity.User, *response.APIError) {
-	user, err := s.repo.Auth.GetUserByRefId(refID)
+func (s *service) GetUserService(refID uint64, ctx context.Context) (*entity.User, *response.APIError) {
+	user, err := s.repo.Auth.GetUserByRefId(refID, ctx)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, &response.APIError{
 			Code:    response.ErrNotFound,
@@ -38,11 +43,50 @@ func (s *service) GetUserService(refID uint64) (*entity.User, *response.APIError
 	return &user, nil
 }
 
-func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *response.APIError) {
-	url := "https://jsonplaceholder.typicode.com/todos/1"
+func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) (*entity.User, *response.APIError) {
+	foundUser, err := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
+	if err == nil {
+		return &foundUser, nil
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "internal db error",
+			Status:  500,
+		}
+	}
+
+	createdUser, createErr := s.repo.Auth.CreateUser(user, ctx)
+	if createErr != nil {
+		if errors.Is(createErr, gorm.ErrDuplicatedKey) {
+			existingUser, _ := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
+			return &existingUser, nil
+		}
+
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "failed to create user",
+			Status:  500,
+		}
+	}
+
+	return createdUser, nil
+}
+
+func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.VerifyTokenRes, *response.APIError) {
+	if strings.TrimSpace(token) == "" {
+		return nil, &response.APIError{
+			Code:    "TOKEN_REQUIRED",
+			Message: "token is required",
+			Status:  400,
+		}
+	}
+
+	tokenValidationUrl := ""
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", tokenValidationUrl, nil)
 	if err != nil {
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
@@ -51,7 +95,7 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 		}
 	}
 
-	ClientId := config.Load().LLEConfig.ClientId
+	ClientId := s.cfg.LLEConfig.ClientId
 	if ClientId == "" {
 		return nil, &response.APIError{
 			Code:    "ClientId_NOT_FOUND",
@@ -60,7 +104,7 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 		}
 	}
 
-	ClientSecret := config.Load().LLEConfig.ClientSecret
+	ClientSecret := s.cfg.LLEConfig.ClientSecret
 	if ClientSecret == "" {
 		return nil, &response.APIError{
 			Code:    "ClientSecret_NOT_FOUND",
@@ -95,8 +139,8 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 		}
 	}
 
-	var data entity.CUNEXUserResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	var UserData entity.CUNEXUserResponse
+	if err := json.NewDecoder(resp.Body).Decode(&UserData); err != nil {
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "failed to decode external API response",
@@ -104,47 +148,76 @@ func (s *service) ValidateCUNEXToken(token string) (*entity.CUNEXUserResponse, *
 		}
 	}
 
-	// MOCK USER DATA
-	// data := entity.CUNEXUserResponse{
-	// 	UserId: "9999999",
-	// 	UserType: "student",
-	// 	RefId: "12345",
-	// 	FirstnameEN: "Somchai",
-	// 	LastNameEN: "Sawasdee",
-	// 	FirstNameTH: "dddd",
-	// 	LastNameTH: "eeee",
+	convRefId, convRefIdErr := strconv.ParseUint(UserData.RefId, 10, 64)
+
+	if convRefIdErr != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Could not convert ref_id from string to uint64",
+			Status:  500,
+		}
+	}
+
+	User := entity.User{
+		RefID:       convRefId,
+		FirstnameTH: UserData.FirstNameTH,
+		SurnameTH:   UserData.LastNameTH,
+		TitleTH:     "",
+		FirstnameEN: UserData.FirstnameEN,
+		SurnameEN:   UserData.LastNameEN,
+		TitleEN:     "",
+	}
+
+	// ### MOCK USER DATA ###
+	// User := entity.User{
+	// 	RefID:       987654321,
+	// 	FirstnameTH: "AB",
+	// 	SurnameTH:   "CD",
+	// 	TitleTH:     "EEEE",
+	// 	FirstnameEN: "FG",
+	// 	SurnameEN:   "HI",
+	// 	TitleEN:     "JJJJ",
 	// }
 
-	return &data, nil
-}
-
-func (s *service) CreateUserIfNotExists(user *entity.User) (*entity.User, *response.APIError) {
-	foundUser, err := s.repo.Auth.GetUserByRefId(user.RefID)
-	if err == nil {
-		return &foundUser, nil
+	createdUser, createdUserErr := s.CreateUserIfNotExists(&User, ctx)
+	if createdUserErr != nil {
+		return nil, &response.APIError{
+			Code:    createdUserErr.Code,
+			Message: createdUserErr.Message,
+			Status:  createdUserErr.Status,
+		}
 	}
 
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	var (
+		key []byte
+		t   *jwt.Token
+	)
+
+	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
+		jwt.MapClaims{
+			"ref_id": createdUser.RefID,
+		})
+
+	JWTSecret := s.cfg.JWTSecret
+	if JWTSecret == "" {
 		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "internal db error",
+			Code:    "JWT_SIGN_KEY_NOT_FOUND",
+			Message: "JWT signing key not configured",
 			Status:  500,
 		}
 	}
 
-	createdUser, createErr := s.repo.Auth.CreateUser(user)
-	if createErr != nil {
-		if errors.Is(createErr, gorm.ErrDuplicatedKey) {
-			existingUser, _ := s.repo.Auth.GetUserByRefId(user.RefID)
-			return &existingUser, nil
-		}
-
+	key = []byte(JWTSecret)
+	access_token, signErr := t.SignedString(key)
+	if signErr != nil {
 		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "failed to create user",
+			Code:    "JWT_SIGN_FAIL",
+			Message: "failed to sign token",
 			Status:  500,
 		}
 	}
 
-	return createdUser, nil
+	return &dtoRes.VerifyTokenRes{
+		AccessToken: access_token,
+	}, nil
 }

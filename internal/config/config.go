@@ -17,14 +17,14 @@ type DatabaseConfig struct {
 	Host     string `env:"POSTGRES_HOST,required"`
 	Port     int    `env:"POSTGRES_PORT" envDefault:"5432"`
 	User     string `env:"POSTGRES_USER,required"`
-	Password string `env:"POSTGRES_PASSWORD,required"`
+	Password string `env:"POSTGRES_PASS,required"`
 	Name     string `env:"POSTGRES_DB,required"`
 	Schema   string `env:"POSTGRES_SCHEMA" envDefault:"public"`
 }
 
 type LLEConfig struct {
-	ClientId     string
-	ClientSecret string
+	ClientId     string `env:"LLEClientId,required"`
+	ClientSecret string `env:"LLEClientSecret,required"`
 }
 
 func Load() *Config {

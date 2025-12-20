@@ -2,13 +2,11 @@ package handler
 
 import (
 	"strconv"
-	"strings"
 
-	"github.com/cunex-club/quickattend-backend/internal/config"
-	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt/v5"
+
+	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
 )
 
 type AuthHandler interface {
@@ -18,66 +16,18 @@ type AuthHandler interface {
 
 func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 
-	var data = struct {
-		Token string `json:"token"`
-	}{}
-
-	if err := c.BodyParser(&data); err != nil {
+	var req dtoReq.VerifyTokenReq
+	if err := c.BodyParser(&req); err != nil {
 		return response.SendError(c, 400, response.ErrBadRequest, "invalid JSON body")
 	}
 
-	if strings.TrimSpace(data.Token) == "" {
-		return response.SendError(c, 400, "TOKEN_REQUIRED", "token is required")
-	}
-
-	userResponse, err := h.Service.Auth.ValidateCUNEXToken(data.Token)
+	ctx := c.UserContext()
+	res, err := h.Service.Auth.VerifyCUNEXToken(req.Token, ctx)
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
 
-	convRefId, convErr := strconv.ParseUint(userResponse.RefId, 10, 64)
-	if convErr != nil {
-		return response.SendError(c, 500, response.ErrInternalError, "failed to convert RefId")
-	}
-
-	user := entity.User{
-		RefID:       convRefId,
-		FirstnameTH: userResponse.FirstNameTH,
-		SurnameTH:   userResponse.LastNameTH,
-		TitleTH:     "",
-		FirstnameEN: userResponse.FirstnameEN,
-		SurnameEN:   userResponse.LastNameEN,
-		TitleEN:     "",
-	}
-	createdUser, createUserErr := h.Service.Auth.CreateUserIfNotExists(&user)
-	if createUserErr != nil {
-		return response.SendError(c, createUserErr.Status, createUserErr.Code, createUserErr.Message)
-	}
-
-	var (
-		key []byte
-		t   *jwt.Token
-	)
-
-	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
-		jwt.MapClaims{
-			"ref_id": createdUser.RefID,
-		})
-
-	JwtKey := config.Load().JWTSecret
-	if JwtKey == "" {
-		return response.SendError(c, 500, "JWT_SIGN_KEY_NOT_FOUND", "JWT signing key not configured")
-	}
-
-	key = []byte(JwtKey)
-	access_token, signErr := t.SignedString(key)
-	if signErr != nil {
-		return response.SendError(c, 500, "JWT_SIGN_FAIL", "failed to sign token")
-	}
-
-	return response.OK(c, map[string]string{
-		"access_token": access_token,
-	})
+	return response.OK(c, res)
 }
 
 func (h *Handler) AuthUser(c *fiber.Ctx) error {
@@ -92,7 +42,8 @@ func (h *Handler) AuthUser(c *fiber.Ctx) error {
 		return response.SendError(c, 500, response.ErrInternalError, "Could not convert ref_id from string to uint64")
 	}
 
-	results, getUserErr := h.Service.Auth.GetUserService(refID)
+	ctx := c.UserContext()
+	results, getUserErr := h.Service.Auth.GetUserService(refID, ctx)
 	if getUserErr != nil {
 		return response.SendError(c, getUserErr.Status, getUserErr.Code, getUserErr.Message)
 	}
