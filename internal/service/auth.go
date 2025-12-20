@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/golang-jwt/jwt/v5"
@@ -23,7 +22,7 @@ type AuthService interface {
 }
 
 func (s *service) GetUserService(tokenStr string) (*entity.User, *response.APIError) {
-	var secretKey = config.Load().JWTSecret
+	var secretKey = s.cfg.JWTSecret
 
 	result, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
@@ -131,7 +130,7 @@ func (s *service) VerifyCUNEXToken(token string) (*dtoRes.VerifyTokenRes, *respo
 		}
 	}
 
-	ClientId := config.Load().LLEConfig.ClientId
+	ClientId := s.cfg.LLEConfig.ClientId
 	if ClientId == "" {
 		return nil, &response.APIError{
 			Code:    "ClientId_NOT_FOUND",
@@ -140,7 +139,7 @@ func (s *service) VerifyCUNEXToken(token string) (*dtoRes.VerifyTokenRes, *respo
 		}
 	}
 
-	ClientSecret := config.Load().LLEConfig.ClientSecret
+	ClientSecret := s.cfg.LLEConfig.ClientSecret
 	if ClientSecret == "" {
 		return nil, &response.APIError{
 			Code:    "ClientSecret_NOT_FOUND",
@@ -235,7 +234,7 @@ func (s *service) VerifyCUNEXToken(token string) (*dtoRes.VerifyTokenRes, *respo
 			"ref_id": createdUser.RefID,
 		})
 
-	JWTSecret := config.Load().JWTSecret
+	JWTSecret := s.cfg.JWTSecret
 	if JWTSecret == "" {
 		return nil, &response.APIError{
 			Code:    "JWT_SIGN_KEY_NOT_FOUND",

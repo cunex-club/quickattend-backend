@@ -29,7 +29,7 @@ func main() {
 	log.Info().Msg("Successfully connected to the database")
 
 	repos := repository.NewRepository(db)
-	services := service.NewService(repos)
+	services := service.NewService(repos, cfg)
 	handlers := handler.NewHandler(&services, &log.Logger)
 
 	app := fiber.New()
