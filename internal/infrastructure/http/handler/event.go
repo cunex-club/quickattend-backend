@@ -7,23 +7,16 @@ import (
 
 type EventHandler interface {
 	EventDelete(c *fiber.Ctx) error
-	EventDuplicate(c *fiber.Ctx) error
 }
 
 func (h *Handler) EventDelete(c *fiber.Ctx) error {
-	id, err := c.ParamsInt("id")
-	println("del event ID:", id)
+	EventID := c.Params("event_id")
+
+	err := h.Service.Event.EventDeleteById(EventID, c.Context())	
 	if err != nil {
-		return response.SendError(c, 400, response.ErrBadRequest, "invalid id")
+		return response.SendError(c, 500, "failed to delete event", err.Error())
 	}
-	return nil
+
+	return response.Deleted(c, nil)
 }
 
-func (h *Handler) EventDuplicate(c *fiber.Ctx) error {
-	id, err := c.ParamsInt("id")
-	println("duplicate event ID:", id)
-	if err != nil {
-		return response.SendError(c, 400, response.ErrBadRequest, "invalid id")
-	}
-	return nil
-}

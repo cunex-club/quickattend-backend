@@ -15,6 +15,7 @@ type service struct {
 type AllOfService struct {
 	HealthCheck HealthCheckService
 	Auth        AuthService
+	Event       EventService
 }
 
 func NewService(repo repository.AllRepo, cfg *config.Config, logger *zerolog.Logger) AllOfService {
@@ -27,5 +28,6 @@ func NewService(repo repository.AllRepo, cfg *config.Config, logger *zerolog.Log
 	return AllOfService{
 		HealthCheck: srv,
 		Auth:        srv,
+		Event:       srv,
 	}
 }
