@@ -44,6 +44,14 @@ func OK(c *fiber.Ctx, data any) error {
 	})
 }
 
+func Deleted(c *fiber.Ctx, data any) error {
+	return c.Status(fiber.StatusNoContent).JSON(APIResponse{
+		Data:  data,
+		Error: nil,
+		Meta:  nil,
+	})
+}
+
 func Paginated(c *fiber.Ctx, data any, pag Pagination) error {
 	return c.Status(fiber.StatusOK).JSON(APIResponse{
 		Data:  data,
