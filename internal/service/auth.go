@@ -44,12 +44,18 @@ func (s *service) GetUserService(refID uint64, ctx context.Context) (*entity.Use
 }
 
 func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) (*entity.User, *response.APIError) {
-	foundUser, err := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
-	if err == nil {
+	foundUser, findErr := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
+	if findErr == nil {
 		return &foundUser, nil
 	}
 
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	if !errors.Is(findErr, gorm.ErrRecordNotFound) {
+		s.logger.Error().
+			Err(findErr).
+			Uint64("user_ref_id", user.RefID).
+			Str("action", "query_user").
+			Msg("service failed to query user by ref_id")
+
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "internal db error",
@@ -63,6 +69,12 @@ func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) 
 			existingUser, _ := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
 			return &existingUser, nil
 		}
+
+		s.logger.Error().
+			Err(createErr).
+			Uint64("user_ref_id", user.RefID).
+			Str("action", "create_user").
+			Msg("service failed to create user")
 
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
