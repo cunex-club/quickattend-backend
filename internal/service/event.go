@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type EventService interface {
@@ -22,6 +24,20 @@ func (s *service) EventDeleteById(EventId string, ctx context.Context) *response
 	}
 
 	eventDeleteErr := s.repo.Event.DeleteById(id, ctx)
+
+	if errors.Is(eventDeleteErr, gorm.ErrRecordNotFound) {
+		s.logger.Error().
+			Err(eventDeleteErr).
+			Str("event_id", EventId).
+			Str("action", "delete_event").
+			Msg("event not found")
+		return &response.APIError{
+			Code:    response.ErrNotFound,
+			Message: "event not found",
+			Status:  404,
+		}
+	}
+
 	if eventDeleteErr != nil {
 		s.logger.Error().
 			Err(eventDeleteErr).
