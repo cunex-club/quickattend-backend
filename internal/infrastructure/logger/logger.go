@@ -7,7 +7,7 @@ import (
 )
 
 func SetupLogger(appEnv string) zerolog.Logger {
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	logger := zerolog.New(os.Stdout).With().Timestamp().Caller().Logger()
 
 	if appEnv == "development" {
 		logger = logger.Output(zerolog.ConsoleWriter{Out: os.Stderr})

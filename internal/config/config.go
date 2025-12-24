@@ -1,50 +1,36 @@
 package config
 
 import (
-	"os"
-	"strconv"
+	"github.com/caarlos0/env/v10"
+	"github.com/rs/zerolog/log"
 )
 
 type Config struct {
-	AppEnv         string
+	AppEnv    string `env:"APP_ENV" envDefault:"development"`
+	JWTSecret string `env:"JWT_SECRET,required"`
+
 	DatabaseConfig DatabaseConfig
+	LLEConfig      LLEConfig
 }
 
 type DatabaseConfig struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	Name     string
-	Schema   string
+	Host     string `env:"POSTGRES_HOST,required"`
+	Port     int    `env:"POSTGRES_PORT" envDefault:"5432"`
+	User     string `env:"POSTGRES_USER,required"`
+	Password string `env:"POSTGRES_PASS,required"`
+	Name     string `env:"POSTGRES_DB,required"`
+	Schema   string `env:"POSTGRES_SCHEMA" envDefault:"public"`
+}
+
+type LLEConfig struct {
+	ClientId     string `env:"LLEClientId,required"`
+	ClientSecret string `env:"LLEClientSecret,required"`
 }
 
 func Load() *Config {
-	return &Config{
-		AppEnv: getEnv("APP_ENV", "development"),
-		DatabaseConfig: DatabaseConfig{
-			Host:     getEnv("POSTGRES_HOST", "localhost"),
-			Port:     getEnvAsInt("POSTGRES_PORT", 5432),
-			User:     getEnv("POSTGRES_USER", "postgres"),
-			Password: getEnv("POSTGRES_PASSWORD", "postgres"),
-			Name:     getEnv("POSTGRES_DB", "quickattend-db"),
-			Schema:   getEnv("POSTGRES_SCHEMA", "public"),
-		},
+	cfg := &Config{}
+	if err := env.Parse(cfg); err != nil {
+		log.Fatal().Err(err).Msg("failed to parse environment variables")
 	}
-}
-
-func getEnv(key, defaultValue string) string {
-	if val, exists := os.LookupEnv(key); exists {
-		return val
-	}
-	return defaultValue
-}
-
-func getEnvAsInt(key string, defaultValue int) int {
-	if val, exists := os.LookupEnv(key); exists {
-		if intValue, err := strconv.Atoi(val); err == nil {
-			return intValue
-		}
-	}
-	return defaultValue
+	return cfg
 }
