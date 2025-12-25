@@ -9,5 +9,4 @@ func EventRoutes(r fiber.Router, h *handler.AllOfHandler) {
 	event := r.Group("/event")
 
 	event.Delete("/:id", h.EventHandler.EventDelete)
-	event.Post("/:id", h.EventHandler.EventDuplicate)
 }

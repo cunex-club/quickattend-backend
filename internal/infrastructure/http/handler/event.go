@@ -14,7 +14,7 @@ func (h *Handler) EventDelete(c *fiber.Ctx) error {
 
 	err := h.Service.Event.EventDeleteById(EventID, c.Context())	
 	if err != nil {
-		return response.SendError(c, 500, "failed to delete event", err.Error())
+		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
 
 	return response.Deleted(c, nil)

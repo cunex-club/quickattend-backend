@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/google/uuid"
@@ -15,7 +14,7 @@ type EventRepository interface {
 
 func (r *repository) DeleteById(id uuid.UUID, ctx context.Context) error {
 	if id == uuid.Nil {
-		return errors.New("cannot delete with empty uuid")
+		return entity.ErrNilUUID
 	}
 
 	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.Event{})
