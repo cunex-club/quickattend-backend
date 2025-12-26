@@ -1,0 +1,31 @@
+package repository
+
+import (
+	"context"
+	"errors"
+
+	"github.com/cunex-club/quickattend-backend/internal/entity"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+type EventRepository interface {
+	DeleteById(uuid.UUID, context.Context) error
+}
+
+func (r *repository) DeleteById(id uuid.UUID, ctx context.Context) error {
+	if id == uuid.Nil {
+		return errors.New("cannot delete with empty uuid")
+	}
+
+	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.Event{})
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
+}
