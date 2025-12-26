@@ -12,6 +12,7 @@ import (
 
 type EventService interface {
 	EventDeleteById(EventID string, ctx context.Context) *response.APIError
+	EventDuplicateById(EventID string, ctx context.Context) *response.APIError
 }
 
 func (s *service) EventDeleteById(EventId string, ctx context.Context) *response.APIError {
@@ -65,5 +66,9 @@ func (s *service) EventDeleteById(EventId string, ctx context.Context) *response
 		}
 	}
 
+	return nil
+}
+
+func (s *service) EventDuplicateById(EventId string, ctx context.Context) *response.APIError {
 	return nil
 }

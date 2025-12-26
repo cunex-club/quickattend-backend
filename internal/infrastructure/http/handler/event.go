@@ -7,6 +7,7 @@ import (
 
 type EventHandler interface {
 	EventDelete(c *fiber.Ctx) error
+	EventDuplicate(c *fiber.Ctx) error
 }
 
 func (h *Handler) EventDelete(c *fiber.Ctx) error {
@@ -20,3 +21,12 @@ func (h *Handler) EventDelete(c *fiber.Ctx) error {
 	return response.Deleted(c, nil)
 }
 
+func (h *Handler) EventDuplicate(c *fiber.Ctx) error {
+	EventID := c.Params("id")
+
+	err := h.Service.Event.EventDuplicateById(EventID, c.Context())	
+	if err != nil {
+		return response.SendError(c, err.Status, err.Code, err.Message)
+	}
+	return response.Deleted(c, nil)
+}
