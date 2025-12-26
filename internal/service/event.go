@@ -12,7 +12,7 @@ import (
 
 type EventService interface {
 	EventDeleteById(EventID string, ctx context.Context) *response.APIError
-	EventDuplicateById(EventID string, ctx context.Context) *response.APIError
+	EventDuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
 }
 
 func (s *service) EventDeleteById(EventId string, ctx context.Context) *response.APIError {
@@ -69,6 +69,47 @@ func (s *service) EventDeleteById(EventId string, ctx context.Context) *response
 	return nil
 }
 
-func (s *service) EventDuplicateById(EventId string, ctx context.Context) *response.APIError {
-	return nil
+func (s *service) EventDuplicateById(EventId string, ctx context.Context) (*entity.Event, *response.APIError) {
+	event_id, parseErr := uuid.Parse(EventId)
+	if parseErr != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "failed to parse event_id to uuid",
+			Status:  500,
+		}
+	}
+
+	originalEvent, findErr := s.repo.Event.FindById(event_id, ctx)
+
+	if errors.Is(findErr, gorm.ErrRecordNotFound) {
+		return nil, &response.APIError {
+			Code :response.ErrBadRequest,
+			Message: "specified event not found",
+			Status: 400,
+		}
+	}
+
+	if findErr != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "internal db error",
+			Status:  500,
+		}
+	}
+
+	createdEvent, createErr := s.repo.Event.Create(originalEvent, ctx)
+	if createErr != nil {
+		s.logger.Error().
+			Err(createErr).
+			Str("event_id", EventId).
+			Str("action", "duplicate_event").
+			Msg("failed to duplicate event")
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "failed to duplicate event",
+			Status:  500,
+		}
+	}
+
+	return createdEvent, nil
 }

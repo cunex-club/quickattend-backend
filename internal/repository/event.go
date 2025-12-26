@@ -10,11 +10,28 @@ import (
 
 type EventRepository interface {
 	FindById(uuid.UUID, context.Context) (*entity.Event, error)
+	Create(*entity.Event, context.Context) (*entity.Event, error)
 	DeleteById(uuid.UUID, context.Context) error
 }
 
+func (r *repository) Create(event *entity.Event, ctx context.Context) (*entity.Event, error) {
+	result := r.db.WithContext(ctx).Create(event)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return event, nil
+}
+
 func (r *repository) FindById(id uuid.UUID, ctx context.Context) (*entity.Event, error) {
-	return nil, nil
+	var event entity.Event
+	err := r.db.WithContext(ctx).First(&event, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
 }
 
 func (r *repository) DeleteById(id uuid.UUID, ctx context.Context) error {
