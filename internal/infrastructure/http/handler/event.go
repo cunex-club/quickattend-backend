@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
@@ -22,7 +23,7 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 		value := pair[1]
 		for foundedKey, _ := range args {
 			if key == foundedKey {
-				return response.SendError(c, 400, response.ErrBadRequest, "Duplicate query parameter")
+				return response.SendError(c, 400, response.ErrBadRequest, fmt.Sprintf("Duplicate query parameter: %s", key))
 			}
 		}
 		unknownKey := true
@@ -32,7 +33,7 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 			}
 		}
 		if unknownKey {
-			return response.SendError(c, 400, response.ErrBadRequest, "Unknown URI query key")
+			return response.SendError(c, 400, response.ErrBadRequest, fmt.Sprintf("Unknown URI query key: %s", key))
 		}
 		args[key] = value
 	}

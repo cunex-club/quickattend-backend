@@ -26,8 +26,8 @@ func (r role) Value() (driver.Value, error) {
 // ====================================================
 
 type User struct {
-	ID          datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	RefID       uint64         `gorm:"type:bigint;not null" json:"ref_id"`
+	ID          datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	RefID       uint64         `gorm:"type:bigint;not null;unique" json:"ref_id"`
 	FirstnameTH string         `gorm:"type:text;not null" json:"firstname_th"`
 	SurnameTH   string         `gorm:"type:text;not null" json:"surname_th"`
 	TitleTH     string         `gorm:"type:text;not null" json:"title_th"`
@@ -37,7 +37,7 @@ type User struct {
 }
 
 type EventUser struct {
-	ID      datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID      datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	Role    role           `gorm:"type:role;not null" json:"role"`
 	UserID  datatypes.UUID `gorm:"type:uuid;not null" json:"user_id"`
 	EventID datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`

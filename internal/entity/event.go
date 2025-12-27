@@ -59,7 +59,7 @@ func (pf *participant_field) Scan(value any) error {
 
 	str = strings.Trim(str, "{}")
 
-	if value == "" {
+	if str == "" {
 		*pf = nil
 		return nil
 	}
@@ -117,7 +117,7 @@ func (p Point) Value() (driver.Value, error) {
 // ====================================================
 
 type Event struct {
-	ID             datatypes.UUID    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID             datatypes.UUID    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	Name           string            `gorm:"type:text;not null" json:"name"`
 	Organizer      string            `gorm:"type:text;not null" json:"organizer"`
 	Description    string            `gorm:"type:text" json:"description"`
@@ -128,11 +128,11 @@ type Event struct {
 	AttendenceType attendence_type   `gorm:"type:attendence_type;not null" json:"attendance_type"`
 	AllowAllToScan bool              `gorm:"type:bool;not null" json:"allow_all_to_scan"`
 	EvaluationForm string            `gorm:"type:text" json:"evaluation_form"`
-	RevealedFields participant_field `gorm:"type:[]participant_data;not null" json:"revealed_fields"`
+	RevealedFields participant_field `gorm:"type:participant_data[];not null" json:"revealed_fields"`
 }
 
 type EventWhitelist struct {
-	ID            datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID            datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID       datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
 	AttendeeRefID uint64         `gorm:"type:bigint;not null" json:"attendee_ref_id"`
 
@@ -141,7 +141,7 @@ type EventWhitelist struct {
 }
 
 type EventAllowedFaculties struct {
-	ID        datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID        datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID   datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
 	FacultyNO uint8          `gorm:"type:int8;not null" json:"faculty_no"`
 
@@ -149,7 +149,7 @@ type EventAllowedFaculties struct {
 }
 
 type EventAgenda struct {
-	ID           datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID           datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID      datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
 	ActivityName string         `gorm:"type:text;not null" json:"activity_name"`
 	StartTime    datatypes.Time `gorm:"type:time;not null" json:"start_time"`
@@ -159,7 +159,7 @@ type EventAgenda struct {
 }
 
 type EventParticipants struct {
-	ID               datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID               datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID          datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
 	CheckinTimestamp time.Time      `gorm:"type:timestamptz;not null" json:"checkin_timestamp"`
 	ParticipantRefID uint64         `gorm:"type:bigint;not null" json:"participant_ref_id"`
@@ -170,6 +170,6 @@ type EventParticipants struct {
 	ScannerID        datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
 
 	Event                      Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	ParticipantRefIDForeignKey User  `gorm:"foreignKey:UserRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ParticipantRefIDForeignKey User  `gorm:"foreignKey:ParticipantRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 }

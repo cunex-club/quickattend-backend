@@ -187,14 +187,14 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		TitleEN:     "JJJJ",
 	}
 
-	createdUser, createdUserErr := s.CreateUserIfNotExists(&User, ctx)
-	if createdUserErr != nil {
-		return nil, &response.APIError{
-			Code:    createdUserErr.Code,
-			Message: createdUserErr.Message,
-			Status:  createdUserErr.Status,
-		}
-	}
+	// createdUser, createdUserErr := s.CreateUserIfNotExists(&User, ctx)
+	// if createdUserErr != nil {
+	// 	return nil, &response.APIError{
+	// 		Code:    createdUserErr.Code,
+	// 		Message: createdUserErr.Message,
+	// 		Status:  createdUserErr.Status,
+	// 	}
+	// }
 
 	var (
 		key []byte
@@ -203,7 +203,8 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"ref_id": createdUser.RefID,
+			// "ref_id": createdUser.RefID,
+			"ref_id": User.RefID,
 		})
 
 	JWTSecret := s.cfg.JWTSecret
