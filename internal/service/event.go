@@ -7,6 +7,7 @@ import (
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -75,21 +76,24 @@ func (s *service) EventDuplicateById(EventId string, ctx context.Context) (*enti
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "failed to parse event_id to uuid",
-			Status:  500,
+			Status:  400,
 		}
 	}
 
 	originalEvent, findErr := s.repo.Event.FindById(event_id, ctx)
-
-	if errors.Is(findErr, gorm.ErrRecordNotFound) {
-		return nil, &response.APIError {
-			Code :response.ErrBadRequest,
-			Message: "specified event not found",
-			Status: 400,
-		}
-	}
-
 	if findErr != nil {
+		if errors.Is(findErr, gorm.ErrRecordNotFound) {
+			return nil, &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: "specified event not found",
+				Status:  400,
+			}
+		}
+		s.logger.Error().
+			Err(findErr).
+			Str("event_id", EventId).
+			Str("action", "duplicate_event_find").
+			Msg("failed to find event for duplication")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "internal db error",
@@ -97,7 +101,37 @@ func (s *service) EventDuplicateById(EventId string, ctx context.Context) (*enti
 		}
 	}
 
-	createdEvent, createErr := s.repo.Event.Create(originalEvent, ctx)
+	newEvent := *originalEvent
+	newEvent.ID = datatypes.UUID(uuid.New())
+
+	// breaking the memory link from originalEvent
+	// Whitelist
+	newEvent.EventWhitelist = make([]entity.EventWhitelist, 0, len(originalEvent.EventWhitelist))
+	for _, item := range originalEvent.EventWhitelist {
+		newEvent.EventWhitelist = append(newEvent.EventWhitelist, entity.EventWhitelist{
+			AttendeeRefID: item.AttendeeRefID,
+		})
+	}
+
+	// Faculties
+	newEvent.EventAllowedFaculties = make([]entity.EventAllowedFaculties, 0, len(originalEvent.EventAllowedFaculties))
+	for _, item := range originalEvent.EventAllowedFaculties {
+		newEvent.EventAllowedFaculties = append(newEvent.EventAllowedFaculties, entity.EventAllowedFaculties{
+			FacultyNO: item.FacultyNO,
+		})
+	}
+
+	// Agenda
+	newEvent.EventAgenda = make([]entity.EventAgenda, 0, len(originalEvent.EventAgenda))
+	for _, item := range originalEvent.EventAgenda {
+		newEvent.EventAgenda = append(newEvent.EventAgenda, entity.EventAgenda{
+			ActivityName: item.ActivityName,
+			StartTime:    item.StartTime,
+			EndTime:      item.EndTime,
+		})
+	}
+
+	createdEvent, createErr := s.repo.Event.CreateWithRelations(&newEvent, ctx)
 	if createErr != nil {
 		s.logger.Error().
 			Err(createErr).

@@ -117,18 +117,21 @@ func (p Point) Value() (driver.Value, error) {
 // ====================================================
 
 type Event struct {
-	ID             datatypes.UUID    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	Name           string            `gorm:"type:text;not null" json:"name"`
-	Organizer      string            `gorm:"type:text;not null" json:"organizer"`
-	Description    string            `gorm:"type:text" json:"description"`
-	Date           datatypes.Date    `gorm:"type:timestamp;not null" json:"date"`
-	StartTime      datatypes.Time    `gorm:"type:time;not null" json:"start_time"`
-	EndTime        datatypes.Time    `gorm:"type:time;not null" json:"end_time"`
-	Location       string            `gorm:"type:text;not null" json:"location"`
-	AttendenceType attendence_type   `gorm:"type:attendence_type;not null" json:"attendance_type"`
-	AllowAllToScan bool              `gorm:"type:bool;not null" json:"allow_all_to_scan"`
-	EvaluationForm string            `gorm:"type:text" json:"evaluation_form"`
-	RevealedFields participant_field `gorm:"type:[]participant_data;not null" json:"revealed_fields"`
+	ID                    datatypes.UUID          `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	Name                  string                  `gorm:"type:text;not null" json:"name"`
+	Organizer             string                  `gorm:"type:text;not null" json:"organizer"`
+	Description           string                  `gorm:"type:text" json:"description"`
+	Date                  datatypes.Date          `gorm:"type:timestamp;not null" json:"date"`
+	StartTime             datatypes.Time          `gorm:"type:time;not null" json:"start_time"`
+	EndTime               datatypes.Time          `gorm:"type:time;not null" json:"end_time"`
+	Location              string                  `gorm:"type:text;not null" json:"location"`
+	AttendenceType        attendence_type         `gorm:"type:attendence_type;not null" json:"attendance_type"`
+	AllowAllToScan        bool                    `gorm:"type:bool;not null" json:"allow_all_to_scan"`
+	EvaluationForm        string                  `gorm:"type:text" json:"evaluation_form"`
+	RevealedFields        participant_field       `gorm:"type:[]participant_data;not null" json:"revealed_fields"`
+	EventWhitelist        []EventWhitelist        `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_whitelist"`
+	EventAllowedFaculties []EventAllowedFaculties `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_allowed_faculties"`
+	EventAgenda           []EventAgenda           `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_agenda"`
 }
 
 type EventWhitelist struct {
