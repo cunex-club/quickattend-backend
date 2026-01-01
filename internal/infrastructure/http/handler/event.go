@@ -10,6 +10,7 @@ import (
 type EventHandler interface {
 	EventDelete(c *fiber.Ctx) error
 	EventDuplicate(c *fiber.Ctx) error
+	EventCheckIn(c *fiber.Ctx) error
 }
 
 func (h *Handler) EventDelete(c *fiber.Ctx) error {
@@ -34,4 +35,10 @@ func (h *Handler) EventDuplicate(c *fiber.Ctx) error {
 	return response.Created(c, dtoRes.DuplicateEventRes{
 		DuplicatedEventId: createdEvent.ID.String(),
 	})
+}
+
+func (h *Handler) EventCheckIn(c *fiber.Ctx) error {
+	// EventID := c.Params("id")
+
+	return nil
 }

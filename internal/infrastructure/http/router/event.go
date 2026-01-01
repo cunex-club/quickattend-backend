@@ -10,4 +10,5 @@ func EventRoutes(r fiber.Router, h *handler.AllOfHandler, mw *middleware.Middlew
 	event := r.Group("/events", mw.AuthRequired())
 	event.Delete("/:id", h.EventHandler.EventDelete)
 	event.Post("/:id/duplicate", h.EventHandler.EventDuplicate)
+	event.Post("/:id/check-in", h.EventHandler.EventCheckIn)
 }
