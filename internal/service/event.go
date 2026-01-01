@@ -131,7 +131,7 @@ func (s *service) EventDuplicateById(EventId string, ctx context.Context) (*enti
 		})
 	}
 
-	createdEvent, createErr := s.repo.Event.CreateWithRelations(&newEvent, ctx)
+	createdEvent, createErr := s.repo.Event.Create(&newEvent, ctx)
 	if createErr != nil {
 		s.logger.Error().
 			Err(createErr).

@@ -11,7 +11,7 @@ import (
 type EventRepository interface {
 	FindById(uuid.UUID, context.Context) (*entity.Event, error)
 	DeleteById(uuid.UUID, context.Context) error
-	CreateWithRelations(*entity.Event, context.Context) (*entity.Event, error)
+	Create(*entity.Event, context.Context) (*entity.Event, error)
 }
 
 func (r *repository) FindById(id uuid.UUID, ctx context.Context) (*entity.Event, error) {
@@ -41,14 +41,9 @@ func (r *repository) DeleteById(id uuid.UUID, ctx context.Context) error {
 	return nil
 }
 
-func (r *repository) CreateWithRelations(event *entity.Event, ctx context.Context) (*entity.Event, error) {
-	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		return tx.Create(event).Error
-	})
-
-	if err != nil {
+func (r *repository) Create(event *entity.Event, ctx context.Context) (*entity.Event, error) {
+	if err := r.db.WithContext(ctx).Create(event).Error; err != nil {
 		return nil, err
 	}
-
 	return event, nil
 }
