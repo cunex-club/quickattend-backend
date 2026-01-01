@@ -7,7 +7,7 @@ import (
 )
 
 func EventRoutes(r fiber.Router, h *handler.AllOfHandler, mw *middleware.Middleware) {
-	event := r.Group("/event", mw.AuthRequired())
+	event := r.Group("/events", mw.AuthRequired())
 	event.Delete("/:id", h.EventHandler.EventDelete)
 	event.Post("/:id/duplicate", h.EventHandler.EventDuplicate)
 }
