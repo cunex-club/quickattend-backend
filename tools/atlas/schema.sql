@@ -62,7 +62,7 @@ CREATE TABLE event_participants (
   checkin_timestamp timestamptz NOT NULL,
   participant_ref_id bigint NOT NULL,
   first_name text NOT NULL,
-  last_name text NOT NULL,
+  sur_name text NOT NULL,
   organization text NOT NULL,
   scanned_location point NOT NULL,
   scanner_id uuid NULL,

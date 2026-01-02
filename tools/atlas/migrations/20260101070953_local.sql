@@ -6,7 +6,7 @@ CREATE TYPE "participant_data" AS ENUM ('NAME', 'ORGANIZATION', 'REFID', 'PHOTO'
 CREATE TYPE "role" AS ENUM ('OWNER', 'STAFF', 'MANAGER');
 -- Create "events" table
 CREATE TABLE "events" (
-  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "name" text NOT NULL,
   "organizer" text NOT NULL,
   "description" text NULL,
@@ -22,7 +22,7 @@ CREATE TABLE "events" (
 );
 -- Create "event_agendas" table
 CREATE TABLE "event_agendas" (
-  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
   "activity_name" text NOT NULL,
   "start_time" time NOT NULL,
@@ -32,17 +32,19 @@ CREATE TABLE "event_agendas" (
 );
 -- Create "event_allowed_faculties" table
 CREATE TABLE "event_allowed_faculties" (
-  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
   "faculty_no" bigint NOT NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_event_allowed_faculties_event" FOREIGN KEY ("event_id") REFERENCES "events" ("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
+-- Rename a column from "uuid" to "id"
+ALTER TABLE "users" RENAME COLUMN "uuid" TO "id";
 -- Modify "users" table
-ALTER TABLE "users" DROP CONSTRAINT "users_pkey", DROP COLUMN "uuid", ADD COLUMN "id" uuid NOT NULL DEFAULT uuid_generate_v4(), ADD COLUMN "ref_id" bigint NOT NULL, ADD COLUMN "firstname_th" text NOT NULL, ADD COLUMN "surname_th" text NOT NULL, ADD COLUMN "title_th" text NOT NULL, ADD COLUMN "firstname_en" text NOT NULL, ADD COLUMN "surname_en" text NOT NULL, ADD COLUMN "title_en" text NOT NULL, ADD PRIMARY KEY ("id"), ADD CONSTRAINT "users_ref_id_key" UNIQUE ("ref_id");
+ALTER TABLE "users" ADD COLUMN "ref_id" bigint NOT NULL, ADD COLUMN "firstname_th" text NOT NULL, ADD COLUMN "surname_th" text NOT NULL, ADD COLUMN "title_th" text NOT NULL, ADD COLUMN "firstname_en" text NOT NULL, ADD COLUMN "surname_en" text NOT NULL, ADD COLUMN "title_en" text NOT NULL, ADD CONSTRAINT "users_ref_id_key" UNIQUE ("ref_id");
 -- Create "event_participants" table
 CREATE TABLE "event_participants" (
-  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
   "checkin_timestamp" timestamptz NOT NULL,
   "participant_ref_id" bigint NOT NULL,
@@ -58,7 +60,7 @@ CREATE TABLE "event_participants" (
 );
 -- Create "event_users" table
 CREATE TABLE "event_users" (
-  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "role" "role" NOT NULL,
   "user_id" uuid NOT NULL,
   "event_id" uuid NOT NULL,
@@ -68,7 +70,7 @@ CREATE TABLE "event_users" (
 );
 -- Create "event_whitelists" table
 CREATE TABLE "event_whitelists" (
-  "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+  "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
   "attendee_ref_id" bigint NOT NULL,
   PRIMARY KEY ("id"),
