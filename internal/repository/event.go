@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
+	"github.com/cunex-club/quickattend-backend/internal/entity"
 )
 
 type EventRepository interface {
@@ -119,15 +120,11 @@ func (r *repository) GetAttendedEvents(refID uint64, page int, pageSize int, sea
 
 // returns (result, total, hasNext, error)
 func (r *repository) GetDiscoveryEvents(refID uint64, page int, pageSize int, search string, ctx context.Context) (*[]dtoRes.GetEventsIndividualEvent, int64, bool, error) {
-	type Results struct {
-		rows  []dtoRes.GetEventsIndividualEvent `gorm:"column:rows"`
-		total int64                             `gorm:"column:total"`
-	}
-	var res Results
-	var userUuid datatypes.UUID
+	var rawResult []dtoRes.RawGetEventsIndividualEvent
+	var user entity.User
 	tx := r.db.WithContext(ctx)
 
-	errGetUuid := tx.Table("users").Select("id").Where("ref_id = ?", refID).First(&userUuid).Error
+	errGetUuid := tx.Model(&user).Select("id").Where("ref_id = ?", refID).Scan(&user).Error
 	if errGetUuid != nil {
 		return nil, -1, false, errGetUuid
 	}
@@ -138,87 +135,66 @@ func (r *repository) GetDiscoveryEvents(refID uint64, page int, pageSize int, se
 
 		subQuery = tx.Table("events").Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
 			"events.end_time", "events.location", "events.evaluation_form").
-			Distinct("events.id").
 			Where(`NOT EXISTS (
 					SELECT 1 FROM event_users WHERE event_users.event_id = events.id
 					AND event_users.user_id = ?
 				) AND NOT EXISTS (
 					SELECT 1 FROM event_participants WHERE event_participants.event_id = events.id
 					AND event_participants.participant_ref_id = ?
-				)`, userUuid, refID).
+				)`, user.ID, refID).
 			Where(`(events.name ILIKE ? OR events.organizer ILIKE ? OR events.description ILIKE ? OR events.location ILIKE ?
 				OR events.evaluation_form ILIKE ?)
 				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
-
-		// subQuery = tx.Raw(`
-		// 	SELECT (id, name, organizer, description, date, start_time, end_time, location, evaluation_form) FROM events
-		// 	WHERE NOT EXISTS (
-		// 		SELECT 1 FROM event_users WHERE event_users.event_id = events.id
-		// 		AND event_users.user_id = ?
-		// 	) AND NOT EXISTS (
-		// 		SELECT 1 FROM event_participants WHERE event_participants.event_id = events.id
-		// 		AND event_participants.participant_ref_id = ?
-		// 	) AND (
-		// 	 	events.name ILIKE ? OR events.organizer ILIKE ? OR events.description ILIKE ? OR events.location ILIKE ?
-		// 		OR events.evaluation_form ILIKE ?
-		// 	)
-		// `, userUuid, refID, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
 	} else {
 		subQuery = tx.Table("events").Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
 			"events.end_time", "events.location", "events.evaluation_form").
-			Distinct("events.id").
 			Where(`NOT EXISTS (
 				SELECT 1 FROM event_users WHERE event_users.event_id = events.id
 				AND event_users.user_id = ?
 			) AND NOT EXISTS (
 				SELECT 1 FROM event_participants WHERE event_participants.event_id = events.id
 				AND event_participants.participant_ref_id = ?
-			)`, userUuid, refID)
-
-		// subQuery = tx.Raw(`
-		// 	SELECT (id, name, organizer, description, date, start_time, end_time, location, evaluation_form) FROM events
-		// 	WHERE NOT EXISTS (
-		// 		SELECT 1 FROM event_users WHERE event_users.event_id = events.id
-		// 		AND event_users.user_id = ?
-		// 	) AND NOT EXISTS (
-		// 		SELECT 1 FROM event_participants WHERE event_participants.event_id = events.id
-		// 		AND event_participants.participant_ref_id = ?
-		// 	)
-		// `, userUuid, refID)
+			)`, user.ID, refID)
 	}
 
-	getEventsErr := tx.Select(`(* AS rows, COUNT(*) OVER() AS total) FROM (?) AS subQuery`, subQuery).
-		Order("events.id").
-		Offset((page - 1) * pageSize).
-		Limit(pageSize + 1).
-		Scan(&res).Error
+	var total struct {
+		Count int64 `gorm:"column:total"`
+	}
+	countErr := tx.Raw(`SELECT COUNT(*) AS total FROM (?) AS subQuery`, subQuery).Scan(&total).Error
+	if countErr != nil {
+		return nil, -1, false, countErr
+	}
+
+	getEventsErr := tx.Raw(`SELECT subQuery.* FROM (?) AS subQuery
+		ORDER BY subQuery.id
+		OFFSET ?
+		LIMIT ?
+	`, subQuery, page*pageSize, pageSize+1).Scan(&rawResult).Error
 	if getEventsErr != nil {
 		return nil, -1, false, getEventsErr
 	}
 
-	if len(res.rows) <= pageSize {
-		return &(res.rows), res.total, false, nil
+	result := []dtoRes.GetEventsIndividualEvent{}
+	if len(rawResult) > 0 {
+		for i := 0; i < len(rawResult); i++ {
+			result = append(result, dtoRes.GetEventsIndividualEvent{
+				ID:             rawResult[i].ID.String(),
+				Name:           rawResult[i].Name,
+				Organizer:      rawResult[i].Organizer,
+				Description:    rawResult[i].Description,
+				Date:           rawResult[i].Date,
+				StartTime:      rawResult[i].StartTime,
+				EndTime:        rawResult[i].EndTime,
+				Location:       rawResult[i].Location,
+				Role:           rawResult[i].Role,
+				EvaluationForm: rawResult[i].EvaluationForm,
+			})
+		}
 	}
-	clipped := res.rows[:pageSize]
-	return &clipped, res.total, true, nil
 
-	// errCountTotal := baseQuery.Count(&total).Error
-	// if errCountTotal != nil {
-	// 	return nil, -1, false, errCountTotal
-	// }
-
-	// errPagination := baseQuery.
-	// 	Order("events.id").
-	// 	Offset((page - 1) * pageSize).
-	// 	Limit(pageSize + 1).
-	// 	Scan(&results).Error
-	// if errPagination != nil {
-	// 	return nil, -1, false, errPagination
-	// }
-
-	// if len(results) <= pageSize {
-	// 	return &results, total, false, nil
-	// }
-	// clipped := results[:pageSize]
-	// return &clipped, total, true, nil
+	if len(result) <= pageSize {
+		return &result, total.Count, false, nil
+	}
+	clipped := result[:pageSize]
+	return &clipped, total.Count, true, nil
 }
