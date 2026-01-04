@@ -64,58 +64,53 @@ func (r *repository) GetManagedEvents(refID uint64, search string, ctx context.C
 
 // returns (result, total, hasNext, error)
 func (r *repository) GetAttendedEvents(refID uint64, page int, pageSize int, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, int64, bool, error) {
-	var results []entity.GetEventsQueryResult
-	var total int64
+	var rawResult []entity.GetEventsQueryResult
 	tx := r.db.WithContext(ctx)
 
+	var subQuery *gorm.DB
 	if search != "" {
 		searchQuery := fmt.Sprintf("%%%s%%", search)
 
-		errGetEvents := tx.Table("events").
+		subQuery = tx.Table("events").
 			Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
 				"events.end_time", "events.location", "events.evaluation_form").
 			Joins(`JOIN event_participants ON event_participants.participant_ref_id = ? 
 				AND event_participants.event_id = events.id
 				`, refID).
-			Where(`events.name ILIKE ? OR events.organizer ILIKE ? OR events.description ILIKE ? OR events.location ILIKE ?
-				OR events.evaluation_form ILIKE ?
-				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery).
-			Count(&total).
-			Offset((page - 1) * pageSize).
-			Limit(pageSize + 1).
-			Scan(&results).Error
-
-		if errGetEvents != nil {
-			return nil, -1, false, errGetEvents
-		}
-
-		if len(results) <= pageSize {
-			return &results, total, false, nil
-		}
-		clipped := results[:pageSize]
-		return &clipped, total, true, nil
-	}
-
-	errGetEvents := tx.Table("events").
-		Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
-			"events.end_time", "events.location", "events.evaluation_form").
-		Joins(`JOIN event_participants ON event_participants.participant_ref_id = ? 
+			Where(`(events.name ILIKE ? OR events.organizer ILIKE ? OR events.description ILIKE ? OR events.location ILIKE ?
+				OR events.evaluation_form ILIKE ?)
+				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
+	} else {
+		subQuery = tx.Table("events").
+			Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
+				"events.end_time", "events.location", "events.evaluation_form").
+			Joins(`JOIN event_participants ON event_participants.participant_ref_id = ? 
 			AND event_participants.event_id = events.id
-			`, refID).
-		Count(&total).
-		Offset((page - 1) * pageSize).
-		Limit(pageSize + 1).
-		Scan(&results).Error
-
-	if errGetEvents != nil {
-		return nil, -1, false, errGetEvents
+			`, refID)
 	}
 
-	if len(results) <= pageSize {
-		return &results, total, false, nil
+	var total struct {
+		Count int64 `gorm:"column:total"`
 	}
-	clipped := results[:pageSize]
-	return &clipped, total, true, nil
+	countErr := tx.Raw(`SELECT COUNT(*) AS total FROM (?) AS subQuery`, subQuery).Scan(&total).Error
+	if countErr != nil {
+		return nil, -1, false, countErr
+	}
+
+	getEventsErr := tx.Raw(`SELECT subQuery.* FROM (?) AS subQuery
+		ORDER BY subQuery.id
+		OFFSET ?
+		LIMIT ?
+	`, subQuery, page*pageSize, pageSize+1).Scan(&rawResult).Error
+	if getEventsErr != nil {
+		return nil, -1, false, getEventsErr
+	}
+
+	if len(rawResult) <= pageSize {
+		return &rawResult, total.Count, false, nil
+	}
+	clipped := rawResult[:pageSize]
+	return &clipped, total.Count, true, nil
 }
 
 // returns (result, total, hasNext, error)
