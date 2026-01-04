@@ -7,19 +7,18 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
-	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 )
 
 type EventRepository interface {
-	GetManagedEvents(uint64, string, context.Context) (*[]dtoRes.GetEventsIndividualEvent, error)
-	GetAttendedEvents(uint64, int, int, string, context.Context) (*[]dtoRes.GetEventsIndividualEvent, int64, bool, error)
-	GetDiscoveryEvents(uint64, int, int, string, context.Context) (*[]dtoRes.GetEventsIndividualEvent, int64, bool, error)
+	GetManagedEvents(uint64, string, context.Context) (*[]entity.GetEventsQueryResult, error)
+	GetAttendedEvents(uint64, int, int, string, context.Context) (*[]entity.GetEventsQueryResult, int64, bool, error)
+	GetDiscoveryEvents(uint64, int, int, string, context.Context) (*[]entity.GetEventsQueryResult, int64, bool, error)
 }
 
 // managed (กิจกรรมของฉัน) section has no pagination
-func (r *repository) GetManagedEvents(refID uint64, search string, ctx context.Context) (*[]dtoRes.GetEventsIndividualEvent, error) {
-	var results []dtoRes.GetEventsIndividualEvent
+func (r *repository) GetManagedEvents(refID uint64, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, error) {
+	var results []entity.GetEventsQueryResult
 	var userUuid datatypes.UUID
 	tx := r.db.WithContext(ctx)
 
@@ -63,8 +62,8 @@ func (r *repository) GetManagedEvents(refID uint64, search string, ctx context.C
 }
 
 // returns (result, total, hasNext, error)
-func (r *repository) GetAttendedEvents(refID uint64, page int, pageSize int, search string, ctx context.Context) (*[]dtoRes.GetEventsIndividualEvent, int64, bool, error) {
-	var results []dtoRes.GetEventsIndividualEvent
+func (r *repository) GetAttendedEvents(refID uint64, page int, pageSize int, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, int64, bool, error) {
+	var results []entity.GetEventsQueryResult
 	var total int64
 	tx := r.db.WithContext(ctx)
 
@@ -119,8 +118,8 @@ func (r *repository) GetAttendedEvents(refID uint64, page int, pageSize int, sea
 }
 
 // returns (result, total, hasNext, error)
-func (r *repository) GetDiscoveryEvents(refID uint64, page int, pageSize int, search string, ctx context.Context) (*[]dtoRes.GetEventsIndividualEvent, int64, bool, error) {
-	var rawResult []dtoRes.RawGetEventsIndividualEvent
+func (r *repository) GetDiscoveryEvents(refID uint64, page int, pageSize int, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, int64, bool, error) {
+	var rawResult []entity.GetEventsQueryResult
 	var user entity.User
 	tx := r.db.WithContext(ctx)
 
@@ -174,27 +173,9 @@ func (r *repository) GetDiscoveryEvents(refID uint64, page int, pageSize int, se
 		return nil, -1, false, getEventsErr
 	}
 
-	result := []dtoRes.GetEventsIndividualEvent{}
-	if len(rawResult) > 0 {
-		for i := 0; i < len(rawResult); i++ {
-			result = append(result, dtoRes.GetEventsIndividualEvent{
-				ID:             rawResult[i].ID.String(),
-				Name:           rawResult[i].Name,
-				Organizer:      rawResult[i].Organizer,
-				Description:    rawResult[i].Description,
-				Date:           rawResult[i].Date,
-				StartTime:      rawResult[i].StartTime,
-				EndTime:        rawResult[i].EndTime,
-				Location:       rawResult[i].Location,
-				Role:           rawResult[i].Role,
-				EvaluationForm: rawResult[i].EvaluationForm,
-			})
-		}
+	if len(rawResult) <= pageSize {
+		return &rawResult, total.Count, false, nil
 	}
-
-	if len(result) <= pageSize {
-		return &result, total.Count, false, nil
-	}
-	clipped := result[:pageSize]
+	clipped := rawResult[:pageSize]
 	return &clipped, total.Count, true, nil
 }

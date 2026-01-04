@@ -7,14 +7,15 @@ import (
 	"strings"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
+	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 )
 
 type EventService interface {
-	GetEventsService(uint64, map[string]string, context.Context) (*[]dtoRes.GetEventsIndividualEvent, *response.Pagination, *response.APIError)
+	GetEventsService(uint64, map[string]string, context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError)
 }
 
-func (s *service) GetEventsService(refID uint64, queryParams map[string]string, ctx context.Context) (*[]dtoRes.GetEventsIndividualEvent, *response.Pagination, *response.APIError) {
+func (s *service) GetEventsService(refID uint64, queryParams map[string]string, ctx context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError) {
 	pageQuery, ok := queryParams["page"]
 	if !ok {
 		return nil, nil, &response.APIError{
@@ -66,6 +67,8 @@ func (s *service) GetEventsService(refID uint64, queryParams map[string]string, 
 		search = strings.TrimSpace(searchQuery)
 	}
 
+	formattedRes := []dtoRes.GetEventsRes{}
+
 	managedQuery, ok := queryParams["managed"]
 	if !ok {
 		res, total, hasNext, err := s.repo.Event.GetDiscoveryEvents(refID, page, size, search, ctx)
@@ -80,7 +83,8 @@ func (s *service) GetEventsService(refID uint64, queryParams map[string]string, 
 				Status:  500,
 			}
 		}
-		return res, &response.Pagination{
+		s._GetEventsDTOFormat(res, &formattedRes)
+		return &formattedRes, &response.Pagination{
 			Page:     page,
 			PageSize: size,
 			Total:    total,
@@ -108,7 +112,8 @@ func (s *service) GetEventsService(refID uint64, queryParams map[string]string, 
 				Status:  500,
 			}
 		}
-		return res, nil, nil
+		s._GetEventsDTOFormat(res, &formattedRes)
+		return &formattedRes, nil, nil
 	}
 	res, total, hasNext, err := s.repo.Event.GetAttendedEvents(refID, page, size, search, ctx)
 	if err != nil {
@@ -122,10 +127,31 @@ func (s *service) GetEventsService(refID uint64, queryParams map[string]string, 
 			Status:  500,
 		}
 	}
-	return res, &response.Pagination{
+	s._GetEventsDTOFormat(res, &formattedRes)
+	return &formattedRes, &response.Pagination{
 		Page:     page,
 		PageSize: size,
 		Total:    total,
 		HasNext:  hasNext,
 	}, nil
+}
+
+func (s *service) _GetEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, result *[]dtoRes.GetEventsRes) {
+	length := len(*rawResult)
+	if length > 0 {
+		for i := 0; i < length; i++ {
+			*result = append(*result, dtoRes.GetEventsRes{
+				ID:             (*rawResult)[i].ID.String(),
+				Name:           (*rawResult)[i].Name,
+				Organizer:      (*rawResult)[i].Organizer,
+				Description:    (*rawResult)[i].Description,
+				Date:           (*rawResult)[i].Date,
+				StartTime:      (*rawResult)[i].StartTime,
+				EndTime:        (*rawResult)[i].EndTime,
+				Location:       (*rawResult)[i].Location,
+				Role:           (*rawResult)[i].Role,
+				EvaluationForm: (*rawResult)[i].EvaluationForm,
+			})
+		}
+	}
 }
