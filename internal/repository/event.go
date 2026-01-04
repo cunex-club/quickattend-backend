@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
@@ -16,13 +15,13 @@ type EventRepository interface {
 	GetDiscoveryEvents(uint64, int, int, string, context.Context) (*[]entity.GetEventsQueryResult, int64, bool, error)
 }
 
-// managed (กิจกรรมของฉัน) section has no pagination
+// No pagination
 func (r *repository) GetManagedEvents(refID uint64, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, error) {
 	var results []entity.GetEventsQueryResult
-	var userUuid datatypes.UUID
+	var user entity.User
 	tx := r.db.WithContext(ctx)
 
-	errGetUuid := tx.Table("users").Select("id").Where("ref_id = ?", refID).First(&userUuid).Error
+	errGetUuid := tx.Model(&user).Select("id").Where("ref_id = ?", refID).Scan(&user).Error
 	if errGetUuid != nil {
 		return nil, errGetUuid
 	}
@@ -35,10 +34,11 @@ func (r *repository) GetManagedEvents(refID uint64, search string, ctx context.C
 				"events.end_time", "events.location", "event_users.role", "events.evaluation_form").
 			Joins(`JOIN event_users ON event_users.user_id = ? 
 				AND event_users.event_id = events.id`,
-				userUuid).
-			Where(`events.name ILIKE ? OR events.organizer ILIKE ? OR events.description ILIKE ? OR events.location ILIKE ?
-				OR event_users.role ILIKE ? OR events.evaluation_form ILIKE ?`,
+				user.ID).
+			Where(`(events.name ILIKE ? OR events.organizer ILIKE ? OR events.description ILIKE ? OR events.location ILIKE ?
+				OR event_users.role::TEXT ILIKE ? OR events.evaluation_form ILIKE ?)`,
 				searchQuery, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery).
+			Order("events.id").
 			Scan(&results).Error
 
 		if errGetEvents != nil {
@@ -52,7 +52,8 @@ func (r *repository) GetManagedEvents(refID uint64, search string, ctx context.C
 			"events.end_time", "events.location", "event_users.role", "events.evaluation_form").
 		Joins(`JOIN event_users ON event_users.user_id = ? 
 			AND event_users.event_id = events.id`,
-			userUuid).
+			user.ID).
+		Order("events.id").
 		Scan(&results).Error
 
 	if errGetEvents != nil {
