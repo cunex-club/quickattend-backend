@@ -16,33 +16,30 @@ type EventService interface {
 }
 
 func (s *service) GetEventsService(refID uint64, queryParams map[string]string, ctx context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError) {
-	pageQuery, ok := queryParams["page"]
-	if !ok {
-		return nil, nil, &response.APIError{
-			Code:    response.ErrBadRequest,
-			Message: "Missing required URL query parameter: page",
-			Status:  400,
+	pageQuery, pageOk := queryParams["page"]
+	var page int
+	if pageOk {
+		pageInt, err := strconv.Atoi(pageQuery)
+		if err != nil {
+			return nil, nil, &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: "URL query parameter 'page' must be int",
+				Status:  400,
+			}
 		}
-	}
-	page, err := strconv.Atoi(pageQuery)
-	if err != nil {
-		return nil, nil, &response.APIError{
-			Code:    response.ErrBadRequest,
-			Message: "URL query parameter 'page' must be int",
-			Status:  400,
+		if pageInt < 0 {
+			return nil, nil, &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: "URL query parameter 'page' must be greater than 0",
+				Status:  400,
+			}
 		}
-	}
-	if page < 0 {
-		return nil, nil, &response.APIError{
-			Code:    response.ErrBadRequest,
-			Message: "URL query parameter 'page' must be greater than 0",
-			Status:  400,
-		}
+		page = pageInt
 	}
 
 	size := 8
-	sizeQuery, ok := queryParams["pageSize"]
-	if ok {
+	sizeQuery, sizeOk := queryParams["pageSize"]
+	if sizeOk {
 		pageSizeInt, err := strconv.Atoi(sizeQuery)
 		if err != nil {
 			return nil, nil, &response.APIError{
@@ -62,15 +59,22 @@ func (s *service) GetEventsService(refID uint64, queryParams map[string]string, 
 	}
 
 	search := ""
-	searchQuery, ok := queryParams["search"]
-	if ok {
+	searchQuery, searchOk := queryParams["search"]
+	if searchOk {
 		search = strings.TrimSpace(searchQuery)
 	}
 
 	formattedRes := []dtoRes.GetEventsRes{}
 
-	managedQuery, ok := queryParams["managed"]
-	if !ok {
+	managedQuery, managedOk := queryParams["managed"]
+	if !managedOk {
+		if !pageOk {
+			return nil, nil, &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: "Missing required URL query parameter: page",
+				Status:  400,
+			}
+		}
 		res, total, hasNext, err := s.repo.Event.GetDiscoveryEvents(refID, page, size, search, ctx)
 		if err != nil {
 			s.logger.Error().Err(err).
@@ -114,6 +118,14 @@ func (s *service) GetEventsService(refID uint64, queryParams map[string]string, 
 		}
 		s._GetEventsDTOFormat(res, &formattedRes)
 		return &formattedRes, nil, nil
+	}
+
+	if !pageOk {
+		return nil, nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "Missing required URL query parameter: page",
+			Status:  400,
+		}
 	}
 	res, total, hasNext, err := s.repo.Event.GetAttendedEvents(refID, page, size, search, ctx)
 	if err != nil {

@@ -177,14 +177,23 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	// }
 
 	// ### MOCK USER DATA ###
+	// User := entity.User{
+	// 	RefID:       987654321,
+	// 	FirstnameTH: "AB",
+	// 	SurnameTH:   "CD",
+	// 	TitleTH:     "EEEE",
+	// 	FirstnameEN: "FG",
+	// 	SurnameEN:   "HI",
+	// 	TitleEN:     "JJJJ",
+	// }
 	User := entity.User{
-		RefID:       987654321,
-		FirstnameTH: "AB",
-		SurnameTH:   "CD",
-		TitleTH:     "EEEE",
-		FirstnameEN: "FG",
-		SurnameEN:   "HI",
-		TitleEN:     "JJJJ",
+		RefID:       6874440950,
+		FirstnameTH: "ค",
+		SurnameTH:   "ง",
+		TitleTH:     "นางสาว",
+		FirstnameEN: "C",
+		SurnameEN:   "D",
+		TitleEN:     "MS",
 	}
 
 	createdUser, createdUserErr := s.CreateUserIfNotExists(&User, ctx)
