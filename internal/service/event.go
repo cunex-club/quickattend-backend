@@ -13,13 +13,14 @@ import (
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
+	"gorm.io/datatypes"
 )
 
 type EventService interface {
-	GetParticipantService(code string, ctx context.Context) (*[]dtoRes.GetParticipantRes, *response.APIError)
+	GetParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
 }
 
-func (s *service) GetParticipantService(code string, ctx context.Context) (*[]dtoRes.GetParticipantRes, *response.APIError) {
+func (s *service) GetParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
 	if code == "" {
 		return nil, &response.APIError{
 			Code:    response.ErrBadRequest,
@@ -27,7 +28,6 @@ func (s *service) GetParticipantService(code string, ctx context.Context) (*[]dt
 			Status:  400,
 		}
 	}
-
 	length := 0
 	numbers := []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
 	for _, r := range code {
@@ -53,6 +53,8 @@ func (s *service) GetParticipantService(code string, ctx context.Context) (*[]dt
 			Status:  400,
 		}
 	}
+
+	eventIdUuid := datatypes.UUID(datatypes.BinUUIDFromString(eventId))
 
 	CUNEXGetQRURL := ""
 	clientId := s.cfg.LLEConfig.ClientId
@@ -113,7 +115,7 @@ func (s *service) GetParticipantService(code string, ctx context.Context) (*[]dt
 			// Need specific error message?
 			return nil, &response.APIError{
 				Code:    CUNEXErr.ErrorCode,
-				Message: "QR code related error from CU NEX GET qrcode",
+				Message: fmt.Sprintf("QR code related error from CU NEX GET qrcode: %s", CUNEXErr.Message),
 				Status:  417,
 			}
 		// In other cases, count as "internal error" with specific details,
@@ -121,7 +123,7 @@ func (s *service) GetParticipantService(code string, ctx context.Context) (*[]dt
 		case 408:
 			s.logger.Error().Str("Error", fmt.Sprintf("Time out error from CU NEX GET qrcode: %s", CUNEXErr.Message))
 			return nil, &response.APIError{
-				Code:    "TIMEOUT_ERROR",
+				Code:    "TIMEOUT",
 				Message: "Time out error from CU NEX GET qrcode",
 				Status:  500,
 			}
@@ -171,20 +173,41 @@ func (s *service) GetParticipantService(code string, ctx context.Context) (*[]dt
 		}
 	}
 
-	checkInTime := time.Now()
+	var orgCode int64
+	switch CUNEXSuccess.UserType {
+	case entity.STAFFS:
+		// TODO: how to get org code from staff id?
+		orgCode = 0
+	case entity.STUDENTS:
+		code, _ := strconv.ParseInt(CUNEXSuccess.RefId[len(CUNEXSuccess.RefId)-2:len(CUNEXSuccess.RefId)], 10, 64)
+		orgCode = code
+	}
 
+	user, status, RepoErr := s.repo.Event.GetParticipantRepository(ctx, eventIdUuid, refIdUInt, orgCode)
+	if RepoErr != nil {
+		s.logger.Error().Err(RepoErr).
+			Uint64("ref_id", refIdUInt).
+			Str("function", "EventRepository.GetParticipantRepository")
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB Error",
+			Status:  500,
+		}
+	}
+
+	checkInTime := time.Now()
 	responseBody := dtoRes.GetParticipantRes{
-		FirstnameTH:  "",
-		SurnameTH:    "",
-		TitleTH:      "",
+		FirstnameTH:  user.FirstnameTH,
+		SurnameTH:    user.SurnameTH,
+		TitleTH:      user.TitleTH,
 		FirstnameEN:  CUNEXSuccess.FirstName,
 		SurnameEN:    CUNEXSuccess.LastName,
-		TitleEN:      "",
+		TitleEN:      user.TitleEN,
 		RefID:        refIdUInt,
 		Organization: CUNEXSuccess.Organization,
 		CheckInTime:  checkInTime,
-		Status:       "",
-		Code:         b64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s,%s", checkInTime.String(), CUNEXSuccess.RefId))),
+		Status:       status,
+		Code:         b64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s,%s", checkInTime.String(), CUNEXSuccess.RefId)),
 	}
 
 	return &responseBody, nil
