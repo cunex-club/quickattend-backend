@@ -1,6 +1,7 @@
 package handler
 
 import (
+	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/gofiber/fiber/v2"
 )
@@ -11,9 +12,16 @@ type EventHandler interface {
 
 func (h *Handler) GetParticipantHandler(c *fiber.Ctx) error {
 	code := c.Params("qrcode")
-	res, err := h.Service.Event.GetParticipantService(code, c.UserContext())
-	if err != nil {
-		return response.SendError(c, err.Status, err.Code, err.Message)
+
+	var reqBody dtoReq.GetParticipantReqBody
+	parseBodyErr := c.BodyParser(&reqBody)
+	if parseBodyErr != nil {
+		return response.SendError(c, 400, response.ErrBadRequest, "Invalid request body")
+	}
+
+	res, serviceErr := h.Service.Event.GetParticipantService(code, reqBody.EventId, c.UserContext())
+	if serviceErr != nil {
+		return response.SendError(c, serviceErr.Status, serviceErr.Code, serviceErr.Message)
 	}
 	return response.OK(c, res)
 }
