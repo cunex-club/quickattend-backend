@@ -2,6 +2,14 @@ package response
 
 import "time"
 
+type status string
+
+const (
+	SUCCESS   status = "success"
+	DUPLICATE status = "duplicate"
+	FAIL      status = "fail"
+)
+
 type GetParticipantRes struct {
 	FirstnameTH  string    `json:"firstname_th"`
 	SurnameTH    string    `json:"surname_th"`
