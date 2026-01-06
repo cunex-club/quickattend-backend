@@ -207,7 +207,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"ref_id": createdUser.RefID,
+			"user_id": createdUser.ID,
 		})
 
 	JWTSecret := s.cfg.JWTSecret
