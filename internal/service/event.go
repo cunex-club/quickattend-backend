@@ -142,7 +142,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 				return nil, &response.APIError{
 					Code:    CUNEXErr.ErrorCode,
 					Message: CUNEXErr.Message,
-					Status:  400,
+					Status:  410,
 				}
 			case "E999":
 				// internal service error
