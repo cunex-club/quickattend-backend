@@ -117,7 +117,7 @@ func (p Point) Value() (driver.Value, error) {
 // ====================================================
 
 type Event struct {
-	ID                    datatypes.UUID          `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID                    datatypes.UUID          `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	Name                  string                  `gorm:"type:text;not null" json:"name"`
 	Organizer             string                  `gorm:"type:text;not null" json:"organizer"`
 	Description           string                  `gorm:"type:text" json:"description"`
@@ -135,7 +135,7 @@ type Event struct {
 }
 
 type EventWhitelist struct {
-	ID            datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID            datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID       datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
 	AttendeeRefID uint64         `gorm:"type:bigint;not null" json:"attendee_ref_id"`
 
@@ -144,7 +144,7 @@ type EventWhitelist struct {
 }
 
 type EventAllowedFaculties struct {
-	ID        datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID        datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID   datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
 	FacultyNO uint8          `gorm:"type:int8;not null" json:"faculty_no"`
 
@@ -152,7 +152,7 @@ type EventAllowedFaculties struct {
 }
 
 type EventAgenda struct {
-	ID           datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID           datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID      datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
 	ActivityName string         `gorm:"type:text;not null" json:"activity_name"`
 	StartTime    datatypes.Time `gorm:"type:time;not null" json:"start_time"`
@@ -162,12 +162,12 @@ type EventAgenda struct {
 }
 
 type EventParticipants struct {
-	ID               datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID               datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID          datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
 	CheckinTimestamp time.Time      `gorm:"type:timestamptz;not null" json:"checkin_timestamp"`
 	ParticipantRefID uint64         `gorm:"type:bigint;not null" json:"participant_ref_id"`
 	FirstName        string         `gorm:"type:text;not null" json:"first_name"`
-	SurName          string         `gorm:"type:text;not null" json:"last_name"`
+	SurName          string         `gorm:"type:text;not null" json:"sur_name"`
 	Organization     string         `gorm:"type:text;not null" json:"organization"`
 	ScannedLocation  Point          `gorm:"type:point;not null" json:"scanned_location"`
 	ScannerID        datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
