@@ -16,7 +16,11 @@ type EventRepository interface {
 
 func (r *repository) FindById(id uuid.UUID, ctx context.Context) (*entity.Event, error) {
 	var event entity.Event
-	err := r.db.WithContext(ctx).First(&event, "id = ?", id).Error
+	err := r.db.WithContext(ctx).
+		Preload("EventWhitelist").
+		Preload("EventAllowedFaculties").
+		Preload("EventAgenda").
+		First(&event, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
