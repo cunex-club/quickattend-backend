@@ -22,35 +22,11 @@ type EventService interface {
 }
 
 func (s *service) GetParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
-	if code == "" {
+	errMsg := s.ValidateQRCode(code)
+	if errMsg != "" {
 		return nil, &response.APIError{
 			Code:    response.ErrBadRequest,
-			Message: "Missing URL path parameter 'qrcode'",
-			Status:  400,
-		}
-	}
-	length := 0
-	numbers := []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
-	for _, r := range code {
-		isDigit := false
-		for _, num := range numbers {
-			if string(r) == num {
-				isDigit = true
-			}
-		}
-		if !isDigit {
-			return nil, &response.APIError{
-				Code:    response.ErrBadRequest,
-				Message: "URL path parameter 'qrcode' contains non-number character(s)",
-				Status:  400,
-			}
-		}
-		length += 1
-	}
-	if length != 10 {
-		return nil, &response.APIError{
-			Code:    response.ErrBadRequest,
-			Message: "URL path parameter 'qrcode' must have length of 10",
+			Message: errMsg,
 			Status:  400,
 		}
 	}
