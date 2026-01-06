@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"unicode/utf8"
 
 	b64 "encoding/base64"
 	"encoding/json"
@@ -13,24 +14,54 @@ import (
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 )
 
 type EventService interface {
 	GetParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
-	ValidateQRCode(code string) (errMsg string)
 }
 
 func (s *service) GetParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
-	errMsg := s.ValidateQRCode(code)
-	if errMsg != "" {
+	if code == "" {
 		return nil, &response.APIError{
 			Code:    response.ErrBadRequest,
-			Message: errMsg,
+			Message: "Missing URL path parameter 'qrcode'",
 			Status:  400,
 		}
 	}
+	if utf8.RuneCountInString(code) != 10 {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "URL path parameter 'qrcode' must have length of 10",
+			Status:  400,
+		}
+	}
+	numbers := []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
+	for _, r := range code {
+		isDigit := false
+		for _, num := range numbers {
+			if string(r) == num {
+				isDigit = true
+			}
+		}
+		if !isDigit {
+			return nil, &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: "URL path parameter 'qrcode' contains non-number character(s)",
+				Status:  400,
+			}
+		}
+	}
 
+	validateUuidErr := uuid.Validate(eventId)
+	if validateUuidErr != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "Invalid event ID format",
+			Status:  400,
+		}
+	}
 	eventIdUuid := datatypes.UUID(datatypes.BinUUIDFromString(eventId))
 
 	CUNEXGetQRURL := ""
@@ -159,12 +190,13 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 	}
 
 	var orgCode int64
+	refIdLen := utf8.RuneCountInString(CUNEXSuccess.RefId)
 	switch CUNEXSuccess.UserType {
 	case entity.STAFFS:
 		// TODO: how to get org code from staff id?
 		orgCode = 0
 	case entity.STUDENTS:
-		code, _ := strconv.ParseInt(CUNEXSuccess.RefId[len(CUNEXSuccess.RefId)-2:len(CUNEXSuccess.RefId)], 10, 64)
+		code, _ := strconv.ParseInt(CUNEXSuccess.RefId[refIdLen-2:], 10, 64)
 		orgCode = code
 	default:
 		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
@@ -269,33 +301,4 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 	}
 
 	return &responseBody, nil
-}
-
-func (s *service) ValidateQRCode(code string) string {
-	if code == "" {
-		return "Missing URL path parameter 'qrcode'"
-	}
-	length := 0
-	numbers := []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
-	for _, r := range code {
-		isDigit := false
-		for _, num := range numbers {
-			if string(r) == num {
-				isDigit = true
-			}
-		}
-		if !isDigit {
-			return "URL path parameter 'qrcode' contains non-number character(s)"
-		}
-
-		length += 1
-		if length > 10 {
-			break
-		}
-	}
-	if length != 10 {
-		return "URL path parameter 'qrcode' must have length of 10"
-	}
-
-	return ""
 }
