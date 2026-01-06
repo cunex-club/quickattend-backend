@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-	"unicode/utf8"
 
 	b64 "encoding/base64"
 	"encoding/json"
@@ -30,7 +29,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 			Status:  400,
 		}
 	}
-	if utf8.RuneCountInString(code) != 10 {
+	if len(code) != 10 {
 		return nil, &response.APIError{
 			Code:    response.ErrBadRequest,
 			Message: "URL path parameter 'qrcode' must have length of 10",
@@ -130,21 +129,30 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 
 		switch resp.StatusCode {
 		case 417:
-			// Need specific error message?
-			return nil, &response.APIError{
-				Code:    CUNEXErr.ErrorCode,
-				Message: fmt.Sprintf("QR code related error from CU NEX GET qrcode: %s", CUNEXErr.Message),
-				Status:  417,
+			switch CUNEXErr.ErrorCode {
+			case "E001", "E002", "E003":
+				// token invalid, token expired, or token inactive
+				return nil, &response.APIError{
+					Code:    CUNEXErr.ErrorCode,
+					Message: CUNEXErr.Message,
+					Status:  401,
+				}
+			case "E004":
+				// qrcode inactive
+				return nil, &response.APIError{
+					Code:    CUNEXErr.ErrorCode,
+					Message: CUNEXErr.Message,
+					Status:  400,
+				}
+			case "E999":
+				// internal service error
+				return nil, &response.APIError{
+					Code:    CUNEXErr.ErrorCode,
+					Message: CUNEXErr.Message,
+					Status:  500,
+				}
 			}
-		// In other cases, count as "internal error" with specific details,
-		// because if client provides valid resources but CU NEX server declines, the fault is at our own server
-		case 408:
-			s.logger.Error().Str("Error", fmt.Sprintf("Time out error from CU NEX GET qrcode: %s", CUNEXErr.Message))
-			return nil, &response.APIError{
-				Code:    "TIMEOUT",
-				Message: "Time out error from CU NEX GET qrcode",
-				Status:  500,
-			}
+
 		case 401:
 			s.logger.Error().Str("Error", fmt.Sprintf("Authorization error from CU NEX GET qrcode: %s", CUNEXErr.Message))
 			return nil, &response.APIError{
@@ -181,22 +189,21 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 
 	refIdUInt, convertErr := strconv.ParseUint(CUNEXSuccess.RefId, 10, 64)
 	if convertErr != nil {
-		s.logger.Error().Err(convertErr).Str("Error", "Invalid refID returned from CU NEX GET qrcode; could not convert to uint64")
+		s.logger.Error().Err(convertErr).Str("Error", fmt.Sprintf("Invalid refID returned from CU NEX GET qrcode; could not convert %s to uint64", CUNEXSuccess.RefId))
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Invalid refID returned from CU NEX GET qrcode; could not convert to uint64",
+			Message: "Invalid refID returned from CU NEX GET qrcode",
 			Status:  500,
 		}
 	}
 
 	var orgCode int64
-	refIdLen := utf8.RuneCountInString(CUNEXSuccess.RefId)
 	switch CUNEXSuccess.UserType {
 	case entity.STAFFS:
 		// TODO: how to get org code from staff id?
 		orgCode = 0
 	case entity.STUDENTS:
-		code, _ := strconv.ParseInt(CUNEXSuccess.RefId[refIdLen-2:], 10, 64)
+		code, _ := strconv.ParseInt(CUNEXSuccess.RefId[len(CUNEXSuccess.RefId)-2:], 10, 64)
 		orgCode = code
 	default:
 		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
