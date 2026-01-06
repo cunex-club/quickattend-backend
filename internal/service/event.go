@@ -67,12 +67,22 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 	}
 
 	query := req.URL.Query()
-	query.Set("qrcode", code)
+	query.Add("qrcode", code)
+	req.URL.RawQuery = query.Encode()
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("ClientId", clientId)
 	req.Header.Set("ClientSecret", clientSecret)
 
-	resp, _ := client.Do(req)
+	resp, doErr := client.Do(req)
+	if doErr != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Failed to send request for CU NEX GET qrcode",
+			Status:  500,
+		}
+	}
+	defer resp.Body.Close()
+
 	var CUNEXSuccess entity.CUNEXGetQRSuccessResponse
 
 	if resp.StatusCode != 200 {
@@ -137,7 +147,6 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 			}
 		}
 	}
-	defer resp.Body.Close()
 
 	refIdUInt, convertErr := strconv.ParseUint(CUNEXSuccess.RefId, 10, 64)
 	if convertErr != nil {
