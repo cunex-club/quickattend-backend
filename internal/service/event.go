@@ -304,7 +304,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		Organization: CUNEXSuccess.Organization,
 		CheckInTime:  checkInTime,
 		Status:       status,
-		Code:         b64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s,%s", checkInTime.String(), CUNEXSuccess.RefId)),
+		Code:         b64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s.%s", checkInTime.String(), CUNEXSuccess.RefId)),
 	}
 
 	return &responseBody, nil
