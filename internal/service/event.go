@@ -2,13 +2,13 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	b64 "encoding/base64"
+	"encoding/json"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
@@ -223,7 +223,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		if found {
 			status = string(dtoRes.DUPLICATE)
 		} else {
-			allow, err := s.repo.Event.GetParticipantCheckAccess(ctx, orgCode, attendanceType, eventIdUuid)
+			allow, err := s.repo.Event.GetParticipantCheckAccess(ctx, orgCode, refIdUInt, attendanceType, eventIdUuid)
 			if err != nil {
 				s.logger.Error().Err(err).
 					Uint64("ref_id", refIdUInt).
@@ -245,7 +245,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 	} else {
 		s.logger.Error().
 			Uint64("ref_id", refIdUInt).
-			Str("Error", fmt.Sprintf("'%s' not within possible value of attendance_type enum", attendanceType))
+			Str("Error", fmt.Sprintf("'%s' is not a possible value for attendance_type enum", attendanceType))
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "Internal DB error",
@@ -253,7 +253,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		}
 	}
 
-	checkInTime := time.Now()
+	checkInTime := time.Now().UTC()
 	responseBody := dtoRes.GetParticipantRes{
 		FirstnameTH:  user.FirstnameTH,
 		SurnameTH:    user.SurnameTH,

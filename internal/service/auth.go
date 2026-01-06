@@ -2,7 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
@@ -83,118 +87,118 @@ func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) 
 }
 
 func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.VerifyTokenRes, *response.APIError) {
-	// if strings.TrimSpace(token) == "" {
-	// 	return nil, &response.APIError{
-	// 		Code:    "TOKEN_REQUIRED",
-	// 		Message: "token is required",
-	// 		Status:  400,
-	// 	}
-	// }
-
-	// tokenValidationUrl := ""
-
-	// client := &http.Client{}
-	// req, err := http.NewRequest("GET", tokenValidationUrl, nil)
-	// if err != nil {
-	// 	return nil, &response.APIError{
-	// 		Code:    response.ErrInternalError,
-	// 		Message: "failed to create token validation request",
-	// 		Status:  500,
-	// 	}
-	// }
-
-	// ClientId := s.cfg.LLEConfig.ClientId
-	// if ClientId == "" {
-	// 	return nil, &response.APIError{
-	// 		Code:    "ClientId_NOT_FOUND",
-	// 		Message: "ClientId not configured",
-	// 		Status:  500,
-	// 	}
-	// }
-
-	// ClientSecret := s.cfg.LLEConfig.ClientSecret
-	// if ClientSecret == "" {
-	// 	return nil, &response.APIError{
-	// 		Code:    "ClientSecret_NOT_FOUND",
-	// 		Message: "ClientSecret not configured",
-	// 		Status:  500,
-	// 	}
-	// }
-
-	// req.Header.Set("Content-type", "application/json")
-	// req.Header.Set("ClientId", ClientId)
-	// req.Header.Set("ClientSecret", ClientSecret)
-
-	// q := req.URL.Query()
-	// q.Add("token", token)
-	// req.URL.RawQuery = q.Encode()
-
-	// resp, err := client.Do(req)
-	// if err != nil {
-	// 	return nil, &response.APIError{
-	// 		Code:    response.ErrInternalError,
-	// 		Message: "failed to call external token validation API",
-	// 		Status:  500,
-	// 	}
-	// }
-	// defer resp.Body.Close()
-
-	// if resp.StatusCode == http.StatusExpectationFailed {
-	// 	return nil, &response.APIError{
-	// 		Code:    response.ErrUnauthorized,
-	// 		Message: "invalid token",
-	// 		Status:  resp.StatusCode,
-	// 	}
-	// }
-
-	// var UserData entity.CUNEXUserResponse
-	// if err := json.NewDecoder(resp.Body).Decode(&UserData); err != nil {
-	// 	return nil, &response.APIError{
-	// 		Code:    response.ErrInternalError,
-	// 		Message: "failed to decode external API response",
-	// 		Status:  500,
-	// 	}
-	// }
-
-	// convRefId, convRefIdErr := strconv.ParseUint(UserData.RefId, 10, 64)
-
-	// if convRefIdErr != nil {
-	// 	return nil, &response.APIError{
-	// 		Code:    response.ErrInternalError,
-	// 		Message: "Could not convert ref_id from string to uint64",
-	// 		Status:  500,
-	// 	}
-	// }
-
-	// User := entity.User{
-	// 	RefID:       convRefId,
-	// 	FirstnameTH: UserData.FirstNameTH,
-	// 	SurnameTH:   UserData.LastNameTH,
-	// 	TitleTH:     "",
-	// 	FirstnameEN: UserData.FirstnameEN,
-	// 	SurnameEN:   UserData.LastNameEN,
-	// 	TitleEN:     "",
-	// }
-
-	// ### MOCK USER DATA ###
-	User := entity.User{
-		RefID:       987654321,
-		FirstnameTH: "AB",
-		SurnameTH:   "CD",
-		TitleTH:     "EEEE",
-		FirstnameEN: "FG",
-		SurnameEN:   "HI",
-		TitleEN:     "JJJJ",
+	if strings.TrimSpace(token) == "" {
+		return nil, &response.APIError{
+			Code:    "TOKEN_REQUIRED",
+			Message: "token is required",
+			Status:  400,
+		}
 	}
 
-	// createdUser, createdUserErr := s.CreateUserIfNotExists(&User, ctx)
-	// if createdUserErr != nil {
-	// 	return nil, &response.APIError{
-	// 		Code:    createdUserErr.Code,
-	// 		Message: createdUserErr.Message,
-	// 		Status:  createdUserErr.Status,
-	// 	}
+	tokenValidationUrl := ""
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", tokenValidationUrl, nil)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "failed to create token validation request",
+			Status:  500,
+		}
+	}
+
+	ClientId := s.cfg.LLEConfig.ClientId
+	if ClientId == "" {
+		return nil, &response.APIError{
+			Code:    "ClientId_NOT_FOUND",
+			Message: "ClientId not configured",
+			Status:  500,
+		}
+	}
+
+	ClientSecret := s.cfg.LLEConfig.ClientSecret
+	if ClientSecret == "" {
+		return nil, &response.APIError{
+			Code:    "ClientSecret_NOT_FOUND",
+			Message: "ClientSecret not configured",
+			Status:  500,
+		}
+	}
+
+	req.Header.Set("Content-type", "application/json")
+	req.Header.Set("ClientId", ClientId)
+	req.Header.Set("ClientSecret", ClientSecret)
+
+	q := req.URL.Query()
+	q.Add("token", token)
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "failed to call external token validation API",
+			Status:  500,
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusExpectationFailed {
+		return nil, &response.APIError{
+			Code:    response.ErrUnauthorized,
+			Message: "invalid token",
+			Status:  resp.StatusCode,
+		}
+	}
+
+	var UserData entity.CUNEXUserResponse
+	if err := json.NewDecoder(resp.Body).Decode(&UserData); err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "failed to decode external API response",
+			Status:  500,
+		}
+	}
+
+	convRefId, convRefIdErr := strconv.ParseUint(UserData.RefId, 10, 64)
+
+	if convRefIdErr != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Could not convert ref_id from string to uint64",
+			Status:  500,
+		}
+	}
+
+	User := entity.User{
+		RefID:       convRefId,
+		FirstnameTH: UserData.FirstNameTH,
+		SurnameTH:   UserData.LastNameTH,
+		TitleTH:     "",
+		FirstnameEN: UserData.FirstnameEN,
+		SurnameEN:   UserData.LastNameEN,
+		TitleEN:     "",
+	}
+
+	// // ### MOCK USER DATA ###
+	// User := entity.User{
+	// 	RefID:       987654321,
+	// 	FirstnameTH: "AB",
+	// 	SurnameTH:   "CD",
+	// 	TitleTH:     "EEEE",
+	// 	FirstnameEN: "FG",
+	// 	SurnameEN:   "HI",
+	// 	TitleEN:     "JJJJ",
 	// }
+
+	createdUser, createdUserErr := s.CreateUserIfNotExists(&User, ctx)
+	if createdUserErr != nil {
+		return nil, &response.APIError{
+			Code:    createdUserErr.Code,
+			Message: createdUserErr.Message,
+			Status:  createdUserErr.Status,
+		}
+	}
 
 	var (
 		key []byte
@@ -203,8 +207,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			// "ref_id": createdUser.RefID,
-			"ref_id": User.RefID,
+			"ref_id": createdUser.RefID,
 		})
 
 	JWTSecret := s.cfg.JWTSecret
