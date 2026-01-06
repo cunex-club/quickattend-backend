@@ -162,13 +162,12 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 	}
 	defer resp.Body.Close()
 
-	// query for title_en, Thai firstName surName title + check event status for this user
 	refIdUInt, convertErr := strconv.ParseUint(CUNEXSuccess.RefId, 10, 64)
 	if convertErr != nil {
-		s.logger.Error().Err(convertErr).Str("Error", "Invalid refID returned from CU NEX GET participant; could not convert to uint64")
+		s.logger.Error().Err(convertErr).Str("Error", "Invalid refID returned from CU NEX GET qrcode; could not convert to uint64")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Invalid refID returned from CU NEX GET participant; could not convert to uint64",
+			Message: "Invalid refID returned from CU NEX GET qrcode; could not convert to uint64",
 			Status:  500,
 		}
 	}
@@ -181,16 +180,89 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 	case entity.STUDENTS:
 		code, _ := strconv.ParseInt(CUNEXSuccess.RefId[len(CUNEXSuccess.RefId)-2:len(CUNEXSuccess.RefId)], 10, 64)
 		orgCode = code
-	}
-
-	user, status, RepoErr := s.repo.Event.GetParticipantRepository(ctx, eventIdUuid, refIdUInt, orgCode)
-	if RepoErr != nil {
-		s.logger.Error().Err(RepoErr).
-			Uint64("ref_id", refIdUInt).
-			Str("function", "EventRepository.GetParticipantRepository")
+	default:
+		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Internal DB Error",
+			Message: "Invalid userType returned from CU NEX GET qrcode",
+			Status:  500,
+		}
+	}
+
+	user, attendanceType, err := s.repo.Event.GetParticipantUserInfoAndAttendanceType(ctx, eventIdUuid, refIdUInt)
+	if err != nil {
+		s.logger.Error().Err(err).
+			Uint64("ref_id", refIdUInt).
+			Str("function", "EventRepository.GetParticipantUserInfoAndAttendanceType")
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB error",
+			Status:  500,
+		}
+	}
+
+	var status string
+	if attendanceType == string(entity.ALL) {
+		found, err := s.repo.Event.GetParticipantCheckParticipation(ctx, eventIdUuid, refIdUInt)
+		if err != nil {
+			s.logger.Error().Err(err).
+				Uint64("ref_id", refIdUInt).
+				Str("function", "EventRepository.GetParticipantCheckParticipation")
+			return nil, &response.APIError{
+				Code:    response.ErrInternalError,
+				Message: "Internal DB error",
+				Status:  500,
+			}
+		}
+
+		if !found {
+			status = string(dtoRes.SUCCESS)
+		} else {
+			status = string(dtoRes.DUPLICATE)
+		}
+
+	} else if attendanceType == string(entity.WHITELIST) || attendanceType == string(entity.FACULTIES) {
+		found, err := s.repo.Event.GetParticipantCheckParticipation(ctx, eventIdUuid, refIdUInt)
+		if err != nil {
+			s.logger.Error().Err(err).
+				Uint64("ref_id", refIdUInt).
+				Str("function", "EventRepository.GetParticipantCheckParticipation")
+			return nil, &response.APIError{
+				Code:    response.ErrInternalError,
+				Message: "Internal DB error",
+				Status:  500,
+			}
+		}
+
+		if found {
+			status = string(dtoRes.DUPLICATE)
+		} else {
+			allow, err := s.repo.Event.GetParticipantCheckAccess(ctx, orgCode, attendanceType, eventIdUuid)
+			if err != nil {
+				s.logger.Error().Err(err).
+					Uint64("ref_id", refIdUInt).
+					Str("function", "EventRepository.GetParticipantCheckAccess")
+				return nil, &response.APIError{
+					Code:    response.ErrInternalError,
+					Message: "Internal DB error",
+					Status:  500,
+				}
+			}
+
+			if !allow {
+				status = string(dtoRes.FAIL)
+			} else {
+				status = string(dtoRes.SUCCESS)
+			}
+		}
+
+	} else {
+		s.logger.Error().
+			Uint64("ref_id", refIdUInt).
+			Str("Error", fmt.Sprintf("'%s' not within possible value of attendance_type enum", attendanceType))
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB error",
 			Status:  500,
 		}
 	}
