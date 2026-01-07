@@ -4,16 +4,17 @@ import (
 	"context"
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
+	"gorm.io/datatypes"
 )
 
 type AuthRepository interface {
-	GetUserByRefId(uint64, context.Context) (entity.User, error)
+	GetUserById(datatypes.UUID, context.Context) (entity.User, error)
 	CreateUser(*entity.User, context.Context) (*entity.User, error)
 }
 
-func (r *repository) GetUserByRefId(refId uint64, ctx context.Context) (entity.User, error) {
+func (r *repository) GetUserById(userID datatypes.UUID, ctx context.Context) (entity.User, error) {
 	var user entity.User
-	err := r.db.WithContext(ctx).First(&user, &entity.User{RefID: refId}).Error
+	err := r.db.WithContext(ctx).First(&user, &entity.User{ID: userID}).Error
 	return user, err
 }
 
