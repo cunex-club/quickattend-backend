@@ -68,7 +68,7 @@ func (s *service) GetUserService(userIDStr string, ctx context.Context) (*dtoRes
 }
 
 func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) (*entity.User, *response.APIError) {
-	foundUser, findErr := s.repo.Auth.GetUserById(user.ID, ctx)
+	foundUser, findErr := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
 	if findErr == nil {
 		return &foundUser, nil
 	}
