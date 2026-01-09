@@ -110,14 +110,14 @@ func (m *Middleware) AuthRequired() fiber.Handler {
 			return response.SendError(c, fiber.StatusUnauthorized, response.ErrUnauthorized, "Invalid or expired token")
 		}
 
-		refID, ok := claimString(claims, "ref_id")
-		if !ok || strings.TrimSpace(refID) == "" {
-			return response.SendError(c, fiber.StatusUnauthorized, response.ErrUnauthorized, "Missing ref_id claim")
+		userID, ok := claimString(claims, "user_id")
+		if !ok || strings.TrimSpace(userID) == "" {
+			return response.SendError(c, fiber.StatusUnauthorized, response.ErrUnauthorized, "Missing user_id claim")
 		}
 
 		role, _ := claimString(claims, "role")
 
-		c.Locals("ref_id", refID)
+		c.Locals("user_id", userID)
 		c.Locals("role", role)
 
 		return c.Next()
