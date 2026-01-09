@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/gofiber/fiber/v2"
 )
@@ -13,13 +11,12 @@ type EventHandler interface {
 
 func (h *Handler) GetEvents(c *fiber.Ctx) error {
 	params := c.Queries()
-	refIDFloat, errStrToFloat := strconv.ParseFloat(c.Locals("ref_id").(string), 64)
-	if errStrToFloat != nil {
-		return response.SendError(c, 400, response.ErrBadRequest, "ref_id should be able to convert to float64")
+	userIDStr, ok := c.Locals("user_id").(string)
+	if !ok {
+		return response.SendError(c, 500, response.ErrInternalError, "Failed to assert user_id as a string")
 	}
-	refID := uint64(refIDFloat)
 
-	res, pagination, err := h.Service.Event.GetEventsService(refID, params, c.UserContext())
+	res, pagination, err := h.Service.Event.GetEventsService(userIDStr, params, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
