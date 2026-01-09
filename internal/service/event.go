@@ -9,13 +9,26 @@ import (
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
 )
 
 type EventService interface {
-	GetEventsService(uint64, map[string]string, context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError)
+	GetEventsService(string, map[string]string, context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError)
 }
 
-func (s *service) GetEventsService(refID uint64, queryParams map[string]string, ctx context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError) {
+func (s *service) GetEventsService(userIDStr string, queryParams map[string]string, ctx context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError) {
+	uuidValidationErr := uuid.Validate(userIDStr)
+	if uuidValidationErr != nil {
+		return nil, nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "Invalid UUID format for user_id from middleware",
+			Status:  500,
+		}
+	}
+
+	userID := datatypes.UUID(datatypes.BinUUIDFromString(userIDStr))
+
 	pageQuery, pageOk := queryParams["page"]
 	var page int
 	if pageOk {
@@ -75,10 +88,10 @@ func (s *service) GetEventsService(refID uint64, queryParams map[string]string, 
 				Status:  400,
 			}
 		}
-		res, total, hasNext, err := s.repo.Event.GetDiscoveryEvents(refID, page, size, search, ctx)
+		res, total, hasNext, err := s.repo.Event.GetDiscoveryEvents(userID, page, size, search, ctx)
 		if err != nil {
 			s.logger.Error().Err(err).
-				Uint64("ref_id", refID).
+				Str("user_id", userIDStr).
 				Str("function", "EventRepository.GetDiscoveryEvents").
 				Msg(fmt.Sprintf("Internal DB error: %s", err.Error()))
 			return nil, nil, &response.APIError{
@@ -103,11 +116,12 @@ func (s *service) GetEventsService(refID uint64, queryParams map[string]string, 
 			Message: "URL query parameter 'managed' must be boolean",
 		}
 	}
-	if managed {
-		res, err := s.repo.Event.GetManagedEvents(refID, search, ctx)
+	switch managed {
+	case true:
+		res, err := s.repo.Event.GetManagedEvents(userID, search, ctx)
 		if err != nil {
 			s.logger.Error().Err(err).
-				Uint64("ref_id", refID).
+				Str("user_id", userIDStr).
 				Str("function", "EventRepository.GetManagedEvents").
 				Msg(fmt.Sprintf("Internal DB error: %s", err.Error()))
 			return nil, nil, &response.APIError{
@@ -118,34 +132,35 @@ func (s *service) GetEventsService(refID uint64, queryParams map[string]string, 
 		}
 		s._GetEventsDTOFormat(res, &formattedRes)
 		return &formattedRes, nil, nil
-	}
 
-	if !pageOk {
-		return nil, nil, &response.APIError{
-			Code:    response.ErrBadRequest,
-			Message: "Missing required URL query parameter: page",
-			Status:  400,
+	default:
+		if !pageOk {
+			return nil, nil, &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: "Missing required URL query parameter: page",
+				Status:  400,
+			}
 		}
-	}
-	res, total, hasNext, err := s.repo.Event.GetAttendedEvents(refID, page, size, search, ctx)
-	if err != nil {
-		s.logger.Error().Err(err).
-			Uint64("ref_id", refID).
-			Str("function", "EventRepository.GetAttendedEvents").
-			Msg(fmt.Sprintf("Internal DB error: %s", err.Error()))
-		return nil, nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Internal DB error on getting attended events",
-			Status:  500,
+		res, total, hasNext, err := s.repo.Event.GetAttendedEvents(userID, page, size, search, ctx)
+		if err != nil {
+			s.logger.Error().Err(err).
+				Str("user_id", userIDStr).
+				Str("function", "EventRepository.GetAttendedEvents").
+				Msg(fmt.Sprintf("Internal DB error: %s", err.Error()))
+			return nil, nil, &response.APIError{
+				Code:    response.ErrInternalError,
+				Message: "Internal DB error on getting attended events",
+				Status:  500,
+			}
 		}
+		s._GetEventsDTOFormat(res, &formattedRes)
+		return &formattedRes, &response.Pagination{
+			Page:     page,
+			PageSize: size,
+			Total:    total,
+			HasNext:  hasNext,
+		}, nil
 	}
-	s._GetEventsDTOFormat(res, &formattedRes)
-	return &formattedRes, &response.Pagination{
-		Page:     page,
-		PageSize: size,
-		Total:    total,
-		HasNext:  hasNext,
-	}, nil
 }
 
 func (s *service) _GetEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, result *[]dtoRes.GetEventsRes) {
