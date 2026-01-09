@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
@@ -75,6 +76,13 @@ func (s *service) GetEventsService(userIDStr string, queryParams map[string]stri
 	searchQuery, searchOk := queryParams["search"]
 	if searchOk {
 		search = strings.TrimSpace(searchQuery)
+		if utf8.RuneCountInString(search) > 256 {
+			return nil, nil, &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: "URL query parameter 'search' longer than 256 characters",
+				Status:  400,
+			}
+		}
 	}
 
 	formattedRes := []dtoRes.GetEventsRes{}
