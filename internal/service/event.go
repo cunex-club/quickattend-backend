@@ -293,6 +293,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 	}
 
 	checkInTime := time.Now().UTC()
+	rawCode := fmt.Appendf(nil, "%s.%s", checkInTime.Format("2006-01-02T15:04:05Z"), CUNEXSuccess.RefId)
 	responseBody := dtoRes.GetParticipantRes{
 		FirstnameTH:  user.FirstnameTH,
 		SurnameTH:    user.SurnameTH,
@@ -304,7 +305,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		Organization: CUNEXSuccess.Organization,
 		CheckInTime:  checkInTime,
 		Status:       status,
-		Code:         b64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s.%s", checkInTime.String(), CUNEXSuccess.RefId)),
+		Code:         b64.StdEncoding.EncodeToString(rawCode),
 	}
 
 	return &responseBody, nil
