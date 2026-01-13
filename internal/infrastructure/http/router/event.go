@@ -7,4 +7,6 @@ import (
 )
 
 func EventRoutes(r fiber.Router, h *handler.AllOfHandler, mw *middleware.Middleware) {
+	event := r.Group("/events", mw.AuthRequired())
+	event.Get("/:id", h.EventHandler.GetOneEventHandler)
 }
