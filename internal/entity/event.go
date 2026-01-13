@@ -121,9 +121,8 @@ type Event struct {
 	Name           string            `gorm:"type:text;not null" json:"name"`
 	Organizer      string            `gorm:"type:text;not null" json:"organizer"`
 	Description    string            `gorm:"type:text" json:"description"`
-	Date           datatypes.Date    `gorm:"type:timestamp;not null" json:"date"`
-	StartTime      datatypes.Time    `gorm:"type:time;not null" json:"start_time"`
-	EndTime        datatypes.Time    `gorm:"type:time;not null" json:"end_time"`
+	StartTime      time.Time         `gorm:"type:timestamptz;not null" json:"start_time"`
+	EndTime        time.Time         `gorm:"type:timestamptz;not null" json:"end_time"`
 	Location       string            `gorm:"type:text;not null" json:"location"`
 	AttendenceType attendence_type   `gorm:"type:attendence_type;not null" json:"attendance_type"`
 	AllowAllToScan bool              `gorm:"type:bool;not null" json:"allow_all_to_scan"`
