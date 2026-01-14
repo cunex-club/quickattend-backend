@@ -25,7 +25,7 @@ func (s *service) GetOneEventService(eventIdStr string, ctx context.Context) (*d
 	}
 	eventId := datatypes.UUID(datatypes.BinUUIDFromString(eventIdStr))
 
-	res, err := s.repo.Event.GetOneEvent(eventId, ctx)
+	eventWithCount, agenda, err := s.repo.Event.GetOneEvent(eventId, ctx)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, &response.APIError{
@@ -44,5 +44,29 @@ func (s *service) GetOneEventService(eventIdStr string, ctx context.Context) (*d
 		}
 	}
 
-	return res, nil
+	agendaDTO := []dtoRes.GetOneEventAgenda{}
+	if len(*agenda) > 0 {
+		for _, slot := range *agenda {
+			agendaDTO = append(agendaDTO, dtoRes.GetOneEventAgenda{
+				ActivityName: slot.ActivityName,
+				StartTime:    slot.StartTime,
+				EndTime:      slot.EndTime,
+			})
+		}
+	}
+
+	finalRes := dtoRes.GetOneEventRes{
+		Name:            eventWithCount.Name,
+		Organizer:       eventWithCount.Organizer,
+		Description:     eventWithCount.Description,
+		StartTime:       eventWithCount.StartTime.UTC(),
+		EndTime:         eventWithCount.EndTime.UTC(),
+		Location:        eventWithCount.Location,
+		TotalRegistered: eventWithCount.TotalRegistered,
+		EvaluationForm:  eventWithCount.EvaluationForm,
+		Agenda:          agendaDTO,
+	}
+
+	return &finalRes, nil
+
 }
