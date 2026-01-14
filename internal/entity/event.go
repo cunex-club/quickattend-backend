@@ -152,8 +152,8 @@ type EventAgenda struct {
 	ID           datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID      datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
 	ActivityName string         `gorm:"type:text;not null" json:"activity_name"`
-	StartTime    datatypes.Time `gorm:"type:time;not null" json:"start_time"`
-	EndTime      datatypes.Time `gorm:"type:time;not null" json:"end_time"`
+	StartTime    time.Time      `gorm:"type:timestamptz;not null" json:"start_time"`
+	EndTime      time.Time      `gorm:"type:timestamptz;not null" json:"end_time"`
 
 	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
