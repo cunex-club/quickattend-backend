@@ -49,8 +49,8 @@ CREATE TABLE event_agendas (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id uuid NOT NULL,
   activity_name text NOT NULL,
-  start_time time NOT NULL,
-  end_time time NOT NULL,
+  start_time timestamptz NOT NULL,
+  end_time timestamptz NOT NULL,
   CONSTRAINT fk_event_agenda_event
     FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE
 );

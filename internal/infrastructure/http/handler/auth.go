@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"strconv"
-
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/gofiber/fiber/v2"
 
@@ -31,19 +29,9 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 }
 
 func (h *Handler) AuthUser(c *fiber.Ctx) error {
+	userIDStr := c.Locals("user_id").(string)
 
-	refIDStr, ok := c.Locals("ref_id").(string)
-	if !ok {
-		return response.SendError(c, 500, response.ErrInternalError, "Failed to assert ref_id as string")
-	}
-
-	refID, err := strconv.ParseUint(refIDStr, 10, 64)
-	if err != nil {
-		return response.SendError(c, 500, response.ErrInternalError, "Could not convert ref_id from string to uint64")
-	}
-
-	ctx := c.UserContext()
-	results, getUserErr := h.Service.Auth.GetUserService(refID, ctx)
+	results, getUserErr := h.Service.Auth.GetUserService(userIDStr, c.UserContext())
 	if getUserErr != nil {
 		return response.SendError(c, getUserErr.Status, getUserErr.Code, getUserErr.Message)
 	}
