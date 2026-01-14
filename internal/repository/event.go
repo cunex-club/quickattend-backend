@@ -9,15 +9,15 @@ import (
 )
 
 type EventRepository interface {
-	// Get user info not provided by CU NEX, and check attendance type of the event
-	GetParticipantUserInfoAndAttendanceType(ctx context.Context, eventId datatypes.UUID, refID uint64) (user *entity.User, attendanceType string, err error)
+	// Get user info not provided by CU NEX, and get attendance type and end time of the event
+	GetParticipantUserAndEventInfo(ctx context.Context, eventId datatypes.UUID, refID uint64) (user *entity.User, attendanceType string, err error)
 	// Check if user has already check in to the event
 	GetParticipantCheckParticipation(ctx context.Context, eventId datatypes.UUID, refID uint64) (found bool, err error)
 	// Check if user is in whitelist / allowed org or faculty of the event
 	GetParticipantCheckAccess(ctx context.Context, orgCode int64, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
 }
 
-func (r *repository) GetParticipantUserInfoAndAttendanceType(ctx context.Context, eventId datatypes.UUID, refID uint64) (*entity.User, string, error) {
+func (r *repository) GetParticipantUserAndEventInfo(ctx context.Context, eventId datatypes.UUID, refID uint64) (*entity.User, string, error) {
 	withCtx := r.db.WithContext(ctx)
 
 	var user entity.User

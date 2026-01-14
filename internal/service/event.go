@@ -214,7 +214,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		}
 	}
 
-	user, attendanceType, err := s.repo.Event.GetParticipantUserInfoAndAttendanceType(ctx, eventIdUuid, refIdUInt)
+	user, attendanceType, err := s.repo.Event.GetParticipantUserAndEventInfo(ctx, eventIdUuid, refIdUInt)
 	if err != nil {
 		s.logger.Error().Err(err).
 			Uint64("ref_id", refIdUInt).
@@ -225,6 +225,8 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 			Status:  500,
 		}
 	}
+
+	checkInTime := time.Now().UTC()
 
 	var status string
 	if attendanceType == string(entity.ALL) {
@@ -292,7 +294,6 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		}
 	}
 
-	checkInTime := time.Now().UTC()
 	rawCode := fmt.Appendf(nil, "%s.%s", checkInTime.Format("2006-01-02T15:04:05Z"), CUNEXSuccess.RefId)
 	responseBody := dtoRes.GetParticipantRes{
 		FirstnameTH:  user.FirstnameTH,
