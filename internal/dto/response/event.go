@@ -8,6 +8,7 @@ const (
 	SUCCESS   status = "success"
 	DUPLICATE status = "duplicate"
 	FAIL      status = "fail"
+	LATE      status = "late"
 )
 
 type GetParticipantRes struct {
