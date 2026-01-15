@@ -31,7 +31,7 @@ func (h *Handler) EventDuplicate(c *fiber.Ctx) error {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
 
-	return response.OK(c, dtoRes.DuplicateEventRes{
+	return response.Created(c, dtoRes.DuplicateEventRes{
 		DuplicatedEventId: createdEvent.ID.String(),
 	})
 }

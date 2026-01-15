@@ -44,6 +44,14 @@ func OK(c *fiber.Ctx, data any) error {
 	})
 }
 
+func Created(c *fiber.Ctx, data any) error {
+	return c.Status(fiber.StatusCreated).JSON(APIResponse{
+		Data:  data,
+		Error: nil,
+		Meta:  nil,
+	})
+}
+
 func Deleted(c *fiber.Ctx, data any) error {
 	return c.Status(fiber.StatusNoContent).JSON(APIResponse{
 		Data:  data,
