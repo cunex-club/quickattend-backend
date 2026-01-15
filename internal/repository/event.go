@@ -3,15 +3,33 @@ package repository
 import (
 	"context"
 
-	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"github.com/cunex-club/quickattend-backend/internal/entity"
 )
 
 type EventRepository interface {
 	FindById(uuid.UUID, context.Context) (*entity.Event, error)
 	DeleteById(uuid.UUID, context.Context) error
 	Create(*entity.Event, context.Context) (*entity.Event, error)
+	CheckIn(uuid.UUID, context.Context) error
+}
+
+func (r *repository) CheckIn(checkInRowId uuid.UUID, timeStamp string, ctx context.Context) error {
+	result := r.db.WithContext(ctx).
+		Where("id = ? AND checkin_timestamp IS NULL", checkInRowId).
+		Update("checkin_timestamp", timeStamp)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return entity.ErrCheckInFailed
+	}
+
+	return nil
 }
 
 func (r *repository) FindById(id uuid.UUID, ctx context.Context) (*entity.Event, error) {

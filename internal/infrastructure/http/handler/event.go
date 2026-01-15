@@ -44,7 +44,7 @@ func (h *Handler) EventCheckIn(c *fiber.Ctx) error {
 		return response.SendError(c, 500, "FAIL_PARSE_REQ_BODY", "failed to parse request body")
 	}
 
-	err := h.Service.Event.EventCheckIn(checkInReq.EncodedOneTimeCode)
+	err := h.Service.Event.EventCheckIn(checkInReq.EncodedOneTimeCode, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}

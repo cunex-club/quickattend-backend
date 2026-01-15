@@ -17,25 +17,57 @@ import (
 type EventService interface {
 	EventDeleteById(EventID string, ctx context.Context) *response.APIError
 	EventDuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
-	EventCheckIn(oneTimeCode string) *response.APIError
+	EventCheckIn(encodedOneTimeCode string, ctx context.Context) *response.APIError
 }
 
-func (s *service) EventCheckIn(encodedOneTimeCode string) *response.APIError {
+func (s *service) EventCheckIn(encodedOneTimeCode string, ctx context.Context) *response.APIError {
 	decodedOneTimeCode, decodeErr := base64.StdEncoding.DecodeString(encodedOneTimeCode)
+
 	if decodeErr != nil {
-		return nil
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "failed to decode one time code",
+			Status:  400,
+		}
 	}
 
 	decodedParts := strings.Split(string(decodedOneTimeCode), ".")
 	if len(decodedParts) != 2 {
 		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "failed to extract timeStamp and EventParticipantsRowId from one time code",
+			Status:  400,
+		}
+	}
+
+	timeStamp, strCheckInRowId := decodedParts[0], decodedParts[1]
+
+	checkInRowId, convErr := uuid.Parse(strCheckInRowId)
+	if convErr != nil {
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "cannot convert strEventParticipantsRowId to uuid",
+			Status:  400,
+		}
+	}
+
+	println(timeStamp, checkInRowId)
+
+	checkinErr := s.repo.Event.CheckIn(checkInRowId, ctx)
+	if checkinErr != nil {
+		if errors.Is(checkinErr, entity.ErrCheckInFailed) {
+			return &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: entity.ErrCheckInFailed.Error(),
+				Status:  400,
+			}
+		}
+		return &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "failed to decode one time code",
+			Message: "internal db error",
 			Status:  500,
 		}
 	}
-	timeStamp, refId := decodedParts[0], decodedParts[1]
-	println(timeStamp, refId)
 	return nil
 }
 
