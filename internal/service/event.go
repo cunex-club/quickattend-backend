@@ -256,13 +256,36 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		}
 	}
 
-	var status string
 	status, checkinTime, errCheckStatus := s._CheckCheckinStatus(ctx, eventIdUuid, refIdUInt, string(event.AttendanceType), orgCode, event.EndTime)
 	if errCheckStatus != nil {
 		return nil, errCheckStatus
 	}
 
-	rawCode := fmt.Appendf(nil, "%s.%s", checkinTime.Format("2006-01-02T15:04:05Z"), CUNEXSuccess.RefId)
+	scanRecord := entity.ScanRecordInsert{
+		EventID:          eventIdUuid,
+		ScannedTimestamp: *checkinTime,
+		ParticipantRefID: refIdUInt,
+		FirstName:        CUNEXSuccess.FirstName,
+		SurName:          CUNEXSuccess.LastName,
+		Organization:     CUNEXSuccess.Organization,
+		// TODO: get point from front end
+		ScannedLocation: entity.Point{X: 0.1, Y: 9.9},
+		// TODO: get scanner ID from this user's user_id
+		ScannerID: datatypes.NewUUIDv4(),
+	}
+	rowId, insertErr := s.repo.Event.InsertScanRecord(ctx, &scanRecord)
+	if insertErr != nil {
+		s.logger.Error().Err(insertErr).
+			Uint64("participant ref_id", refIdUInt).
+			Str("function", "EventRepository.InsertScanRecord")
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB error",
+			Status:  500,
+		}
+	}
+
+	rawCode := fmt.Appendf(nil, "%s.%s", checkinTime.Format("2006-01-02T15:04:05Z"), rowId.String())
 	responseBody := dtoRes.GetParticipantRes{
 		FirstnameTH:  user.FirstnameTH,
 		SurnameTH:    user.SurnameTH,
@@ -283,6 +306,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 func (s *service) _CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, attendanceType string, orgCode int64, eventEndTime time.Time) (string, *time.Time, *response.APIError) {
 	now := time.Now().UTC()
 
+	// Must check if already checked in, regardless of attendance type
 	found, err := s.repo.Event.CheckEventParticipation(ctx, eventId, participantRefId)
 	if err != nil {
 		s.logger.Error().Err(err).
@@ -298,6 +322,7 @@ func (s *service) _CheckCheckinStatus(ctx context.Context, eventId datatypes.UUI
 		return string(dtoRes.DUPLICATE), &now, nil
 	}
 
+	// If FACULTIES or WHITELIST, must check for access
 	if attendanceType == string(entity.FACULTIES) || attendanceType == string(entity.WHITELIST) {
 		allow, err := s.repo.Event.CheckEventAccess(ctx, orgCode, participantRefId, attendanceType, eventId)
 		if err != nil {
@@ -316,6 +341,7 @@ func (s *service) _CheckCheckinStatus(ctx context.Context, eventId datatypes.UUI
 		}
 	}
 
+	// Cannot check in if already past the event's ending time
 	if now.After(eventEndTime.UTC()) {
 		return string(dtoRes.LATE), &now, nil
 	}
