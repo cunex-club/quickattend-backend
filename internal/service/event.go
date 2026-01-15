@@ -48,7 +48,7 @@ func (s *service) EventDeleteById(EventId string, ctx context.Context) *response
 			Str("action", "delete_event").
 			Msg("attempt deleting nil uuid")
 		return &response.APIError{
-			Code:    response.ErrNotFound,
+			Code:    response.ErrBadRequest,
 			Message: "nil uuid not allowed",
 			Status:  400,
 		}
