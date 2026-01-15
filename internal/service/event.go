@@ -2,18 +2,41 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"strings"
 
-	"github.com/cunex-club/quickattend-backend/internal/entity"
-	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+
+	"github.com/cunex-club/quickattend-backend/internal/entity"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 )
 
 type EventService interface {
 	EventDeleteById(EventID string, ctx context.Context) *response.APIError
 	EventDuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
+	EventCheckIn(oneTimeCode string) *response.APIError
+}
+
+func (s *service) EventCheckIn(encodedOneTimeCode string) *response.APIError {
+	decodedOneTimeCode, decodeErr := base64.StdEncoding.DecodeString(encodedOneTimeCode)
+	if decodeErr != nil {
+		return nil
+	}
+
+	decodedParts := strings.Split(string(decodedOneTimeCode), ".")
+	if len(decodedParts) != 2 {
+		return &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "failed to decode one time code",
+			Status:  500,
+		}
+	}
+	timeStamp, refId := decodedParts[0], decodedParts[1]
+	println(timeStamp, refId)
+	return nil
 }
 
 func (s *service) EventDeleteById(EventId string, ctx context.Context) *response.APIError {
