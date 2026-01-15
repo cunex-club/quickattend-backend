@@ -9,34 +9,44 @@ import (
 )
 
 type EventRepository interface {
-	// Get user info not provided by CU NEX, and get attendance type and end time of the event
-	GetParticipantUserAndEventInfo(ctx context.Context, eventId datatypes.UUID, refID uint64) (user *entity.User, attendanceType string, err error)
-	// Check if user has already check in to the event
-	GetParticipantCheckParticipation(ctx context.Context, eventId datatypes.UUID, refID uint64) (found bool, err error)
+	// For POST participant/:qrcode. Get user info not provided by CU NEX
+	GetUserForCheckin(ctx context.Context, refID uint64) (user *entity.CheckinUserQuery, err error)
+	// For POST participant/:qrcode. Get attendance_type and end_time of the event
+	GetEventForCheckin(ctx context.Context, eventId datatypes.UUID) (event *entity.CheckinEventQuery, err error)
+	// Check if user has already checked in to the event
+	CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, refID uint64) (found bool, err error)
 	// Check if user is in whitelist / allowed org or faculty of the event
-	GetParticipantCheckAccess(ctx context.Context, orgCode int64, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
+	CheckEventAccess(ctx context.Context, orgCode int64, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
+	InsertCheckinRecord(ctx context.Context) (id *datatypes.UUID, err error)
 }
 
-func (r *repository) GetParticipantUserAndEventInfo(ctx context.Context, eventId datatypes.UUID, refID uint64) (*entity.User, string, error) {
+func (r *repository) GetUserForCheckin(ctx context.Context, refID uint64) (*entity.CheckinUserQuery, error) {
 	withCtx := r.db.WithContext(ctx)
 
-	var user entity.User
-	getUserErr := withCtx.Model(&user).Select("firstname_th", "surname_th", "title_th", "title_en").
+	var user entity.CheckinUserQuery
+	getUserErr := withCtx.Model(&entity.User{}).Select("firstname_th", "surname_th", "title_th", "title_en").
 		First(&user, &entity.User{RefID: refID}).Error
 	if getUserErr != nil {
-		return nil, "", getUserErr
+		return nil, getUserErr
 	}
 
-	var event entity.Event
-	getAttendanceTypeErr := withCtx.Model(&event).Select("attendence_type").First(&event, &entity.Event{ID: eventId}).Error
-	if getAttendanceTypeErr != nil {
-		return nil, "", getAttendanceTypeErr
-	}
-
-	return &user, string(event.AttendenceType), nil
+	return &user, nil
 }
 
-func (r *repository) GetParticipantCheckParticipation(ctx context.Context, eventId datatypes.UUID, refID uint64) (bool, error) {
+func (r *repository) GetEventForCheckin(ctx context.Context, eventId datatypes.UUID) (*entity.CheckinEventQuery, error) {
+	withCtx := r.db.WithContext(ctx)
+
+	var event entity.CheckinEventQuery
+	getEventErr := withCtx.Model(&entity.Event{}).Select("end_time", "attendance_type").
+		First(&event, &entity.Event{ID: eventId}).Error
+	if getEventErr != nil {
+		return nil, getEventErr
+	}
+
+	return &event, nil
+}
+
+func (r *repository) CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, refID uint64) (bool, error) {
 	withCtx := r.db.WithContext(ctx)
 
 	var found bool
@@ -51,7 +61,7 @@ func (r *repository) GetParticipantCheckParticipation(ctx context.Context, event
 	return found, nil
 }
 
-func (r *repository) GetParticipantCheckAccess(ctx context.Context, orgCode int64, refID uint64, attendanceType string, eventId datatypes.UUID) (bool, error) {
+func (r *repository) CheckEventAccess(ctx context.Context, orgCode int64, refID uint64, attendanceType string, eventId datatypes.UUID) (bool, error) {
 	withCtx := r.db.WithContext(ctx)
 	var found bool
 
@@ -82,4 +92,8 @@ func (r *repository) GetParticipantCheckAccess(ctx context.Context, orgCode int6
 		// should not happen
 		return false, errors.New("attendanceType is neither 'FACULTIES' nor 'WHITELISTS'")
 	}
+}
+
+func (r *repository) InsertCheckinRecord(ctx context.Context) (*datatypes.UUID, error) {
+
 }
