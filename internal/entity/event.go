@@ -160,7 +160,9 @@ type EventAgenda struct {
 type EventParticipants struct {
 	ID               datatypes.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID          datatypes.UUID  `gorm:"type:uuid;not null" json:"event_id"`
-	CheckinTimestamp time.Time       `gorm:"type:timestamptz;not null" json:"checkin_timestamp"`
+	CheckinTimestamp *time.Time      `gorm:"type:timestamptz" json:"checkin_timestamp"`
+	ScannedTimestamp time.Time       `gorm:"type:timestamptz;not null" json:"scanned_timestamp"`
+	Comment          *string         `gorm:"type:text" json:"comment"`
 	ParticipantRefID uint64          `gorm:"type:bigint;not null" json:"participant_ref_id"`
 	FirstName        string          `gorm:"type:text;not null" json:"first_name"`
 	SurName          string          `gorm:"type:text;not null" json:"last_name"`
