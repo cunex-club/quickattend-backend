@@ -19,10 +19,10 @@ import (
 )
 
 type EventService interface {
-	GetParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
+	PostParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
 }
 
-func (s *service) GetParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
+func (s *service) PostParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
 	if code == "" {
 		return nil, &response.APIError{
 			Code:    response.ErrBadRequest,

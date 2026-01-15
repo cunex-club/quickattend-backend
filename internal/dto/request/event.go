@@ -1,5 +1,5 @@
 package response
 
-type GetParticipantReqBody struct {
+type PostParticipantReqBody struct {
 	EventId string `json:"event_id"`
 }
