@@ -15,6 +15,7 @@ import (
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type EventService interface {
@@ -203,6 +204,7 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		// TODO: how to get org code from staff id?
 		orgCode = 0
 	case entity.STUDENTS:
+		// Get faculty ID from the last 2 digits of student ID
 		code, _ := strconv.ParseInt(CUNEXSuccess.RefId[len(CUNEXSuccess.RefId)-2:], 10, 64)
 		orgCode = code
 	default:
@@ -214,11 +216,19 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		}
 	}
 
-	user, attendanceType, err := s.repo.Event.GetParticipantUserAndEventInfo(ctx, eventIdUuid, refIdUInt)
-	if err != nil {
-		s.logger.Error().Err(err).
-			Uint64("ref_id", refIdUInt).
-			Str("function", "EventRepository.GetParticipantUserInfoAndAttendanceType")
+	user, getUserErr := s.repo.Event.GetUserForCheckin(ctx, refIdUInt)
+	if getUserErr != nil {
+		if getUserErr == gorm.ErrRecordNotFound {
+			return nil, &response.APIError{
+				Code:    response.ErrNotFound,
+				Message: "Participant with this ref_id not found",
+				Status:  404,
+			}
+		}
+
+		s.logger.Error().Err(getUserErr).
+			Uint64("participant ref_id", refIdUInt).
+			Str("function", "EventRepository.GetUserForCheckin")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "Internal DB error",
@@ -226,75 +236,33 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		}
 	}
 
-	checkInTime := time.Now().UTC()
+	event, getEventErr := s.repo.Event.GetEventForCheckin(ctx, eventIdUuid)
+	if getEventErr != nil {
+		if getEventErr == gorm.ErrRecordNotFound {
+			return nil, &response.APIError{
+				Code:    response.ErrNotFound,
+				Message: "Event with this id not found",
+				Status:  404,
+			}
+		}
+
+		s.logger.Error().Err(getEventErr).
+			Str("event_id", eventId).
+			Str("function", "EventRepository.GetEventForCheckin")
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB error",
+			Status:  500,
+		}
+	}
 
 	var status string
-	if attendanceType == string(entity.ALL) {
-		found, err := s.repo.Event.GetParticipantCheckParticipation(ctx, eventIdUuid, refIdUInt)
-		if err != nil {
-			s.logger.Error().Err(err).
-				Uint64("ref_id", refIdUInt).
-				Str("function", "EventRepository.GetParticipantCheckParticipation")
-			return nil, &response.APIError{
-				Code:    response.ErrInternalError,
-				Message: "Internal DB error",
-				Status:  500,
-			}
-		}
-
-		if !found {
-			status = string(dtoRes.SUCCESS)
-		} else {
-			status = string(dtoRes.DUPLICATE)
-		}
-
-	} else if attendanceType == string(entity.WHITELIST) || attendanceType == string(entity.FACULTIES) {
-		found, err := s.repo.Event.GetParticipantCheckParticipation(ctx, eventIdUuid, refIdUInt)
-		if err != nil {
-			s.logger.Error().Err(err).
-				Uint64("ref_id", refIdUInt).
-				Str("function", "EventRepository.GetParticipantCheckParticipation")
-			return nil, &response.APIError{
-				Code:    response.ErrInternalError,
-				Message: "Internal DB error",
-				Status:  500,
-			}
-		}
-
-		if found {
-			status = string(dtoRes.DUPLICATE)
-		} else {
-			allow, err := s.repo.Event.GetParticipantCheckAccess(ctx, orgCode, refIdUInt, attendanceType, eventIdUuid)
-			if err != nil {
-				s.logger.Error().Err(err).
-					Uint64("ref_id", refIdUInt).
-					Str("function", "EventRepository.GetParticipantCheckAccess")
-				return nil, &response.APIError{
-					Code:    response.ErrInternalError,
-					Message: "Internal DB error",
-					Status:  500,
-				}
-			}
-
-			if !allow {
-				status = string(dtoRes.FAIL)
-			} else {
-				status = string(dtoRes.SUCCESS)
-			}
-		}
-
-	} else {
-		s.logger.Error().
-			Uint64("ref_id", refIdUInt).
-			Str("Error", fmt.Sprintf("'%s' is not a possible value for attendance_type enum", attendanceType))
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Internal DB error",
-			Status:  500,
-		}
+	status, checkinTime, errCheckStatus := s._CheckCheckinStatus(ctx, eventIdUuid, refIdUInt, string(event.AttendanceType), orgCode, event.EndTime)
+	if errCheckStatus != nil {
+		return nil, errCheckStatus
 	}
 
-	rawCode := fmt.Appendf(nil, "%s.%s", checkInTime.Format("2006-01-02T15:04:05Z"), CUNEXSuccess.RefId)
+	rawCode := fmt.Appendf(nil, "%s.%s", checkinTime.Format("2006-01-02T15:04:05Z"), CUNEXSuccess.RefId)
 	responseBody := dtoRes.GetParticipantRes{
 		FirstnameTH:  user.FirstnameTH,
 		SurnameTH:    user.SurnameTH,
@@ -304,10 +272,53 @@ func (s *service) GetParticipantService(code string, eventId string, ctx context
 		TitleEN:      user.TitleEN,
 		RefID:        refIdUInt,
 		Organization: CUNEXSuccess.Organization,
-		CheckInTime:  checkInTime,
+		CheckInTime:  *checkinTime,
 		Status:       status,
 		Code:         b64.StdEncoding.EncodeToString(rawCode),
 	}
 
 	return &responseBody, nil
+}
+
+func (s *service) _CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, attendanceType string, orgCode int64, eventEndTime time.Time) (string, *time.Time, *response.APIError) {
+	now := time.Now().UTC()
+
+	found, err := s.repo.Event.CheckEventParticipation(ctx, eventId, participantRefId)
+	if err != nil {
+		s.logger.Error().Err(err).
+			Uint64("participant ref_id", participantRefId).
+			Str("function", "EventRepository.CheckEventParticipation")
+		return "", nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB error",
+			Status:  500,
+		}
+	}
+	if found {
+		return string(dtoRes.DUPLICATE), &now, nil
+	}
+
+	if attendanceType == string(entity.FACULTIES) || attendanceType == string(entity.WHITELIST) {
+		allow, err := s.repo.Event.CheckEventAccess(ctx, orgCode, participantRefId, attendanceType, eventId)
+		if err != nil {
+			s.logger.Error().Err(err).
+				Uint64("participant ref_id", participantRefId).
+				Str("function", "EventRepository.CheckEventAccess")
+			return "", nil, &response.APIError{
+				Code:    response.ErrInternalError,
+				Message: "Internal DB error",
+				Status:  500,
+			}
+		}
+
+		if !allow {
+			return string(dtoRes.FAIL), &now, nil
+		}
+	}
+
+	if now.After(eventEndTime.UTC()) {
+		return string(dtoRes.LATE), &now, nil
+	}
+
+	return string(dtoRes.SUCCESS), &now, nil
 }
