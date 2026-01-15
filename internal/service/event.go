@@ -19,10 +19,10 @@ import (
 )
 
 type EventService interface {
-	PostParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
+	PostParticipantService(code string, userId string, eventId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
 }
 
-func (s *service) PostParticipantService(code string, eventId string, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
+func (s *service) PostParticipantService(code string, userId string, eventId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
 	if code == "" {
 		return nil, &response.APIError{
 			Code:    response.ErrBadRequest,
@@ -54,8 +54,8 @@ func (s *service) PostParticipantService(code string, eventId string, ctx contex
 		}
 	}
 
-	validateUuidErr := uuid.Validate(eventId)
-	if validateUuidErr != nil {
+	eventIdErr := uuid.Validate(eventId)
+	if eventIdErr != nil {
 		return nil, &response.APIError{
 			Code:    response.ErrBadRequest,
 			Message: "Invalid event ID format",
@@ -63,6 +63,18 @@ func (s *service) PostParticipantService(code string, eventId string, ctx contex
 		}
 	}
 	eventIdUuid := datatypes.UUID(datatypes.BinUUIDFromString(eventId))
+
+	userIdErr := uuid.Validate(userId)
+	if userIdErr != nil {
+		s.logger.Error().Err(userIdErr).
+			Str("user_id", userId)
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Invalid user_id from JWT claim",
+			Status:  500,
+		}
+	}
+	userIdUuid := datatypes.UUID(datatypes.BinUUIDFromString(userId))
 
 	CUNEXGetQRURL := ""
 	clientId := s.cfg.LLEConfig.ClientId
@@ -268,10 +280,8 @@ func (s *service) PostParticipantService(code string, eventId string, ctx contex
 		FirstName:        CUNEXSuccess.FirstName,
 		SurName:          CUNEXSuccess.LastName,
 		Organization:     CUNEXSuccess.Organization,
-		// TODO: get point from front end
-		ScannedLocation: entity.Point{X: 0.1, Y: 9.9},
-		// TODO: get scanner ID from this user's user_id
-		ScannerID: datatypes.NewUUIDv4(),
+		ScannedLocation:  entity.Point{X: scannedLocX, Y: scannedLocY},
+		ScannerID:        userIdUuid,
 	}
 	rowId, insertErr := s.repo.Event.InsertScanRecord(ctx, &scanRecord)
 	if insertErr != nil {
