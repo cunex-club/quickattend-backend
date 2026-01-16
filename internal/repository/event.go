@@ -24,7 +24,7 @@ func (r *repository) GetManagedEvents(userID datatypes.UUID, search string, ctx 
 		searchQuery := fmt.Sprintf("%%%s%%", search)
 
 		errGetEvents := tx.Table("events").
-			Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
+			Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
 				"events.end_time", "events.location", "event_users.role", "events.evaluation_form").
 			Joins(`JOIN event_users ON event_users.user_id = ? 
 				AND event_users.event_id = events.id`,
@@ -42,7 +42,7 @@ func (r *repository) GetManagedEvents(userID datatypes.UUID, search string, ctx 
 	}
 
 	errGetEvents := tx.Table("events").
-		Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
+		Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
 			"events.end_time", "events.location", "event_users.role", "events.evaluation_form").
 		Joins(`JOIN event_users ON event_users.user_id = ? 
 			AND event_users.event_id = events.id`,
@@ -70,7 +70,7 @@ func (r *repository) GetAttendedEvents(userID datatypes.UUID, page int, pageSize
 		searchQuery := fmt.Sprintf("%%%s%%", search)
 
 		subQuery = tx.Table("events").
-			Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
+			Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
 				"events.end_time", "events.location", "events.evaluation_form").
 			Joins(`JOIN event_participants ON event_participants.participant_ref_id = ? 
 				AND event_participants.event_id = events.id
@@ -80,7 +80,7 @@ func (r *repository) GetAttendedEvents(userID datatypes.UUID, page int, pageSize
 				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
 	} else {
 		subQuery = tx.Table("events").
-			Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
+			Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
 				"events.end_time", "events.location", "events.evaluation_form").
 			Joins(`JOIN event_participants ON event_participants.participant_ref_id = ? 
 			AND event_participants.event_id = events.id
@@ -125,7 +125,7 @@ func (r *repository) GetDiscoveryEvents(userID datatypes.UUID, page int, pageSiz
 	if search != "" {
 		searchQuery := fmt.Sprintf("%%%s%%", search)
 
-		subQuery = tx.Table("events").Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
+		subQuery = tx.Table("events").Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
 			"events.end_time", "events.location", "events.evaluation_form").
 			Where(`NOT EXISTS (
 					SELECT 1 FROM event_users WHERE event_users.event_id = events.id
@@ -138,7 +138,7 @@ func (r *repository) GetDiscoveryEvents(userID datatypes.UUID, page int, pageSiz
 				OR events.evaluation_form ILIKE ?)
 				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
 	} else {
-		subQuery = tx.Table("events").Select("events.id", "events.name", "events.organizer", "events.description", "events.date", "events.start_time",
+		subQuery = tx.Table("events").Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
 			"events.end_time", "events.location", "events.evaluation_form").
 			Where(`NOT EXISTS (
 				SELECT 1 FROM event_users WHERE event_users.event_id = events.id
