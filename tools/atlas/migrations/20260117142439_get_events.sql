@@ -10,9 +10,8 @@ CREATE TABLE "events" (
   "name" text NOT NULL,
   "organizer" text NOT NULL,
   "description" text NULL,
-  "date" timestamp NOT NULL,
-  "start_time" time NOT NULL,
-  "end_time" time NOT NULL,
+  "start_time" timestamptz NOT NULL,
+  "end_time" timestamptz NOT NULL,
   "location" text NOT NULL,
   "attendence_type" "attendence_type" NOT NULL,
   "allow_all_to_scan" boolean NOT NULL,
@@ -25,8 +24,8 @@ CREATE TABLE "event_agendas" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
   "activity_name" text NOT NULL,
-  "start_time" time NOT NULL,
-  "end_time" time NOT NULL,
+  "start_time" timestamptz NOT NULL,
+  "end_time" timestamptz NOT NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_event_agenda_event" FOREIGN KEY ("event_id") REFERENCES "events" ("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
@@ -38,18 +37,29 @@ CREATE TABLE "event_allowed_faculties" (
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_event_allowed_faculties_event" FOREIGN KEY ("event_id") REFERENCES "events" ("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
--- Rename a column from "uuid" to "id"
-ALTER TABLE "users" RENAME COLUMN "uuid" TO "id";
--- Modify "users" table
-ALTER TABLE "users" ADD COLUMN "ref_id" bigint NOT NULL, ADD COLUMN "firstname_th" text NOT NULL, ADD COLUMN "surname_th" text NOT NULL, ADD COLUMN "title_th" text NOT NULL, ADD COLUMN "firstname_en" text NOT NULL, ADD COLUMN "surname_en" text NOT NULL, ADD COLUMN "title_en" text NOT NULL, ADD CONSTRAINT "users_ref_id_key" UNIQUE ("ref_id");
+-- Create "users" table
+CREATE TABLE "users" (
+  "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+  "ref_id" bigint NOT NULL,
+  "firstname_th" text NOT NULL,
+  "surname_th" text NOT NULL,
+  "title_th" text NOT NULL,
+  "firstname_en" text NOT NULL,
+  "surname_en" text NOT NULL,
+  "title_en" text NOT NULL,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "users_ref_id_key" UNIQUE ("ref_id")
+);
 -- Create "event_participants" table
 CREATE TABLE "event_participants" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
-  "checkin_timestamp" timestamptz NOT NULL,
+  "checkin_timestamp" timestamptz NULL,
+  "scanned_timestamp" timestamptz NOT NULL,
+  "comment" text NULL,
   "participant_ref_id" bigint NOT NULL,
   "first_name" text NOT NULL,
-  "last_name" text NOT NULL,
+  "sur_name" text NOT NULL,
   "organization" text NOT NULL,
   "scanned_location" point NOT NULL,
   "scanner_id" uuid NULL,
