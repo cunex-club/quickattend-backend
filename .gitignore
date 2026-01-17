@@ -34,3 +34,5 @@ go.work.sum
 # Air - Live reload for Go apps
 tmp
 .air.toml
+
+.DS_Store
