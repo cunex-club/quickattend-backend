@@ -52,7 +52,9 @@ func (r *repository) CheckEventParticipation(ctx context.Context, eventId dataty
 	var found bool
 	checkParticipantErr := withCtx.Raw(`SELECT EXISTS (
 				SELECT 1 FROM event_participants
-				WHERE participant_ref_id = ? AND event_id = ?
+				WHERE participant_ref_id = ? 
+				AND event_id = ?
+				AND checkin_timestamp IS NOT NULL
 			) AS subQuery`, refID, eventId).Scan(&found).Error
 	if checkParticipantErr != nil {
 		return false, checkParticipantErr
