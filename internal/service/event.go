@@ -27,7 +27,6 @@ func (s *service) GetEventsService(userIDStr string, queryParams map[string]stri
 			Status:  500,
 		}
 	}
-
 	userID := datatypes.UUID(datatypes.BinUUIDFromString(userIDStr))
 
 	pageQuery, pageOk := queryParams["page"]
@@ -180,7 +179,6 @@ func (s *service) _GetEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, 
 				Name:           (*rawResult)[i].Name,
 				Organizer:      (*rawResult)[i].Organizer,
 				Description:    (*rawResult)[i].Description,
-				Date:           (*rawResult)[i].Date,
 				StartTime:      (*rawResult)[i].StartTime,
 				EndTime:        (*rawResult)[i].EndTime,
 				Location:       (*rawResult)[i].Location,
