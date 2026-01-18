@@ -24,11 +24,13 @@ func (r *repository) GetOneEvent(eventId datatypes.UUID, ctx context.Context) (*
 	}
 
 	var eventWithCount entity.GetOneEventWithTotalCount
-	eventErr := withCtx.Model(&entity.Event{}).Select("events.name", "events.organizer", "events.description", "events.start_time",
-		"events.end_time", "events.location", "events.evaluation_form", "COUNT(event_participants.id) AS total_registered").
-		Joins("LEFT JOIN event_participants ON events.id = event_participants.event_id").
-		Where("events.id = ?", eventId).
-		Group("events.id").
+	eventErr := withCtx.Table("events e").
+		Select("e.name", "e.organizer", "e.description", "e.start_time",
+			"e.end_time", "e.location", "e.evaluation_form",
+			"COUNT(ep.id) FILTER (WHERE ep.checkin_timestamp IS NOT NULL) AS total_registered").
+		Joins("LEFT JOIN event_participants ep ON e.id = ep.event_id").
+		Where("e.id = ?", eventId).
+		Group("e.id").
 		Scan(&eventWithCount).Error
 	if eventErr != nil {
 		return nil, nil, eventErr
