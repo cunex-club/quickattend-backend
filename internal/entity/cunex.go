@@ -23,10 +23,17 @@ const (
 )
 
 type CUNEXGetQRSuccessResponse struct {
-	UserType     UserTypes `json:"userType"`
-	RefId        string    `json:"refId"`
-	FirstName    string    `json:"firstName"`
-	LastName     string    `json:"lastName"`
-	Organization string    `json:"organization"`
-	PhotoBase64  string    `json:"photoBase64"`
+	DepartmentNameEN string    `json:"departmentNameEN"`
+	DepartmentNameTH string    `json:"departmentNameTH"`
+	FacultyCode      string    `json:"facultyCode"`
+	FacultyNameEN    string    `json:"facultyNameEN"`
+	FacultyNameTH    string    `json:"facultyNameTH"`
+	FirstNameEN      string    `json:"firstNameEN"`
+	FirstNameTH      string    `json:"firstNameTH"`
+	Gender           string    `json:"gender"`
+	LastNameEN       string    `json:"lastNameEN"`
+	LastNameTH       string    `json:"lastNameTH"`
+	ProfileImageUrl  string    `json:"profileImageUrl"`
+	RefId            string    `json:"refId"`
+	UserType         UserTypes `json:"userType"`
 }
