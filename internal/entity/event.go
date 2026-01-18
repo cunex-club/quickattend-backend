@@ -179,10 +179,8 @@ type EventParticipants struct {
 
 // For retrieving result from DB in EventRepository.GetUserForCheckin
 type CheckinUserQuery struct {
-	FirstnameTH string `gorm:"column:firstname_th"`
-	SurnameTH   string `gorm:"column:surname_th"`
-	TitleTH     string `gorm:"column:title_th"`
-	TitleEN     string `gorm:"column:title_en"`
+	TitleTH string `gorm:"column:title_th"`
+	TitleEN string `gorm:"column:title_en"`
 }
 
 // For retrieving result from DB in EventRepository.GetUserForCheckin

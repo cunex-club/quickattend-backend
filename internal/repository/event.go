@@ -24,7 +24,7 @@ func (r *repository) GetUserForCheckin(ctx context.Context, refID uint64) (*enti
 	withCtx := r.db.WithContext(ctx)
 
 	var user entity.CheckinUserQuery
-	getUserErr := withCtx.Model(&entity.User{}).Select("firstname_th", "surname_th", "title_th", "title_en").
+	getUserErr := withCtx.Model(&entity.User{}).Select("title_th", "title_en").
 		First(&user, &entity.User{RefID: refID}).Error
 	if getUserErr != nil {
 		return nil, getUserErr
