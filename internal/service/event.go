@@ -76,7 +76,7 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 	}
 	userIdUuid := datatypes.UUID(datatypes.BinUUIDFromString(userId))
 
-	CUNEXGetQRURL := ""
+	CUNEXGetQRURL := "https://culab-svc.azurewebsites.net/Service.svc/qrcodeinfo_for_all"
 	clientId := s.cfg.LLEConfig.ClientId
 	if clientId == "" {
 		s.logger.Error().Str("Error", "Missing env config 'LLEClientId'")
@@ -128,67 +128,8 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 
 	var CUNEXSuccess entity.CUNEXGetQRSuccessResponse
 
-	if resp.StatusCode != 200 {
-		var CUNEXErr entity.CUNEXGetQRErrorResponse
-		parseErr := json.NewDecoder(resp.Body).Decode(&CUNEXErr)
-		if parseErr != nil {
-			s.logger.Error().Err(parseErr).Str("Error", "Could not parse error response from CU NEX GET qrcode")
-			return nil, &response.APIError{
-				Code:    response.ErrInternalError,
-				Message: "Could not parse error response from CU NEX GET qrcode",
-				Status:  500,
-			}
-		}
-
-		switch resp.StatusCode {
-		case 417:
-			switch CUNEXErr.ErrorCode {
-			case "E001", "E002", "E003":
-				// token invalid, token expired, or token inactive
-				return nil, &response.APIError{
-					Code:    CUNEXErr.ErrorCode,
-					Message: CUNEXErr.Message,
-					Status:  401,
-				}
-			case "E004":
-				// qrcode inactive
-				return nil, &response.APIError{
-					Code:    CUNEXErr.ErrorCode,
-					Message: CUNEXErr.Message,
-					Status:  410,
-				}
-			case "E999":
-				// internal service error
-				return nil, &response.APIError{
-					Code:    CUNEXErr.ErrorCode,
-					Message: CUNEXErr.Message,
-					Status:  500,
-				}
-			}
-
-		case 401:
-			s.logger.Error().Str("Error", fmt.Sprintf("Authorization error from CU NEX GET qrcode: %s", CUNEXErr.Message))
-			return nil, &response.APIError{
-				Code:    response.ErrInternalError,
-				Message: "Authorization error from CU NEX GET qrcode",
-				Status:  500,
-			}
-		case 400:
-			s.logger.Error().Str("Error", fmt.Sprintf("Bad request error from CU NEX GET qrcode: %s", CUNEXErr.Message))
-			return nil, &response.APIError{
-				Code:    response.ErrInternalError,
-				Message: "Bad request error from CU NEX GET qrcode",
-				Status:  500,
-			}
-		case 500:
-			s.logger.Error().Str("Error", fmt.Sprintf("Server error from CU NEX GET qrcode: %s", CUNEXErr.Message))
-			return nil, &response.APIError{
-				Code:    response.ErrInternalError,
-				Message: "Server error from CU NEX GET qrcode",
-				Status:  500,
-			}
-		}
-	} else {
+	switch resp.StatusCode {
+	case 200:
 		parseErr := json.NewDecoder(resp.Body).Decode(&CUNEXSuccess)
 		if parseErr != nil {
 			s.logger.Error().Err(parseErr).Str("Error", "Could not parse success response from CU NEX GET qrcode")
@@ -198,7 +139,103 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 				Status:  500,
 			}
 		}
+
+	case 401:
+		// Incorrect ClientId or ClientSecret
+		s.logger.Error().Str("Error", "Authorization error from CU NEX GET qrcode")
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Authorization error from CU NEX GET qrcode",
+			Status:  500,
+		}
+
+	case 403:
+		// Expired or invalid QR
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Invalid or expired qrcode",
+			Status:  410,
+		}
+
+	case 500:
+		s.logger.Error().Str("Error", "Internal server error from CU NEX GET qrcode")
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal error from CU NEX GET qrcode",
+			Status:  500,
+		}
+
+	default:
+		s.logger.Error().Str("Error", fmt.Sprintf("Response with unexpected status code from CU NEX GET qrcode: %d", resp.StatusCode))
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Unknown response from CU NEX GET qrcode",
+			Status:  500,
+		}
+
 	}
+	// if resp.StatusCode != 200 {
+	// 	var CUNEXErr entity.CUNEXGetQRErrorResponse
+	// 	parseErr := json.NewDecoder(resp.Body).Decode(&CUNEXErr)
+	// 	if parseErr != nil {
+	// 		s.logger.Error().Err(parseErr).Str("Error", "Could not parse error response from CU NEX GET qrcode")
+	// 		return nil, &response.APIError{
+	// 			Code:    response.ErrInternalError,
+	// 			Message: "Could not parse error response from CU NEX GET qrcode",
+	// 			Status:  500,
+	// 		}
+	// 	}
+
+	// 	switch resp.StatusCode {
+	// 	case 417:
+	// 		switch CUNEXErr.ErrorCode {
+	// 		case "E001", "E002", "E003":
+	// 			// token invalid, token expired, or token inactive
+	// 			return nil, &response.APIError{
+	// 				Code:    CUNEXErr.ErrorCode,
+	// 				Message: CUNEXErr.Message,
+	// 				Status:  401,
+	// 			}
+	// 		case "E004":
+	// 			// qrcode inactive
+	// 			return nil, &response.APIError{
+	// 				Code:    CUNEXErr.ErrorCode,
+	// 				Message: CUNEXErr.Message,
+	// 				Status:  410,
+	// 			}
+	// 		case "E999":
+	// 			// internal service error
+	// 			return nil, &response.APIError{
+	// 				Code:    CUNEXErr.ErrorCode,
+	// 				Message: CUNEXErr.Message,
+	// 				Status:  500,
+	// 			}
+	// 		}
+
+	// 	case 401:
+	// 		s.logger.Error().Str("Error", fmt.Sprintf("Authorization error from CU NEX GET qrcode: %s", CUNEXErr.Message))
+	// 		return nil, &response.APIError{
+	// 			Code:    response.ErrInternalError,
+	// 			Message: "Authorization error from CU NEX GET qrcode",
+	// 			Status:  500,
+	// 		}
+	// 	case 400:
+	// 		s.logger.Error().Str("Error", fmt.Sprintf("Bad request error from CU NEX GET qrcode: %s", CUNEXErr.Message))
+	// 		return nil, &response.APIError{
+	// 			Code:    response.ErrInternalError,
+	// 			Message: "Bad request error from CU NEX GET qrcode",
+	// 			Status:  500,
+	// 		}
+	// 	case 500:
+	// 		s.logger.Error().Str("Error", fmt.Sprintf("Server error from CU NEX GET qrcode: %s", CUNEXErr.Message))
+	// 		return nil, &response.APIError{
+	// 			Code:    response.ErrInternalError,
+	// 			Message: "Server error from CU NEX GET qrcode",
+	// 			Status:  500,
+	// 		}
+	// 	}
+	// } else {
+	// }
 
 	refIdUInt, convertErr := strconv.ParseUint(CUNEXSuccess.RefId, 10, 64)
 	if convertErr != nil {
@@ -210,23 +247,15 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 		}
 	}
 
-	var orgCode int64
-	switch CUNEXSuccess.UserType {
-	case entity.STAFFS:
-		// TODO: how to get org code from staff id?
-		orgCode = 0
-	case entity.STUDENTS:
-		// Get faculty ID from the last 2 digits of student ID
-		code, _ := strconv.ParseInt(CUNEXSuccess.RefId[len(CUNEXSuccess.RefId)-2:], 10, 64)
-		orgCode = code
-	default:
-		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
+	tempCode, err := strconv.ParseUint(CUNEXSuccess.FacultyCode, 10, 8)
+	if err != nil {
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Invalid userType returned from CU NEX GET qrcode",
+			Message: "Invalid facultyCode returned from CU NEX GET qrcode",
 			Status:  500,
 		}
 	}
+	orgCode := uint8(tempCode)
 
 	user, getUserErr := s.repo.Event.GetUserForCheckin(ctx, refIdUInt)
 	if getUserErr != nil {
@@ -273,13 +302,30 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 		return nil, errCheckStatus
 	}
 
+	var org string
+	switch CUNEXSuccess.UserType {
+	case entity.STUDENTS:
+		org = CUNEXSuccess.FacultyNameEN
+
+	case entity.STAFFS:
+		org = CUNEXSuccess.DepartmentNameEN
+
+	default:
+		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Invalid userType returned from CU NEX GET qrcode",
+			Status:  500,
+		}
+	}
+
 	scanRecord := entity.ScanRecordInsert{
 		EventID:          eventIdUuid,
 		ScannedTimestamp: *checkinTime,
 		ParticipantRefID: refIdUInt,
-		FirstName:        CUNEXSuccess.FirstName,
-		SurName:          CUNEXSuccess.LastName,
-		Organization:     CUNEXSuccess.Organization,
+		FirstName:        CUNEXSuccess.FirstNameEN,
+		SurName:          CUNEXSuccess.LastNameEN,
+		Organization:     org,
 		ScannedLocation:  entity.Point{X: scannedLocX, Y: scannedLocY},
 		ScannerID:        userIdUuid,
 	}
@@ -297,14 +343,14 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 
 	rawCode := fmt.Appendf(nil, "%s.%s", checkinTime.Format("2006-01-02T15:04:05Z"), rowId.String())
 	responseBody := dtoRes.GetParticipantRes{
-		FirstnameTH:  user.FirstnameTH,
-		SurnameTH:    user.SurnameTH,
+		FirstnameTH:  CUNEXSuccess.FirstNameTH,
+		SurnameTH:    CUNEXSuccess.LastNameTH,
 		TitleTH:      user.TitleTH,
-		FirstnameEN:  CUNEXSuccess.FirstName,
-		SurnameEN:    CUNEXSuccess.LastName,
+		FirstnameEN:  CUNEXSuccess.FirstNameEN,
+		SurnameEN:    CUNEXSuccess.LastNameEN,
 		TitleEN:      user.TitleEN,
 		RefID:        refIdUInt,
-		Organization: CUNEXSuccess.Organization,
+		Organization: org,
 		CheckInTime:  *checkinTime,
 		Status:       status,
 		Code:         b64.StdEncoding.EncodeToString(rawCode),
@@ -313,7 +359,7 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 	return &responseBody, nil
 }
 
-func (s *service) _CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, attendanceType string, orgCode int64, eventEndTime time.Time) (string, *time.Time, *response.APIError) {
+func (s *service) _CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, attendanceType string, orgCode uint8, eventEndTime time.Time) (string, *time.Time, *response.APIError) {
 	now := time.Now().UTC()
 
 	// Must check if already checked in, regardless of attendance type

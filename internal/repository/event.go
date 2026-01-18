@@ -16,7 +16,7 @@ type EventRepository interface {
 	// Check if user has already checked in to the event
 	CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, refID uint64) (found bool, err error)
 	// Check if user is in whitelist / allowed org or faculty of the event
-	CheckEventAccess(ctx context.Context, orgCode int64, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
+	CheckEventAccess(ctx context.Context, orgCode uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
 	InsertScanRecord(ctx context.Context, record *entity.ScanRecordInsert) (rowId *datatypes.UUID, err error)
 }
 
@@ -63,7 +63,7 @@ func (r *repository) CheckEventParticipation(ctx context.Context, eventId dataty
 	return found, nil
 }
 
-func (r *repository) CheckEventAccess(ctx context.Context, orgCode int64, refID uint64, attendanceType string, eventId datatypes.UUID) (bool, error) {
+func (r *repository) CheckEventAccess(ctx context.Context, orgCode uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (bool, error) {
 	withCtx := r.db.WithContext(ctx)
 	var found bool
 
