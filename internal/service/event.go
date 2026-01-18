@@ -49,8 +49,8 @@ func (s *service) GetOneEventService(eventIdStr string, ctx context.Context) (*d
 		for _, slot := range *agenda {
 			agendaDTO = append(agendaDTO, dtoRes.GetOneEventAgenda{
 				ActivityName: slot.ActivityName,
-				StartTime:    slot.StartTime,
-				EndTime:      slot.EndTime,
+				StartTime:    slot.StartTime.UTC(),
+				EndTime:      slot.EndTime.UTC(),
 			})
 		}
 	}

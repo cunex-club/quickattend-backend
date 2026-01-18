@@ -2,14 +2,12 @@ package response
 
 import (
 	"time"
-
-	"gorm.io/datatypes"
 )
 
 type GetOneEventAgenda struct {
-	ActivityName string         `json:"activity_name"`
-	StartTime    datatypes.Time `json:"start_time"`
-	EndTime      datatypes.Time `json:"end_time"`
+	ActivityName string    `json:"activity_name"`
+	StartTime    time.Time `json:"start_time"`
+	EndTime      time.Time `json:"end_time"`
 }
 
 type GetOneEventRes struct {

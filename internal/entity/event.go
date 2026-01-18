@@ -179,9 +179,9 @@ type EventParticipants struct {
 
 // for retrieving agenda query result in GET /events/:id
 type GetOneEventAgenda struct {
-	ActivityName string         `gorm:"column:activity_name"`
-	StartTime    datatypes.Time `gorm:"column:start_time"`
-	EndTime      datatypes.Time `gorm:"column:end_time"`
+	ActivityName string    `gorm:"column:activity_name"`
+	StartTime    time.Time `gorm:"column:start_time"`
+	EndTime      time.Time `gorm:"column:end_time"`
 }
 
 // for retrieving event details and total participant count in GET /events/:id
