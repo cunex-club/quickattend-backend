@@ -54,7 +54,9 @@ CREATE TABLE "users" (
 CREATE TABLE "event_participants" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
-  "checkin_timestamp" timestamptz NOT NULL,
+  "checkin_timestamp" timestamptz NULL,
+  "scanned_timestamp" timestamptz NOT NULL,
+  "comment" text NULL,
   "participant_ref_id" bigint NOT NULL,
   "first_name" text NOT NULL,
   "sur_name" text NOT NULL,
