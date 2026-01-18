@@ -24,8 +24,8 @@ CREATE TABLE "event_agendas" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
   "activity_name" text NOT NULL,
-  "start_time" time NOT NULL,
-  "end_time" time NOT NULL,
+  "start_time" timestamptz NOT NULL,
+  "end_time" timestamptz NOT NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_event_agenda_event" FOREIGN KEY ("event_id") REFERENCES "events" ("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
@@ -54,7 +54,9 @@ CREATE TABLE "users" (
 CREATE TABLE "event_participants" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
-  "checkin_timestamp" timestamptz NOT NULL,
+  "checkin_timestamp" timestamptz NULL,
+  "scanned_timestamp" timestamptz NOT NULL,
+  "comment" text NULL,
   "participant_ref_id" bigint NOT NULL,
   "first_name" text NOT NULL,
   "sur_name" text NOT NULL,
