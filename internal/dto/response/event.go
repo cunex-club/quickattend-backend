@@ -19,6 +19,6 @@ type GetOneEventRes struct {
 	Location        string              `json:"location"`
 	TotalRegistered uint16              `json:"total_registered"`
 	EvaluationForm  *string             `json:"evaluation_form"`
-	Role            string              `json:"role"`
+	Role            *string             `json:"role"`
 	Agenda          []GetOneEventAgenda `json:"agenda"`
 }
