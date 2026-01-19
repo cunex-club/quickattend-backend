@@ -258,14 +258,8 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 	orgCode := uint8(tempCode)
 
 	user, getUserErr := s.repo.Event.GetUserForCheckin(ctx, refIdUInt)
-	if getUserErr != nil {
-		if getUserErr == gorm.ErrRecordNotFound {
-			return nil, &response.APIError{
-				Code:    response.ErrNotFound,
-				Message: "Participant with this ref_id not found",
-				Status:  404,
-			}
-		}
+	if getUserErr != nil && getUserErr != gorm.ErrRecordNotFound {
+		// Possible for no record; user can be people with no account in our system
 
 		s.logger.Error().Err(getUserErr).
 			Uint64("participant ref_id", refIdUInt).
