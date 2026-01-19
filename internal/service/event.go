@@ -304,13 +304,18 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 		return nil, errCheckStatus
 	}
 
-	var org string
+	var (
+		orgTH string
+		orgEN string
+	)
 	switch CUNEXSuccess.UserType {
 	case entity.STUDENTS:
-		org = CUNEXSuccess.FacultyNameEN
+		orgTH = CUNEXSuccess.FacultyNameTH
+		orgEN = CUNEXSuccess.FacultyNameEN
 
 	case entity.STAFFS:
-		org = CUNEXSuccess.DepartmentNameEN
+		orgTH = CUNEXSuccess.DepartmentNameTH
+		orgEN = CUNEXSuccess.DepartmentNameEN
 
 	default:
 		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
@@ -325,9 +330,9 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 		EventID:          eventIdUuid,
 		ScannedTimestamp: *checkinTime,
 		ParticipantRefID: refIdUInt,
-		FirstName:        CUNEXSuccess.FirstNameEN,
-		SurName:          CUNEXSuccess.LastNameEN,
-		Organization:     org,
+		FirstNameEN:      CUNEXSuccess.FirstNameEN,
+		SurNameEN:        CUNEXSuccess.LastNameEN,
+		OrganizationEN:   orgEN,
 		ScannedLocation:  entity.Point{X: scannedLocX, Y: scannedLocY},
 		ScannerID:        userIdUuid,
 	}
@@ -345,17 +350,18 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 
 	rawCode := fmt.Appendf(nil, "%s.%s", checkinTime.Format("2006-01-02T15:04:05Z"), rowId.String())
 	responseBody := dtoRes.GetParticipantRes{
-		FirstnameTH:  CUNEXSuccess.FirstNameTH,
-		SurnameTH:    CUNEXSuccess.LastNameTH,
-		TitleTH:      user.TitleTH,
-		FirstnameEN:  CUNEXSuccess.FirstNameEN,
-		SurnameEN:    CUNEXSuccess.LastNameEN,
-		TitleEN:      user.TitleEN,
-		RefID:        refIdUInt,
-		Organization: org,
-		CheckInTime:  *checkinTime,
-		Status:       status,
-		Code:         b64.StdEncoding.EncodeToString(rawCode),
+		FirstnameTH:    CUNEXSuccess.FirstNameTH,
+		SurnameTH:      CUNEXSuccess.LastNameTH,
+		TitleTH:        user.TitleTH,
+		FirstnameEN:    CUNEXSuccess.FirstNameEN,
+		SurnameEN:      CUNEXSuccess.LastNameEN,
+		TitleEN:        user.TitleEN,
+		RefID:          refIdUInt,
+		OrganizationTH: orgTH,
+		OrganizationEN: orgEN,
+		CheckInTime:    *checkinTime,
+		Status:         status,
+		Code:           b64.StdEncoding.EncodeToString(rawCode),
 	}
 
 	return &responseBody, nil

@@ -198,9 +198,9 @@ type ScanRecordInsert struct {
 	EventID          datatypes.UUID `gorm:"column:event_id"`
 	ScannedTimestamp time.Time      `gorm:"column:scanned_timestamp"`
 	ParticipantRefID uint64         `gorm:"column:participant_ref_id"`
-	FirstName        string         `gorm:"column:first_name"`
-	SurName          string         `gorm:"column:sur_name"`
-	Organization     string         `gorm:"column:organization"`
+	FirstNameEN      string         `gorm:"column:first_name"`
+	SurNameEN        string         `gorm:"column:sur_name"`
+	OrganizationEN   string         `gorm:"column:organization"`
 	ScannedLocation  Point          `gorm:"column:scanned_location"`
 	ScannerID        datatypes.UUID `gorm:"column:scanner_id"`
 }
