@@ -194,4 +194,5 @@ type GetOneEventWithTotalCount struct {
 	Location        string    `gorm:"column:location"`
 	TotalRegistered uint16    `gorm:"column:total_registered"`
 	EvaluationForm  *string   `gorm:"column:evaluation_form"`
+	Role            string    `gorm:"column:role"`
 }
