@@ -37,7 +37,7 @@ func (r *repository) GetEventForCheckin(ctx context.Context, eventId datatypes.U
 	withCtx := r.db.WithContext(ctx)
 
 	var event entity.CheckinEventQuery
-	getEventErr := withCtx.Model(&entity.Event{}).Select("end_time", "attendance_type").
+	getEventErr := withCtx.Model(&entity.Event{}).Select("end_time", "attendance_type", "allow_all_to_scan", "revealed_fields").
 		First(&event, &entity.Event{ID: eventId}).Error
 	if getEventErr != nil {
 		return nil, getEventErr
