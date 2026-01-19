@@ -350,18 +350,19 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 
 	rawCode := fmt.Appendf(nil, "%s.%s", checkinTime.Format("2006-01-02T15:04:05Z"), rowId.String())
 	responseBody := dtoRes.GetParticipantRes{
-		FirstnameTH:    CUNEXSuccess.FirstNameTH,
-		SurnameTH:      CUNEXSuccess.LastNameTH,
-		TitleTH:        user.TitleTH,
-		FirstnameEN:    CUNEXSuccess.FirstNameEN,
-		SurnameEN:      CUNEXSuccess.LastNameEN,
-		TitleEN:        user.TitleEN,
-		RefID:          refIdUInt,
-		OrganizationTH: orgTH,
-		OrganizationEN: orgEN,
-		CheckInTime:    *checkinTime,
-		Status:         status,
-		Code:           b64.StdEncoding.EncodeToString(rawCode),
+		FirstnameTH:     CUNEXSuccess.FirstNameTH,
+		SurnameTH:       CUNEXSuccess.LastNameTH,
+		TitleTH:         user.TitleTH,
+		FirstnameEN:     CUNEXSuccess.FirstNameEN,
+		SurnameEN:       CUNEXSuccess.LastNameEN,
+		TitleEN:         user.TitleEN,
+		RefID:           refIdUInt,
+		OrganizationTH:  orgTH,
+		OrganizationEN:  orgEN,
+		CheckInTime:     *checkinTime,
+		Status:          status,
+		Code:            b64.StdEncoding.EncodeToString(rawCode),
+		ProfileImageUrl: CUNEXSuccess.ProfileImageUrl,
 	}
 
 	return &responseBody, nil

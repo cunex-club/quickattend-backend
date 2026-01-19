@@ -12,16 +12,17 @@ const (
 )
 
 type GetParticipantRes struct {
-	FirstnameTH    string    `json:"firstname_th"`
-	SurnameTH      string    `json:"surname_th"`
-	TitleTH        string    `json:"title_th"`
-	FirstnameEN    string    `json:"firstname_en"`
-	SurnameEN      string    `json:"surname_en"`
-	TitleEN        string    `json:"title_en"`
-	RefID          uint64    `json:"ref_id"`
-	OrganizationTH string    `json:"organization_th"`
-	OrganizationEN string    `json:"organization_en"`
-	CheckInTime    time.Time `json:"check_in_time"`
-	Status         string    `json:"status"`
-	Code           string    `json:"code"`
+	FirstnameTH     string    `json:"firstname_th"`
+	SurnameTH       string    `json:"surname_th"`
+	TitleTH         string    `json:"title_th"`
+	FirstnameEN     string    `json:"firstname_en"`
+	SurnameEN       string    `json:"surname_en"`
+	TitleEN         string    `json:"title_en"`
+	RefID           uint64    `json:"ref_id"`
+	OrganizationTH  string    `json:"organization_th"`
+	OrganizationEN  string    `json:"organization_en"`
+	CheckInTime     time.Time `json:"check_in_time"`
+	Status          string    `json:"status"`
+	Code            string    `json:"code"`
+	ProfileImageUrl string    `json:"profile_image_url"`
 }
