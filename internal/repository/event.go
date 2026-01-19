@@ -8,10 +8,10 @@ import (
 )
 
 type EventRepository interface {
-	GetOneEvent(eventId datatypes.UUID, ctx context.Context) (eventWithCount *entity.GetOneEventWithTotalCount, agenda *[]entity.GetOneEventAgenda, err error)
+	GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (eventWithCount *entity.GetOneEventWithTotalCount, agenda *[]entity.GetOneEventAgenda, err error)
 }
 
-func (r *repository) GetOneEvent(eventId datatypes.UUID, ctx context.Context) (*entity.GetOneEventWithTotalCount, *[]entity.GetOneEventAgenda, error) {
+func (r *repository) GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (*entity.GetOneEventWithTotalCount, *[]entity.GetOneEventAgenda, error) {
 	withCtx := r.db.WithContext(ctx)
 
 	var agenda []entity.GetOneEventAgenda
@@ -26,11 +26,14 @@ func (r *repository) GetOneEvent(eventId datatypes.UUID, ctx context.Context) (*
 	var eventWithCount entity.GetOneEventWithTotalCount
 	eventErr := withCtx.Table("events e").
 		Select("e.name", "e.organizer", "e.description", "e.start_time",
-			"e.end_time", "e.location", "e.evaluation_form",
+			"e.end_time", "e.location", "e.evaluation_form", "eu.role",
 			"COUNT(ep.id) FILTER (WHERE ep.checkin_timestamp IS NOT NULL) AS total_registered").
 		Joins("LEFT JOIN event_participants ep ON e.id = ep.event_id").
+		Joins("LEFT JOIN event_users eu ON e.id = eu.event_id").
+		Where("COALESCE(eu.user_id = ?, true)", userId).
 		Where("e.id = ?", eventId).
 		Group("e.id").
+		Group("eu.role").
 		Scan(&eventWithCount).Error
 	if eventErr != nil {
 		return nil, nil, eventErr
