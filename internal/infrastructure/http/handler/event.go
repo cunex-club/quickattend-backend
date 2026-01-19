@@ -11,8 +11,9 @@ type EventHandler interface {
 
 func (h *Handler) GetOneEventHandler(c *fiber.Ctx) error {
 	eventIdStr := c.Params("id")
+	userIdStr := c.Locals("user_id").(string)
 
-	res, err := h.Service.Event.GetOneEventService(eventIdStr, c.UserContext())
+	res, err := h.Service.Event.GetOneEventService(eventIdStr, userIdStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}

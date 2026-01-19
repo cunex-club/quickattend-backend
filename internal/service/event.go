@@ -11,10 +11,10 @@ import (
 )
 
 type EventService interface {
-	GetOneEventService(eventIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
+	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
 }
 
-func (s *service) GetOneEventService(eventIdStr string, ctx context.Context) (*dtoRes.GetOneEventRes, *response.APIError) {
+func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (*dtoRes.GetOneEventRes, *response.APIError) {
 	eventIdErr := uuid.Validate(eventIdStr)
 	if eventIdErr != nil {
 		return nil, &response.APIError{
@@ -25,7 +25,17 @@ func (s *service) GetOneEventService(eventIdStr string, ctx context.Context) (*d
 	}
 	eventId := datatypes.UUID(datatypes.BinUUIDFromString(eventIdStr))
 
-	eventWithCount, agenda, err := s.repo.Event.GetOneEvent(eventId, ctx)
+	userIdErr := uuid.Validate(userIdStr)
+	if userIdErr != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Invalid user_id from JWT claim",
+			Status:  500,
+		}
+	}
+	userId := datatypes.UUID(datatypes.BinUUIDFromString(userIdStr))
+
+	eventWithCount, agenda, err := s.repo.Event.GetOneEvent(eventId, userId, ctx)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, &response.APIError{
@@ -65,6 +75,7 @@ func (s *service) GetOneEventService(eventIdStr string, ctx context.Context) (*d
 		TotalRegistered: eventWithCount.TotalRegistered,
 		EvaluationForm:  eventWithCount.EvaluationForm,
 		Agenda:          agendaDTO,
+		Role:            eventWithCount.Role,
 	}
 
 	return &finalRes, nil
