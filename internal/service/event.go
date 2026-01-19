@@ -350,19 +350,41 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 
 	rawCode := fmt.Appendf(nil, "%s.%s", checkinTime.Format("2006-01-02T15:04:05Z"), rowId.String())
 	responseBody := dtoRes.GetParticipantRes{
-		FirstnameTH:     CUNEXSuccess.FirstNameTH,
-		SurnameTH:       CUNEXSuccess.LastNameTH,
-		TitleTH:         user.TitleTH,
-		FirstnameEN:     CUNEXSuccess.FirstNameEN,
-		SurnameEN:       CUNEXSuccess.LastNameEN,
-		TitleEN:         user.TitleEN,
-		RefID:           refIdUInt,
-		OrganizationTH:  orgTH,
-		OrganizationEN:  orgEN,
+		FirstnameTH:     nil,
+		SurnameTH:       nil,
+		TitleTH:         nil,
+		FirstnameEN:     nil,
+		SurnameEN:       nil,
+		TitleEN:         nil,
+		RefID:           nil,
+		OrganizationTH:  nil,
+		OrganizationEN:  nil,
 		CheckInTime:     *checkinTime,
 		Status:          status,
 		Code:            b64.StdEncoding.EncodeToString(rawCode),
-		ProfileImageUrl: CUNEXSuccess.ProfileImageUrl,
+		ProfileImageUrl: nil,
+	}
+
+	for _, field := range event.RevealedFields {
+		switch field {
+		case entity.NAME:
+			responseBody.FirstnameTH = &CUNEXSuccess.FirstNameTH
+			responseBody.FirstnameEN = &CUNEXSuccess.FirstNameEN
+			responseBody.TitleTH = &user.TitleTH
+			responseBody.SurnameTH = &CUNEXSuccess.LastNameTH
+			responseBody.SurnameEN = &CUNEXSuccess.LastNameEN
+			responseBody.TitleEN = &user.TitleEN
+
+		case entity.ORGANIZATION:
+			responseBody.OrganizationTH = &orgTH
+			responseBody.OrganizationEN = &orgEN
+
+		case entity.PHOTO:
+			responseBody.ProfileImageUrl = &CUNEXSuccess.ProfileImageUrl
+
+		case entity.REFID:
+			responseBody.RefID = &refIdUInt
+		}
 	}
 
 	return &responseBody, nil
