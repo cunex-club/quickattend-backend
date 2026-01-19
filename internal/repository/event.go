@@ -11,8 +11,8 @@ import (
 type EventRepository interface {
 	// For POST participant/:qrcode. Get user info not provided by CU NEX
 	GetUserForCheckin(ctx context.Context, refID uint64) (user *entity.CheckinUserQuery, err error)
-	// For POST participant/:qrcode. Get attendance_type and end_time of the event
-	GetEventForCheckin(ctx context.Context, eventId datatypes.UUID) (event *entity.CheckinEventQuery, err error)
+	// For POST participant/:qrcode. Get necessary event details for checking
+	GetEventForCheckin(ctx context.Context, eventId datatypes.UUID, userId datatypes.UUID) (event *entity.CheckinEventQuery, err error)
 	// Check if user has already checked in to the event
 	CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, refID uint64) (found bool, err error)
 	// Check if user is in whitelist / allowed org or faculty of the event
@@ -33,12 +33,17 @@ func (r *repository) GetUserForCheckin(ctx context.Context, refID uint64) (*enti
 	return &user, nil
 }
 
-func (r *repository) GetEventForCheckin(ctx context.Context, eventId datatypes.UUID) (*entity.CheckinEventQuery, error) {
+func (r *repository) GetEventForCheckin(ctx context.Context, eventId datatypes.UUID, userId datatypes.UUID) (*entity.CheckinEventQuery, error) {
 	withCtx := r.db.WithContext(ctx)
 
 	var event entity.CheckinEventQuery
-	getEventErr := withCtx.Model(&entity.Event{}).Select("end_time", "attendance_type", "allow_all_to_scan", "revealed_fields").
-		First(&event, &entity.Event{ID: eventId}).Error
+	getEventErr := withCtx.Raw(`
+			SELECT e.end_time, e.attendance_type, e.allow_all_to_scan, e.revealed_fields, 
+				(SELECT EXISTS (SELECT 1 FROM event_users WHERE event_id = ? AND user_id = ?)) AS this_user_can_scan
+			FROM events e
+			WHERE e.id = ?
+		`, eventId, userId, eventId).
+		Scan(&event).Error
 	if getEventErr != nil {
 		return nil, getEventErr
 	}

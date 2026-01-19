@@ -277,7 +277,7 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 		}
 	}
 
-	event, getEventErr := s.repo.Event.GetEventForCheckin(ctx, eventIdUuid)
+	event, getEventErr := s.repo.Event.GetEventForCheckin(ctx, eventIdUuid, userIdUuid)
 	if getEventErr != nil {
 		if getEventErr == gorm.ErrRecordNotFound {
 			return nil, &response.APIError{
@@ -294,6 +294,14 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 			Code:    response.ErrInternalError,
 			Message: "Internal DB error",
 			Status:  500,
+		}
+	}
+
+	if !event.AllowAllToScan && !event.ThisUserCanScan {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "This user doesn't have permission to be a scanner for this event",
+			Status:  400,
 		}
 	}
 

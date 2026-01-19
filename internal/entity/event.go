@@ -185,10 +185,11 @@ type CheckinUserQuery struct {
 
 // For retrieving result from DB in EventRepository.GetUserForCheckin
 type CheckinEventQuery struct {
-	AttendanceType attendence_type   `gorm:"column:attendance_type"`
-	EndTime        time.Time         `gorm:"column:end_time"`
-	AllowAllToScan bool              `gorm:"column:allow_all_to_scan"`
-	RevealedFields participant_field `gorm:"column:revealed_fields"`
+	AttendanceType  attendence_type   `gorm:"column:attendance_type"`
+	EndTime         time.Time         `gorm:"column:end_time"`
+	AllowAllToScan  bool              `gorm:"column:allow_all_to_scan"`
+	RevealedFields  participant_field `gorm:"column:revealed_fields"`
+	ThisUserCanScan bool              `gorm:"column:this_user_can_scan"`
 }
 
 // For inserting record in EventRepository.InsertScanRecord
