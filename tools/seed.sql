@@ -6,7 +6,8 @@ VALUES
     ('a99e1c32-ac26-4bb3-9add-340f57749d87', 6874440950, 'ค', 'ง', 'นางสาว', 'C', 'D', 'MS'),
     ('cb147cf1-3d70-403c-9590-89371001623a', 12345678, 'จจจ', 'กขค', 'นาย', 'jjj', 'abc', 'MR'),
     ('0b76a343-1e72-4882-bfe8-124c36cf5ebb', 04498344, 'รรรร', 'ขค', 'นาง', 'rrrr', 'kk', 'MRS'),
-    ('28e55bae-89e1-4c56-b5d2-7470284b2e2c', 987654321, 'AB', 'CD', 'EEEE', 'FG', 'HI', 'JJJJ');
+    ('28e55bae-89e1-4c56-b5d2-7470284b2e2c', 987654321, 'AB', 'CD', 'EEEE', 'FG', 'HI', 'JJJJ'),
+    ('85b05455-b1b7-4f85-a460-b473184765d3', 56732200, 'ทธทธ', 'ยยยยย', 'นาย', 'tspmo', 'png', 'MR');
 
 INSERT INTO events (
     id,
@@ -86,6 +87,19 @@ VALUES
         true,
         ';?:',
         '{}'
+    ),
+    (
+        '60fa93cc-f59d-4c34-9240-dc25ebdfb916',
+        'expo',
+        'erfref',
+        'desc desc desc desc',
+        '2026-02-22 02:00:00+00',
+        '2026-02-22 17:00:00+00',
+        'building x hall y',
+        'ALL',
+        false,
+        NULL,
+        '{NAME, ORGANIZATION, REFID, PHOTO}'
     );
 
 
@@ -216,6 +230,7 @@ INSERT INTO event_users (role, user_id, event_id)
 VALUES
     ('MANAGER', 'cb11ed5c-6d11-43f1-b004-a4625c7551df', '7525aa0f-0cb9-4e08-9503-f005d38c5151'),
     ('OWNER', 'a99e1c32-ac26-4bb3-9add-340f57749d87', '3cf8ca23-b68c-48a8-9f97-ffeb7c42f176'),
-    ('STAFF', 'a99e1c32-ac26-4bb3-9add-340f57749d87', '7525aa0f-0cb9-4e08-9503-f005d38c5151');
+    ('STAFF', 'a99e1c32-ac26-4bb3-9add-340f57749d87', '7525aa0f-0cb9-4e08-9503-f005d38c5151'),
+    ('MANAGER', '85b05455-b1b7-4f85-a460-b473184765d3', '60fa93cc-f59d-4c34-9240-dc25ebdfb916');
 
 COMMIT;
