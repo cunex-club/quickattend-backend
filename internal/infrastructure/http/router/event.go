@@ -6,10 +6,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func SetupRoutes(app *fiber.App, h *handler.AllOfHandler, mw *middleware.Middleware) {
-	api := app.Group("/api")
+func EventRoutes(r fiber.Router, h *handler.AllOfHandler, mw *middleware.Middleware) {
+	events := r.Group("/events")
 
-	AuthRoutes(api, h, mw)
-	EventRoutes(api, h, mw)
-	HealthCheckRoutes(api, h)
+	events.Post("/", h.EventHandler.CreateEvent)
+	events.Put("/:id", h.EventHandler.UpdateEvent)
 }
