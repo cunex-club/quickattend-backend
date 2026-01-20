@@ -17,7 +17,7 @@ type EventRepository interface {
 	CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, refID uint64) (found bool, err error)
 	// Check if user is in whitelist / allowed org or faculty of the event
 	CheckEventAccess(ctx context.Context, orgCode uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
-	InsertScanRecord(ctx context.Context, record *entity.ScanRecordInsert) (rowId *datatypes.UUID, err error)
+	InsertScanRecord(ctx context.Context, record *entity.EventParticipants) (rowId *datatypes.UUID, err error)
 }
 
 func (r *repository) GetUserForCheckin(ctx context.Context, refID uint64) (*entity.CheckinUserQuery, error) {
@@ -38,11 +38,18 @@ func (r *repository) GetEventForCheckin(ctx context.Context, eventId datatypes.U
 
 	var event entity.CheckinEventQuery
 	getEventErr := withCtx.Raw(`
-			SELECT e.end_time, e.attendance_type, e.allow_all_to_scan, e.revealed_fields, 
-				(SELECT EXISTS (SELECT 1 FROM event_users WHERE event_id = ? AND user_id = ?)) AS this_user_can_scan
+			SELECT e.end_time, e.attendence_type, e.allow_all_to_scan, e.revealed_fields, 
+				(
+					SELECT (
+						EXISTS
+						(SELECT 1 FROM event_users WHERE event_id = ? AND user_id = ?) 
+						OR EXISTS
+						(SELECT 1 FROM events WHERE id = ? AND allow_all_to_scan = true)
+					)
+				) AS this_user_can_scan
 			FROM events e
 			WHERE e.id = ?
-		`, eventId, userId, eventId).
+		`, eventId, userId, eventId, eventId).
 		Scan(&event).Error
 	if getEventErr != nil {
 		return nil, getEventErr
@@ -101,7 +108,7 @@ func (r *repository) CheckEventAccess(ctx context.Context, orgCode uint8, refID 
 	}
 }
 
-func (r *repository) InsertScanRecord(ctx context.Context, record *entity.ScanRecordInsert) (*datatypes.UUID, error) {
+func (r *repository) InsertScanRecord(ctx context.Context, record *entity.EventParticipants) (*datatypes.UUID, error) {
 	withCtx := r.db.WithContext(ctx)
 
 	insertErr := withCtx.Model(&entity.EventParticipants{}).Create(record).Error
