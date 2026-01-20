@@ -15,7 +15,7 @@ import (
 )
 
 type EventService interface {
-	GetEventsService(string, map[string]string, context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError)
+	GetEventsService(userIDStr string, queryParams map[string]string, ctx context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError)
 }
 
 func (s *service) GetEventsService(userIDStr string, queryParams map[string]string, ctx context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError) {
@@ -87,6 +87,7 @@ func (s *service) GetEventsService(userIDStr string, queryParams map[string]stri
 	formattedRes := []dtoRes.GetEventsRes{}
 
 	managedQuery, managedOk := queryParams["managed"]
+	// 'managed' not present -> get discovery events
 	if !managedOk {
 		if !pageOk {
 			return nil, nil, &response.APIError{
@@ -116,6 +117,7 @@ func (s *service) GetEventsService(userIDStr string, queryParams map[string]stri
 		}, nil
 	}
 
+	// 'managed' present -> parse and get managed or participated events
 	managed, err := strconv.ParseBool(managedQuery)
 	if err != nil {
 		return nil, nil, &response.APIError{
