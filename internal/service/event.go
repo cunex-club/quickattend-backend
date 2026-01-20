@@ -19,10 +19,10 @@ import (
 )
 
 type EventService interface {
-	PostParticipantService(code string, userId string, eventId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
+	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
 }
 
-func (s *service) PostParticipantService(code string, userId string, eventId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
+func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
 	if code == "" {
 		return nil, &response.APIError{
 			Code:    response.ErrBadRequest,
@@ -104,7 +104,7 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 		s.logger.Error().Err(formNewReqErr).Str("Error", "Failed to form new HTTP request for CU NEX GET qrcode")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Failed to form new HTTP request for CU NEX GET qrcode",
+			Message: "Failed to perform HTTP request for CU NEX GET qrcode",
 			Status:  500,
 		}
 	}
@@ -152,7 +152,7 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 	case 403:
 		// Expired or invalid QR
 		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
+			Code:    "GONE",
 			Message: "Invalid or expired qrcode",
 			Status:  410,
 		}
@@ -174,68 +174,6 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 		}
 
 	}
-	// if resp.StatusCode != 200 {
-	// 	var CUNEXErr entity.CUNEXGetQRErrorResponse
-	// 	parseErr := json.NewDecoder(resp.Body).Decode(&CUNEXErr)
-	// 	if parseErr != nil {
-	// 		s.logger.Error().Err(parseErr).Str("Error", "Could not parse error response from CU NEX GET qrcode")
-	// 		return nil, &response.APIError{
-	// 			Code:    response.ErrInternalError,
-	// 			Message: "Could not parse error response from CU NEX GET qrcode",
-	// 			Status:  500,
-	// 		}
-	// 	}
-
-	// 	switch resp.StatusCode {
-	// 	case 417:
-	// 		switch CUNEXErr.ErrorCode {
-	// 		case "E001", "E002", "E003":
-	// 			// token invalid, token expired, or token inactive
-	// 			return nil, &response.APIError{
-	// 				Code:    CUNEXErr.ErrorCode,
-	// 				Message: CUNEXErr.Message,
-	// 				Status:  401,
-	// 			}
-	// 		case "E004":
-	// 			// qrcode inactive
-	// 			return nil, &response.APIError{
-	// 				Code:    CUNEXErr.ErrorCode,
-	// 				Message: CUNEXErr.Message,
-	// 				Status:  410,
-	// 			}
-	// 		case "E999":
-	// 			// internal service error
-	// 			return nil, &response.APIError{
-	// 				Code:    CUNEXErr.ErrorCode,
-	// 				Message: CUNEXErr.Message,
-	// 				Status:  500,
-	// 			}
-	// 		}
-
-	// 	case 401:
-	// 		s.logger.Error().Str("Error", fmt.Sprintf("Authorization error from CU NEX GET qrcode: %s", CUNEXErr.Message))
-	// 		return nil, &response.APIError{
-	// 			Code:    response.ErrInternalError,
-	// 			Message: "Authorization error from CU NEX GET qrcode",
-	// 			Status:  500,
-	// 		}
-	// 	case 400:
-	// 		s.logger.Error().Str("Error", fmt.Sprintf("Bad request error from CU NEX GET qrcode: %s", CUNEXErr.Message))
-	// 		return nil, &response.APIError{
-	// 			Code:    response.ErrInternalError,
-	// 			Message: "Bad request error from CU NEX GET qrcode",
-	// 			Status:  500,
-	// 		}
-	// 	case 500:
-	// 		s.logger.Error().Str("Error", fmt.Sprintf("Server error from CU NEX GET qrcode: %s", CUNEXErr.Message))
-	// 		return nil, &response.APIError{
-	// 			Code:    response.ErrInternalError,
-	// 			Message: "Server error from CU NEX GET qrcode",
-	// 			Status:  500,
-	// 		}
-	// 	}
-	// } else {
-	// }
 
 	refIdUInt, convertErr := strconv.ParseUint(CUNEXSuccess.RefId, 10, 64)
 	if convertErr != nil {
@@ -258,16 +196,23 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 	orgCode := uint8(tempCode)
 
 	user, getUserErr := s.repo.Event.GetUserForCheckin(ctx, refIdUInt)
-	if getUserErr != nil && getUserErr != gorm.ErrRecordNotFound {
-		// Possible for no record; user can be people with no account in our system
+	if getUserErr != nil {
+		if getUserErr != gorm.ErrRecordNotFound {
+			s.logger.Error().Err(getUserErr).
+				Uint64("participant ref_id", refIdUInt).
+				Str("function", "EventRepository.GetUserForCheckin")
+			return nil, &response.APIError{
+				Code:    response.ErrInternalError,
+				Message: "Internal DB error",
+				Status:  500,
+			}
+		}
 
-		s.logger.Error().Err(getUserErr).
-			Uint64("participant ref_id", refIdUInt).
-			Str("function", "EventRepository.GetUserForCheckin")
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Internal DB error",
-			Status:  500,
+		// Possible for no record; user can be people with no account in our system
+		// TODO: API doesn't provide title, so where to get title if this participant isn't in our DB?
+		user = &entity.CheckinUserQuery{
+			TitleTH: "",
+			TitleEN: "",
 		}
 	}
 
@@ -293,13 +238,13 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 
 	if !event.AllowAllToScan && !event.ThisUserCanScan {
 		return nil, &response.APIError{
-			Code:    response.ErrBadRequest,
+			Code:    response.ErrForbidden,
 			Message: "This user doesn't have permission to be a scanner for this event",
-			Status:  400,
+			Status:  403,
 		}
 	}
 
-	status, checkinTime, errCheckStatus := s._CheckCheckinStatus(ctx, eventIdUuid, refIdUInt, string(event.AttendanceType), orgCode, event.EndTime)
+	status, checkinTime, errCheckStatus := s._CheckCheckinStatus(ctx, eventIdUuid, refIdUInt, string(event.AttendenceType), orgCode, event.EndTime)
 	if errCheckStatus != nil {
 		return nil, errCheckStatus
 	}
@@ -326,15 +271,15 @@ func (s *service) PostParticipantService(code string, userId string, eventId str
 		}
 	}
 
-	scanRecord := entity.ScanRecordInsert{
+	scanRecord := entity.EventParticipants{
 		EventID:          eventIdUuid,
 		ScannedTimestamp: *checkinTime,
 		ParticipantRefID: refIdUInt,
-		FirstNameEN:      CUNEXSuccess.FirstNameEN,
-		SurNameEN:        CUNEXSuccess.LastNameEN,
-		OrganizationEN:   orgEN,
+		FirstName:        CUNEXSuccess.FirstNameEN,
+		SurName:          CUNEXSuccess.LastNameEN,
+		Organization:     orgEN,
 		ScannedLocation:  entity.Point{X: scannedLocX, Y: scannedLocY},
-		ScannerID:        userIdUuid,
+		ScannerID:        &userIdUuid,
 	}
 	rowId, insertErr := s.repo.Event.InsertScanRecord(ctx, &scanRecord)
 	if insertErr != nil {
