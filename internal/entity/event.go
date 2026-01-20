@@ -11,37 +11,72 @@ import (
 
 // ====================================================
 
-type attendence_type string
+type AttendanceType string
 
 const (
-	WHITELIST attendence_type = "WHITELIST"
-	FACULTIES attendence_type = "FACULTIES"
-	ALL       attendence_type = "ALL"
+	AttendanceAll       AttendanceType = "all"
+	AttendanceWhitelist AttendanceType = "whitelist"
+	AttendanceFaculties AttendanceType = "faculties"
 )
 
-func (at *attendence_type) Scan(value any) error {
-	*at = attendence_type(value.(string))
-	return nil
+func (at *AttendanceType) Scan(value any) error {
+	if value == nil {
+		*at = ""
+		return nil
+	}
+
+	switch v := value.(type) {
+	case string:
+		*at = AttendanceType(v)
+		return nil
+	case []byte:
+		*at = AttendanceType(string(v))
+		return nil
+	default:
+		return fmt.Errorf("cannot scan %T into AttendanceType", value)
+	}
 }
 
-func (at attendence_type) Value() (driver.Value, error) {
+func (at AttendanceType) Value() (driver.Value, error) {
 	return string(at), nil
+}
+
+func ParseAttendanceType(s string) (AttendanceType, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "all":
+		return AttendanceAll, nil
+	case "whitelist":
+		return AttendanceWhitelist, nil
+	case "faculties":
+		return AttendanceFaculties, nil
+	default:
+		return "", fmt.Errorf("invalid attendance_type")
+	}
+}
+
+func (at AttendanceType) Valid() bool {
+	switch at {
+	case AttendanceAll, AttendanceWhitelist, AttendanceFaculties:
+		return true
+	default:
+		return false
+	}
 }
 
 // ====================================================
 
-type participant_data string
+type ParticipantData string
 
 const (
-	NAME         participant_data = "NAME"
-	ORGANIZATION participant_data = "ORGANIZATION"
-	REFID        participant_data = "REFID"
-	PHOTO        participant_data = "PHOTO"
+	ParticipantName         ParticipantData = "name"
+	ParticipantOrganization ParticipantData = "organization"
+	ParticipantRefID        ParticipantData = "refid"
+	ParticipantPhoto        ParticipantData = "photo"
 )
 
-type participant_field []participant_data
+type ParticipantField []ParticipantData
 
-func (pf *participant_field) Scan(value any) error {
+func (pf *ParticipantField) Scan(value any) error {
 	if value == nil {
 		*pf = nil
 		return nil
@@ -57,35 +92,72 @@ func (pf *participant_field) Scan(value any) error {
 		return fmt.Errorf("Error scanning participant_field")
 	}
 
-	str = strings.Trim(str, "{}")
+	str = strings.TrimSpace(str)
+	str = strings.TrimPrefix(str, "{")
+	str = strings.TrimSuffix(str, "}")
 
-	if value == "" {
+	if str == "" {
 		*pf = nil
 		return nil
 	}
 
 	items := strings.Split(str, ",")
-	out := make([]participant_data, len(items))
-	for i, item := range items {
-		out[i] = participant_data(strings.TrimSpace(item))
+	out := make([]ParticipantData, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		out = append(out, ParticipantData(item))
 	}
 
 	*pf = out
 	return nil
 }
 
-func (pf participant_field) Value() (driver.Value, error) {
+func (pf ParticipantField) Value() (driver.Value, error) {
 	if len(pf) == 0 {
 		return "{}", nil
 	}
 
-	items := make([]string, len(pf))
-
-	for i, p := range pf {
-		items[i] = string(p)
+	items := make([]string, 0, len(pf))
+	for _, p := range pf {
+		items = append(items, string(p))
 	}
 
 	return fmt.Sprintf("{%s}", strings.Join(items, ",")), nil
+}
+
+func ParseParticipantData(s string) (ParticipantData, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "name":
+		return ParticipantName, nil
+	case "organization":
+		return ParticipantOrganization, nil
+	case "refid":
+		return ParticipantRefID, nil
+	case "photo":
+		return ParticipantPhoto, nil
+	default:
+		return "", fmt.Errorf("invalid participant field: %s", s)
+	}
+}
+
+func ParseParticipantFields(fields []string) (ParticipantField, error) {
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("revealed_fields is required")
+	}
+
+	out := make(ParticipantField, 0, len(fields))
+	for _, f := range fields {
+		p, err := ParseParticipantData(f)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+
+	return out, nil
 }
 
 // ====================================================
@@ -115,20 +187,24 @@ func (p Point) Value() (driver.Value, error) {
 }
 
 // ====================================================
+const ThaiTZ = "Asia/Bangkok"
 
 type Event struct {
-	ID             datatypes.UUID    `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	Name           string            `gorm:"type:text;not null" json:"name"`
-	Organizer      string            `gorm:"type:text;not null" json:"organizer"`
-	Description    string            `gorm:"type:text" json:"description"`
-	Date           datatypes.Date    `gorm:"type:timestamp;not null" json:"date"`
-	StartTime      datatypes.Time    `gorm:"type:time;not null" json:"start_time"`
-	EndTime        datatypes.Time    `gorm:"type:time;not null" json:"end_time"`
-	Location       string            `gorm:"type:text;not null" json:"location"`
-	AttendenceType attendence_type   `gorm:"type:attendence_type;not null" json:"attendance_type"`
-	AllowAllToScan bool              `gorm:"type:bool;not null" json:"allow_all_to_scan"`
-	EvaluationForm string            `gorm:"type:text" json:"evaluation_form"`
-	RevealedFields participant_field `gorm:"type:[]participant_data;not null" json:"revealed_fields"`
+	ID datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+
+	Name        string `gorm:"type:text;not null" json:"name"`
+	Organizer   string `gorm:"type:text;not null" json:"organizer"`
+	Description string `gorm:"type:text" json:"description"`
+
+	Date      time.Time `gorm:"type:timestamptz;not null" json:"date"`       // derive จากเวลาไทย
+	StartTime time.Time `gorm:"type:timestamptz;not null" json:"start_time"` // UTC
+	EndTime   time.Time `gorm:"type:timestamptz;not null" json:"end_time"`   // UTC
+
+	Location       string           `gorm:"type:text;not null" json:"location"`
+	AttendanceType AttendanceType   `gorm:"type:attendance_type;not null" json:"attendance_type"`
+	AllowAllToScan bool             `gorm:"type:bool;not null" json:"allow_all_to_scan"`
+	EvaluationForm string           `gorm:"type:text" json:"evaluation_form"`
+	RevealedFields ParticipantField `gorm:"type:participant_data[];not null" json:"revealed_fields"`
 }
 
 type EventWhitelist struct {
@@ -152,8 +228,8 @@ type EventAgenda struct {
 	ID           datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	EventID      datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
 	ActivityName string         `gorm:"type:text;not null" json:"activity_name"`
-	StartTime    datatypes.Time `gorm:"type:time;not null" json:"start_time"`
-	EndTime      datatypes.Time `gorm:"type:time;not null" json:"end_time"`
+	StartTime    time.Time      `gorm:"type:timestamptz;not null" json:"start_time"`
+	EndTime      time.Time      `gorm:"type:timestamptz;not null" json:"end_time"`
 
 	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
@@ -172,4 +248,20 @@ type EventParticipants struct {
 	Event                      Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	ParticipantRefIDForeignKey User  `gorm:"foreignKey:UserRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
+}
+
+type CreateEventPayload struct {
+	Event            Event
+	Agendas          []EventAgenda
+	Whitelist        []EventWhitelist
+	AllowedFaculties []EventAllowedFaculties
+	EventUsersInput  []EventUserInput
+}
+
+type UpdateEventPayload struct {
+	EventUpdates     map[string]any
+	Agendas          *[]EventAgenda
+	Whitelist        *[]EventWhitelist
+	AllowedFaculties *[]EventAllowedFaculties
+	EventUsers       *[]EventUser
 }
