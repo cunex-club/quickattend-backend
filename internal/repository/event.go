@@ -27,7 +27,7 @@ func (r *repository) GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, 
 	eventErr := withCtx.Table("events e").
 		Select("e.name", "e.organizer", "e.description", "e.start_time",
 			"e.end_time", "e.location", "e.evaluation_form", "eu.role",
-			"COUNT(ep.id) FILTER (WHERE ep.checkin_timestamp IS NOT NULL) AS total_registered").
+			"COUNT(ep.id) AS total_registered").
 		Joins("LEFT JOIN event_participants ep ON e.id = ep.event_id").
 		Joins("LEFT JOIN event_users eu ON e.id = eu.event_id").
 		Where("COALESCE(eu.user_id = ?, true)", userId).
