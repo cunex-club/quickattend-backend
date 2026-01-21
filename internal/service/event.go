@@ -152,9 +152,9 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	case 403:
 		// Expired or invalid QR
 		return nil, &response.APIError{
-			Code:    "GONE",
-			Message: "Invalid or expired qrcode",
-			Status:  410,
+			Code:    response.ErrNotFound,
+			Message: "qrcode not found (expired or invalid)",
+			Status:  404,
 		}
 
 	case 500:
