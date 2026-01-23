@@ -22,16 +22,9 @@ func (r *repository) CheckIn(checkInRowId uuid.UUID, timeStamp time.Time, commen
 		return entity.ErrNilUUID
 	}
 
-	// var data entity.EventParticipants
-	// findErr := r.db.WithContext(ctx).First(&data, "id = ?", checkInRowId).Error
-	//
-	// if findErr != nil {
-	// 	return findErr
-	// }
-
 	result := r.db.WithContext(ctx).Model(&entity.EventParticipants{}).
 		Where("id = ? AND checkin_timestamp IS NULL", checkInRowId).
-		Updates(map[string]interface{}{"checkin_timestamp": timeStamp, "comment": comment})
+		Updates(map[string]any{"checkin_timestamp": timeStamp, "comment": comment})
 
 	if result.Error != nil {
 		return result.Error

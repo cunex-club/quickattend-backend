@@ -9,15 +9,15 @@ import (
 )
 
 type EventHandler interface {
-	EventDelete(c *fiber.Ctx) error
-	EventDuplicate(c *fiber.Ctx) error
-	EventCheckIn(c *fiber.Ctx) error
+	Delete(c *fiber.Ctx) error
+	Duplicate(c *fiber.Ctx) error
+	CheckIn(c *fiber.Ctx) error
 }
 
-func (h *Handler) EventDelete(c *fiber.Ctx) error {
+func (h *Handler) Delete(c *fiber.Ctx) error {
 	EventID := c.Params("id")
 
-	err := h.Service.Event.EventDeleteById(EventID, c.UserContext())
+	err := h.Service.Event.DeleteById(EventID, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
@@ -25,10 +25,10 @@ func (h *Handler) EventDelete(c *fiber.Ctx) error {
 	return response.Deleted(c, nil)
 }
 
-func (h *Handler) EventDuplicate(c *fiber.Ctx) error {
+func (h *Handler) Duplicate(c *fiber.Ctx) error {
 	EventID := c.Params("id")
 
-	createdEvent, err := h.Service.Event.EventDuplicateById(EventID, c.UserContext())
+	createdEvent, err := h.Service.Event.DuplicateById(EventID, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
@@ -38,13 +38,13 @@ func (h *Handler) EventDuplicate(c *fiber.Ctx) error {
 	})
 }
 
-func (h *Handler) EventCheckIn(c *fiber.Ctx) error {
+func (h *Handler) CheckIn(c *fiber.Ctx) error {
 	checkInReq := new(dtoReq.CheckInReq)
 	if err := c.BodyParser(checkInReq); err != nil {
 		return response.SendError(c, 400, response.ErrBadRequest, "bad request body")
 	}
 
-	err := h.Service.Event.EventCheckIn(checkInReq, c.UserContext())
+	err := h.Service.Event.CheckIn(checkInReq, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}

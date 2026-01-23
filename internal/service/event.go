@@ -17,19 +17,16 @@ import (
 )
 
 type EventService interface {
-	EventDeleteById(EventID string, ctx context.Context) *response.APIError
-	EventDuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
-	EventCheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *response.APIError
+	DeleteById(EventID string, ctx context.Context) *response.APIError
+	DuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
+	CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *response.APIError
 }
 
-func (s *service) EventCheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *response.APIError {
+func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *response.APIError {
 
-	encodedOneTimeCode := checkInReq.EncodedOneTimeCode
-	comment := checkInReq.Comment
-
-	decodedOneTimeCode, decodeErr := base64.StdEncoding.DecodeString(encodedOneTimeCode)
-
-	if decodeErr != nil {
+	// Decode base64
+	decoded, err := base64.StdEncoding.DecodeString(checkInReq.EncodedOneTimeCode)
+	if err != nil {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
 			Message: "failed to interpret one_time_code as base64 encoded",
@@ -37,9 +34,9 @@ func (s *service) EventCheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Contex
 		}
 	}
 
-	strDecodedOneTimeCode := string(decodedOneTimeCode)
-
-	idx := strings.LastIndex(strDecodedOneTimeCode, ".")
+	// Split "<UTC timestamp>.<uuid>"
+	raw := string(decoded)
+	idx := strings.LastIndex(raw, ".")
 	if idx == -1 {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
@@ -48,10 +45,12 @@ func (s *service) EventCheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Contex
 		}
 	}
 
-	strTimeStamp, strCheckInRowId := strDecodedOneTimeCode[:idx], strDecodedOneTimeCode[idx+1:]
+	strTimeStamp := raw[:idx]
+	strCheckInRowId := raw[idx+1:]
 
-	checkInRowId, rowIdConvErr := uuid.Parse(strCheckInRowId)
-	if rowIdConvErr != nil {
+	// Parse UUID
+	checkInRowId, err := uuid.Parse(strCheckInRowId)
+	if err != nil {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
 			Message: "failed to convert checkInRowId to uuid",
@@ -59,8 +58,9 @@ func (s *service) EventCheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Contex
 		}
 	}
 
-	timeStamp, timeStampConvErr := time.Parse(time.RFC3339, strTimeStamp)
-	if timeStampConvErr != nil {
+	// Parse timestamp
+	timeStamp, err := time.Parse(time.RFC3339, strTimeStamp)
+	if err != nil {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
 			Message: "failed to convert timeStamp to time (go)",
@@ -73,24 +73,33 @@ func (s *service) EventCheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Contex
 		Str("checkInRowId", checkInRowId.String()).
 		Msg("Received timeStamp and target row-id to check-in Event-Participant")
 
-	if checkInErr := s.repo.Event.CheckIn(checkInRowId, timeStamp, comment, ctx); checkInErr != nil {
-		if errors.Is(checkInErr, entity.ErrCheckInFailed) {
+	// Check-in
+	if err := s.repo.Event.CheckIn(
+		checkInRowId,
+		timeStamp,
+		checkInReq.Comment,
+		ctx,
+	); err != nil {
+
+		if errors.Is(err, entity.ErrCheckInFailed) {
 			return &response.APIError{
 				Code:    response.ErrBadRequest,
 				Message: entity.ErrCheckInFailed.Error(),
 				Status:  400,
 			}
 		}
+
 		return &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "internal db error",
 			Status:  500,
 		}
 	}
+
 	return nil
 }
 
-func (s *service) EventDeleteById(EventId string, ctx context.Context) *response.APIError {
+func (s *service) DeleteById(EventId string, ctx context.Context) *response.APIError {
 	event_id, parseErr := uuid.Parse(EventId)
 	if parseErr != nil {
 		return &response.APIError{
@@ -144,7 +153,7 @@ func (s *service) EventDeleteById(EventId string, ctx context.Context) *response
 	return nil
 }
 
-func (s *service) EventDuplicateById(EventId string, ctx context.Context) (*entity.Event, *response.APIError) {
+func (s *service) DuplicateById(EventId string, ctx context.Context) (*entity.Event, *response.APIError) {
 	event_id, parseErr := uuid.Parse(EventId)
 	if parseErr != nil {
 		return nil, &response.APIError{
