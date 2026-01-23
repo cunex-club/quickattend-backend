@@ -39,12 +39,13 @@ func (h *Handler) Duplicate(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CheckIn(c *fiber.Ctx) error {
-	checkInReq := new(dtoReq.CheckInReq)
-	if err := c.BodyParser(checkInReq); err != nil {
-		return response.SendError(c, 400, response.ErrBadRequest, "bad request body")
+	var req dtoReq.CheckInReq
+
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, 400, response.ErrBadRequest, "invalid JSON body")
 	}
 
-	err := h.Service.Event.CheckIn(checkInReq, c.UserContext())
+	err := h.Service.Event.CheckIn(req, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}

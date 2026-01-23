@@ -9,6 +9,7 @@ const (
 	ErrNotFound      = "NOT_FOUND"
 	ErrValidation    = "VALIDATION_ERROR"
 	ErrInternalError = "INTERNAL_SERVER_ERROR"
+	ErrConflict = "CONFLICT"
 )
 
 type APIResponse struct {

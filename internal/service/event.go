@@ -19,10 +19,10 @@ import (
 type EventService interface {
 	DeleteById(EventID string, ctx context.Context) *response.APIError
 	DuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
-	CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *response.APIError
+	CheckIn(checkInReq dtoReq.CheckInReq, ctx context.Context) *response.APIError
 }
 
-func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *response.APIError {
+func (s *service) CheckIn(checkInReq dtoReq.CheckInReq, ctx context.Context) *response.APIError {
 
 	decoded, err := base64.StdEncoding.DecodeString(checkInReq.EncodedOneTimeCode)
 	if err != nil {
@@ -50,7 +50,7 @@ func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *r
 	if err != nil {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
-			Message: "failed to convert checkInRowId to uuid",
+			Message: "failed to parse check-in target id",
 			Status:  400,
 		}
 	}
@@ -59,7 +59,7 @@ func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *r
 	if err != nil {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
-			Message: "failed to convert timeStamp to time (go)",
+			Message: "failed to parse timeStamp to go time",
 			Status:  400,
 		}
 	}
@@ -69,7 +69,6 @@ func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *r
 		Str("checkInRowId", checkInRowId.String()).
 		Msg("Received timeStamp and target row-id to check-in Event-Participant")
 
-	// Check-in
 	if err := s.repo.Event.CheckIn(
 		checkInRowId,
 		timeStamp,
@@ -77,7 +76,15 @@ func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *r
 		ctx,
 	); err != nil {
 
-		if errors.Is(err, entity.ErrAlreadyCheckedIn) || errors.Is(err, entity.ErrCheckInTargetNotFound) {
+		if errors.Is(err, entity.ErrAlreadyCheckedIn) {
+			return &response.APIError{
+				Code:    response.ErrConflict,
+				Message: err.Error(),
+				Status:  409,
+			}
+		}
+
+		if errors.Is(err, entity.ErrCheckInTargetNotFound) {
 			return &response.APIError{
 				Code:    response.ErrBadRequest,
 				Message: err.Error(),
