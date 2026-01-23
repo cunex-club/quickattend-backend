@@ -48,7 +48,7 @@ func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *r
 	strTimeStamp := raw[:idx]
 	strCheckInRowId := raw[idx+1:]
 
-	// Parse UUID
+	// Parse Event-Participant rowId
 	checkInRowId, err := uuid.Parse(strCheckInRowId)
 	if err != nil {
 		return &response.APIError{
