@@ -41,10 +41,10 @@ func (h *Handler) EventDuplicate(c *fiber.Ctx) error {
 func (h *Handler) EventCheckIn(c *fiber.Ctx) error {
 	checkInReq := new(dtoReq.CheckInReq)
 	if err := c.BodyParser(checkInReq); err != nil {
-		return response.SendError(c, 500, "FAIL_PARSE_REQ_BODY", "failed to parse request body")
+		return response.SendError(c, 400, response.ErrBadRequest, "bad request body")
 	}
 
-	err := h.Service.Event.EventCheckIn(checkInReq.EncodedOneTimeCode, c.UserContext())
+	err := h.Service.Event.EventCheckIn(checkInReq, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}

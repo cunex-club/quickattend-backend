@@ -3,11 +3,12 @@ package database
 import (
 	"fmt"
 
-	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+
+	"github.com/cunex-club/quickattend-backend/internal/config"
 )
 
 var logger = log.With().Str("module", "database").Logger()

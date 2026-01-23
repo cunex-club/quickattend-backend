@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -13,13 +14,24 @@ type EventRepository interface {
 	FindById(uuid.UUID, context.Context) (*entity.Event, error)
 	DeleteById(uuid.UUID, context.Context) error
 	Create(*entity.Event, context.Context) (*entity.Event, error)
-	CheckIn(uuid.UUID, context.Context) error
+	CheckIn(uuid.UUID, time.Time, string, context.Context) error
 }
 
-func (r *repository) CheckIn(checkInRowId uuid.UUID, timeStamp string, ctx context.Context) error {
-	result := r.db.WithContext(ctx).
+func (r *repository) CheckIn(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
+	if checkInRowId == uuid.Nil {
+		return entity.ErrNilUUID
+	}
+
+	// var data entity.EventParticipants
+	// findErr := r.db.WithContext(ctx).First(&data, "id = ?", checkInRowId).Error
+	//
+	// if findErr != nil {
+	// 	return findErr
+	// }
+
+	result := r.db.WithContext(ctx).Model(&entity.EventParticipants{}).
 		Where("id = ? AND checkin_timestamp IS NULL", checkInRowId).
-		Update("checkin_timestamp", timeStamp)
+		Updates(map[string]interface{}{"checkin_timestamp": timeStamp, "comment": comment})
 
 	if result.Error != nil {
 		return result.Error

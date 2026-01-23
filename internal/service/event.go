@@ -5,11 +5,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
+	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 )
@@ -17,10 +19,14 @@ import (
 type EventService interface {
 	EventDeleteById(EventID string, ctx context.Context) *response.APIError
 	EventDuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
-	EventCheckIn(encodedOneTimeCode string, ctx context.Context) *response.APIError
+	EventCheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *response.APIError
 }
 
-func (s *service) EventCheckIn(encodedOneTimeCode string, ctx context.Context) *response.APIError {
+func (s *service) EventCheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *response.APIError {
+
+	encodedOneTimeCode := checkInReq.EncodedOneTimeCode
+	comment := checkInReq.Comment
+
 	decodedOneTimeCode, decodeErr := base64.StdEncoding.DecodeString(encodedOneTimeCode)
 
 	if decodeErr != nil {
@@ -35,27 +41,38 @@ func (s *service) EventCheckIn(encodedOneTimeCode string, ctx context.Context) *
 	if len(decodedParts) != 2 {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
-			Message: "failed to extract timeStamp and EventParticipantsRowId from one time code",
+			Message: "failed to extract timeStamp and strCheckInRowId from one time code",
 			Status:  400,
 		}
 	}
 
-	timeStamp, strCheckInRowId := decodedParts[0], decodedParts[1]
+	strTimeStamp, strCheckInRowId := decodedParts[0], decodedParts[1]
 
-	checkInRowId, convErr := uuid.Parse(strCheckInRowId)
-	if convErr != nil {
+	checkInRowId, rowIdConvErr := uuid.Parse(strCheckInRowId)
+	if rowIdConvErr != nil {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
-			Message: "cannot convert strEventParticipantsRowId to uuid",
+			Message: "failed to convert checkInRowId to uuid",
 			Status:  400,
 		}
 	}
 
-	println(timeStamp, checkInRowId)
+	timeStamp, timeStampConvErr := time.Parse("2006-01-02T15:04:05Z07:00", strTimeStamp)
+	if timeStampConvErr != nil {
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "failed to convert timeStamp to time (go)",
+			Status:  400,
+		}
+	}
 
-	checkinErr := s.repo.Event.CheckIn(checkInRowId, ctx)
-	if checkinErr != nil {
-		if errors.Is(checkinErr, entity.ErrCheckInFailed) {
+	s.logger.Info().
+		Str("timeStamp", timeStamp.String()).
+		Str("checkInRowId", checkInRowId.String()).
+		Msg("Received timeStamp and target row-id to check-in Event-Participant")
+
+	if checkInErr := s.repo.Event.CheckIn(checkInRowId, timeStamp, comment, ctx); checkInErr != nil {
+		if errors.Is(checkInErr, entity.ErrCheckInFailed) {
 			return &response.APIError{
 				Code:    response.ErrBadRequest,
 				Message: entity.ErrCheckInFailed.Error(),
