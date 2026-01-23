@@ -22,16 +22,35 @@ func (r *repository) CheckIn(checkInRowId uuid.UUID, timeStamp time.Time, commen
 		return entity.ErrNilUUID
 	}
 
-	result := r.db.WithContext(ctx).Model(&entity.EventParticipants{}).
+	result := r.db.WithContext(ctx).
+		Model(&entity.EventParticipants{}).
 		Where("id = ? AND checkin_timestamp IS NULL", checkInRowId).
-		Updates(map[string]any{"checkin_timestamp": timeStamp, "comment": comment})
+		Updates(map[string]any{
+			"checkin_timestamp": timeStamp,
+			"comment":           comment,
+		})
 
 	if result.Error != nil {
 		return result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		return entity.ErrCheckInFailed
+		var exists bool
+		err := r.db.WithContext(ctx).
+			Model(&entity.EventParticipants{}).
+			Select("count(1) > 0").
+			Where("id = ?", checkInRowId).
+			Find(&exists).Error
+
+		if err != nil {
+			return err
+		}
+
+		if !exists {
+			return entity.ErrCheckInTargetNotFound
+		}
+
+		return entity.ErrAlreadyCheckedIn
 	}
 
 	return nil

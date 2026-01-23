@@ -24,7 +24,6 @@ type EventService interface {
 
 func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *response.APIError {
 
-	// Decode base64
 	decoded, err := base64.StdEncoding.DecodeString(checkInReq.EncodedOneTimeCode)
 	if err != nil {
 		return &response.APIError{
@@ -34,7 +33,6 @@ func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *r
 		}
 	}
 
-	// Split "<UTC timestamp>.<uuid>"
 	raw := string(decoded)
 	idx := strings.LastIndex(raw, ".")
 	if idx == -1 {
@@ -48,7 +46,6 @@ func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *r
 	strTimeStamp := raw[:idx]
 	strCheckInRowId := raw[idx+1:]
 
-	// Parse Event-Participant rowId
 	checkInRowId, err := uuid.Parse(strCheckInRowId)
 	if err != nil {
 		return &response.APIError{
@@ -58,7 +55,6 @@ func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *r
 		}
 	}
 
-	// Parse timestamp
 	timeStamp, err := time.Parse(time.RFC3339, strTimeStamp)
 	if err != nil {
 		return &response.APIError{
@@ -81,10 +77,10 @@ func (s *service) CheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Context) *r
 		ctx,
 	); err != nil {
 
-		if errors.Is(err, entity.ErrCheckInFailed) {
+		if errors.Is(err, entity.ErrAlreadyCheckedIn) || errors.Is(err, entity.ErrCheckInTargetNotFound) {
 			return &response.APIError{
 				Code:    response.ErrBadRequest,
-				Message: entity.ErrCheckInFailed.Error(),
+				Message: err.Error(),
 				Status:  400,
 			}
 		}

@@ -4,5 +4,6 @@ import "errors"
 
 var (
 	ErrNilUUID = errors.New("uuid cannot be nil")
-	ErrCheckInFailed = errors.New("already checked in or not found")
+	ErrAlreadyCheckedIn = errors.New("already checked in")
+	ErrCheckInTargetNotFound = errors.New("check in target not found")
 )
