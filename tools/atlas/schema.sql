@@ -21,9 +21,9 @@ CREATE TABLE "events" (
     "name" text NOT NULL,
     "organizer" text NOT NULL,
     "description" text,
-    "date" timestamp NOT NULL,
-    "start_time" time NOT NULL,
-    "end_time" time NOT NULL,
+    -- "date" timestamp NOT NULL,
+    "start_time" timestamp NOT NULL,
+    "end_time" timestamp NOT NULL,
     "location" text NOT NULL,
     "attendence_type" attendence_type NOT NULL,
     "allow_all_to_scan" boolean NOT NULL,
@@ -67,8 +67,8 @@ CREATE TABLE "event_agendas" (
     "id" uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     "event_id" uuid NOT NULL,
     "activity_name" text NOT NULL,
-    "start_time" time NOT NULL,
-    "end_time" time NOT NULL,
+    "start_time" timestamptz NOT NULL,
+    "end_time" timestamptz NOT NULL,
 
     CONSTRAINT "fk_event_agendas_event" FOREIGN KEY ("event_id") 
         REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
@@ -77,7 +77,9 @@ CREATE TABLE "event_agendas" (
 CREATE TABLE "event_participants" (
     "id" uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     "event_id" uuid NOT NULL,
-    "checkin_timestamp" timestamptz NOT NULL,
+    "checkin_timestamp" timestamptz,
+    "comment" text,
+    "scanned_timestamp" timestamptz NOT NULL,
     "participant_ref_id" bigint NOT NULL,
     "first_name" text NOT NULL,
     "sur_name" text NOT NULL,
