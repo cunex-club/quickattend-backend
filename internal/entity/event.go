@@ -173,6 +173,5 @@ type EventParticipants struct {
 	ScannerID        datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
 
 	Event                      Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	ParticipantRefIDForeignKey User  `gorm:"foreignKey:UserRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 }

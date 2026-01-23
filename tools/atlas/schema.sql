@@ -89,8 +89,8 @@ CREATE TABLE "event_participants" (
 
     CONSTRAINT "fk_event_participants_event" FOREIGN KEY ("event_id") 
         REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE,
-    CONSTRAINT "fk_event_participants_user" FOREIGN KEY ("participant_ref_id") 
-        REFERENCES "users"("ref_id") ON UPDATE CASCADE ON DELETE CASCADE,
+    -- CONSTRAINT "fk_event_participants_user" FOREIGN KEY ("participant_ref_id") 
+    --     REFERENCES "users"("ref_id") ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT "fk_event_participants_scanner" FOREIGN KEY ("scanner_id") 
         REFERENCES "users"("id") ON UPDATE CASCADE ON DELETE SET NULL
 );

@@ -32,21 +32,23 @@ func (s *service) EventCheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Contex
 	if decodeErr != nil {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
-			Message: "failed to decode one time code",
+			Message: "failed to interpret one_time_code as base64 encoded",
 			Status:  400,
 		}
 	}
 
-	decodedParts := strings.Split(string(decodedOneTimeCode), ".")
-	if len(decodedParts) != 2 {
+	strDecodedOneTimeCode := string(decodedOneTimeCode)
+
+	idx := strings.LastIndex(strDecodedOneTimeCode, ".")
+	if idx == -1 {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
-			Message: "failed to extract timeStamp and strCheckInRowId from one time code",
+			Message: "invalid one_time_code format",
 			Status:  400,
 		}
 	}
 
-	strTimeStamp, strCheckInRowId := decodedParts[0], decodedParts[1]
+	strTimeStamp, strCheckInRowId := strDecodedOneTimeCode[:idx], strDecodedOneTimeCode[idx+1:]
 
 	checkInRowId, rowIdConvErr := uuid.Parse(strCheckInRowId)
 	if rowIdConvErr != nil {
@@ -57,7 +59,7 @@ func (s *service) EventCheckIn(checkInReq *dtoReq.CheckInReq, ctx context.Contex
 		}
 	}
 
-	timeStamp, timeStampConvErr := time.Parse("2006-01-02T15:04:05Z07:00", strTimeStamp)
+	timeStamp, timeStampConvErr := time.Parse(time.RFC3339, strTimeStamp)
 	if timeStampConvErr != nil {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
