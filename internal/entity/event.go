@@ -163,16 +163,14 @@ type EventParticipants struct {
 	CheckinTimestamp *time.Time      `gorm:"type:timestamptz" json:"checkin_timestamp"`
 	ScannedTimestamp time.Time       `gorm:"type:timestamptz;not null" json:"scanned_timestamp"`
 	Comment          *string         `gorm:"type:text" json:"comment"`
-	ParticipantRefID uint64          `gorm:"type:bigint;not null" json:"participant_ref_id"`
-	FirstName        string          `gorm:"type:text;not null" json:"first_name"`
-	SurName          string          `gorm:"type:text;not null" json:"last_name"`
+	ParticipantID    datatypes.UUID  `gorm:"type:uuid;not null" json:"participant_id"`
 	Organization     string          `gorm:"type:text;not null" json:"organization"`
 	ScannedLocation  Point           `gorm:"type:point;not null" json:"scanned_location"`
 	ScannerID        *datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
 
-	Event                      Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	ParticipantRefIDForeignKey User  `gorm:"foreignKey:ParticipantRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
+	Event                   Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ParticipantIDForeignKey User  `gorm:"foreignKey:ParticipantID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ScannerIDForeignKey     User  `gorm:"foreignKey:ScannerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 }
 
 // ====================================================
