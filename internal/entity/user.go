@@ -40,7 +40,7 @@ type EventUser struct {
 	ID      datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	Role    role           `gorm:"type:role;not null" json:"role"`
 	UserID  datatypes.UUID `gorm:"type:uuid;not null" json:"user_id"`
-	EventID datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
+	EventID datatypes.UUID `gorm:"type:uuid;not null;index:idx_event_users_event_id" json:"event_id"`
 
 	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	User  User  `gorm:"foreignKey:UserID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
