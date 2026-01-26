@@ -14,7 +14,7 @@ type EventRepository interface {
 	// For POST participant/:qrcode. Get necessary event details for checking
 	GetEventForCheckin(ctx context.Context, eventId datatypes.UUID, userId datatypes.UUID) (event *entity.CheckinEventQuery, err error)
 	// Check if user has already checked in to the event
-	CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, refID uint64) (found bool, err error)
+	CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, participantID datatypes.UUID) (found bool, err error)
 	// Check if user is in whitelist / allowed org or faculty of the event
 	CheckEventAccess(ctx context.Context, orgCode uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
 	InsertScanRecord(ctx context.Context, record *entity.EventParticipants) (rowId *datatypes.UUID, err error)
@@ -58,16 +58,16 @@ func (r *repository) GetEventForCheckin(ctx context.Context, eventId datatypes.U
 	return &event, nil
 }
 
-func (r *repository) CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, refID uint64) (bool, error) {
+func (r *repository) CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, participantID datatypes.UUID) (bool, error) {
 	withCtx := r.db.WithContext(ctx)
 
 	var found bool
 	checkParticipantErr := withCtx.Raw(`SELECT EXISTS (
 				SELECT 1 FROM event_participants
-				WHERE participant_ref_id = ? 
+				WHERE participant_id = ? 
 				AND event_id = ?
 				AND checkin_timestamp IS NOT NULL
-			) AS subQuery`, refID, eventId).Scan(&found).Error
+			) AS subQuery`, participantID, eventId).Scan(&found).Error
 	if checkParticipantErr != nil {
 		return false, checkParticipantErr
 	}

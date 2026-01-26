@@ -237,7 +237,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	status, checkinTime, errCheckStatus := s._CheckCheckinStatus(ctx, eventIdUuid, refIdUInt, string(event.AttendenceType), orgCode, event.EndTime)
+	status, checkinTime, errCheckStatus := s.CheckCheckinStatus(ctx, eventIdUuid, user.RefID, user.ID, string(event.AttendenceType), orgCode, event.EndTime)
 	if errCheckStatus != nil {
 		return nil, errCheckStatus
 	}
@@ -336,14 +336,14 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	return &responseBody, nil
 }
 
-func (s *service) _CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, attendanceType string, orgCode uint8, eventEndTime time.Time) (string, *time.Time, *response.APIError) {
+func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, participantId datatypes.UUID, attendanceType string, orgCode uint8, eventEndTime time.Time) (string, *time.Time, *response.APIError) {
 	now := time.Now().UTC()
 
 	// Must check if already checked in, regardless of attendance type
-	found, err := s.repo.Event.CheckEventParticipation(ctx, eventId, participantRefId)
+	found, err := s.repo.Event.CheckEventParticipation(ctx, eventId, participantId)
 	if err != nil {
 		s.logger.Error().Err(err).
-			Uint64("participant ref_id", participantRefId).
+			Str("participant id", participantId.String()).
 			Str("function", "EventRepository.CheckEventParticipation")
 		return "", nil, &response.APIError{
 			Code:    response.ErrInternalError,
