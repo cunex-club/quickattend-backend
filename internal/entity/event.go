@@ -118,21 +118,21 @@ func (p Point) Value() (driver.Value, error) {
 
 type Event struct {
 	ID             datatypes.UUID    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name           string            `gorm:"type:text;not null" json:"name"`
-	Organizer      string            `gorm:"type:text;not null" json:"organizer"`
-	Description    *string           `gorm:"type:text" json:"description"`
+	Name           string            `gorm:"type:text;not null;index:idx_events_name_trgm,type:gin" json:"name"`
+	Organizer      string            `gorm:"type:text;not null;index:idx_events_organizer_trgm,type:gin" json:"organizer"`
+	Description    *string           `gorm:"type:text;index:idx_events_description_trgm,type:gin" json:"description"`
 	StartTime      time.Time         `gorm:"type:timestamptz;not null" json:"start_time"`
 	EndTime        time.Time         `gorm:"type:timestamptz;not null" json:"end_time"`
-	Location       string            `gorm:"type:text;not null" json:"location"`
+	Location       string            `gorm:"type:text;not null;index:idx_events_location_trgm,type:gin" json:"location"`
 	AttendenceType attendence_type   `gorm:"type:attendence_type;not null" json:"attendance_type"`
 	AllowAllToScan bool              `gorm:"type:bool;not null" json:"allow_all_to_scan"`
-	EvaluationForm *string           `gorm:"type:text" json:"evaluation_form"`
+	EvaluationForm *string           `gorm:"type:text;index:idx_events_evaluation_form_trgm,type:gin" json:"evaluation_form"`
 	RevealedFields participant_field `gorm:"type:participant_data[];not null" json:"revealed_fields"`
 }
 
 type EventWhitelist struct {
 	ID            datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	EventID       datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
+	EventID       datatypes.UUID `gorm:"type:uuid;not null;index:idx_event_whitelists_event_id" json:"event_id"`
 	AttendeeRefID uint64         `gorm:"type:bigint;not null" json:"attendee_ref_id"`
 
 	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
@@ -141,7 +141,7 @@ type EventWhitelist struct {
 
 type EventAllowedFaculties struct {
 	ID        datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	EventID   datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
+	EventID   datatypes.UUID `gorm:"type:uuid;not null;index:idx_event_allowed_faculties_event_id" json:"event_id"`
 	FacultyNO uint8          `gorm:"type:int8;not null" json:"faculty_no"`
 
 	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
@@ -149,7 +149,7 @@ type EventAllowedFaculties struct {
 
 type EventAgenda struct {
 	ID           datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	EventID      datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
+	EventID      datatypes.UUID `gorm:"type:uuid;not null;index:idx_event_agendas_event_id" json:"event_id"`
 	ActivityName string         `gorm:"type:text;not null" json:"activity_name"`
 	StartTime    time.Time      `gorm:"type:timestamptz;not null" json:"start_time"`
 	EndTime      time.Time      `gorm:"type:timestamptz;not null" json:"end_time"`
@@ -159,13 +159,11 @@ type EventAgenda struct {
 
 type EventParticipants struct {
 	ID               datatypes.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	EventID          datatypes.UUID  `gorm:"type:uuid;not null" json:"event_id"`
+	EventID          datatypes.UUID  `gorm:"type:uuid;not null;index:idx_event_participants_event_id" json:"event_id"`
 	CheckinTimestamp *time.Time      `gorm:"type:timestamptz" json:"checkin_timestamp"`
 	ScannedTimestamp time.Time       `gorm:"type:timestamptz;not null" json:"scanned_timestamp"`
 	Comment          *string         `gorm:"type:text" json:"comment"`
-	ParticipantRefID uint64          `gorm:"type:bigint;not null" json:"participant_ref_id"`
-	FirstName        string          `gorm:"type:text;not null" json:"first_name"`
-	SurName          string          `gorm:"type:text;not null" json:"last_name"`
+	ParticipantID    datatypes.UUID  `gorm:"type:uuid;not null;unique" json:"participant_id"`
 	Organization     string          `gorm:"type:text;not null" json:"organization"`
 	ScannedLocation  Point           `gorm:"type:point;not null" json:"scanned_location"`
 	ScannerID        *datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
