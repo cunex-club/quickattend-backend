@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -55,7 +56,7 @@ func (s *service) GetUserService(userIDStr string, ctx context.Context) (*dtoRes
 
 	userDTO := dtoRes.GetAuthUserRes{
 		ID:          user.ID.String(),
-		RefID:       user.RefID,
+		RefID:       s.FormatRefIdToStr(user.RefID),
 		FirstnameTH: user.FirstnameTH,
 		SurnameTH:   user.SurnameTH,
 		TitleTH:     user.TitleTH,
@@ -256,4 +257,14 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	return &dtoRes.VerifyTokenRes{
 		AccessToken: access_token,
 	}, nil
+}
+
+func (s *service) FormatRefIdToStr(refId uint64) string {
+	str := fmt.Sprint(refId)
+	if len(str) < 8 {
+		// In case it's staff ref id with zeros at the start
+		// Student ref id cannot start with zero so it's fine
+		str = strings.Repeat("0", 8-len(str)) + str
+	}
+	return str
 }

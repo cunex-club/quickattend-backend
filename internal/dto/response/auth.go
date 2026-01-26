@@ -6,7 +6,7 @@ type VerifyTokenRes struct {
 
 type GetAuthUserRes struct {
 	ID          string `json:"id"`
-	RefID       uint64 `json:"ref_id"`
+	RefID       string `json:"ref_id"`
 	FirstnameTH string `json:"firstname_th"`
 	SurnameTH   string `json:"surname_th"`
 	TitleTH     string `json:"title_th"`
