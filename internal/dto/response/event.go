@@ -18,7 +18,7 @@ type GetParticipantRes struct {
 	FirstnameEN     *string   `json:"firstname_en"`
 	SurnameEN       *string   `json:"surname_en"`
 	TitleEN         *string   `json:"title_en"`
-	RefID           *uint64   `json:"ref_id"`
+	RefID           *string   `json:"ref_id"`
 	OrganizationTH  *string   `json:"organization_th"`
 	OrganizationEN  *string   `json:"organization_en"`
 	CheckInTime     time.Time `json:"check_in_time"`

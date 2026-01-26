@@ -329,7 +329,8 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 			responseBody.ProfileImageUrl = &CUNEXSuccess.ProfileImageUrl
 
 		case entity.REFID:
-			responseBody.RefID = &refIdUInt
+			temp := s.FormatRefIdToStr(refIdUInt)
+			responseBody.RefID = &temp
 		}
 	}
 
