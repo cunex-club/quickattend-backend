@@ -9,6 +9,7 @@ type repository struct {
 type AllRepo struct {
 	HealthCheck HealthCheckRepository
 	Auth        AuthRepository
+	Event       EventRepository
 }
 
 func NewRepository(db *gorm.DB) AllRepo {
@@ -16,5 +17,6 @@ func NewRepository(db *gorm.DB) AllRepo {
 	return AllRepo{
 		HealthCheck: repo,
 		Auth:        repo,
+		Event:       repo,
 	}
 }

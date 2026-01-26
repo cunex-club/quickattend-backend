@@ -27,9 +27,6 @@ tidy:
 test:
 	go test -v ./...
 
-seed:
-	# TODO: Implement seeding logic here
-	@echo "Seeding database... (not implemented)"
 
 compose-up:
 	docker compose up -d
@@ -47,8 +44,6 @@ migrate-diff:
 		--to file://tools/atlas/schema.sql \
 		--dev-url "docker://postgres/18-alpine/dev?search_path=public"
 
-
-
 migrate:
 	@if atlas schema inspect -u "$(DB_URL)" | diff -q - tools/atlas/schema.sql > /dev/null; then \
 		echo "Schema is already up-to-date."; \
@@ -57,3 +52,17 @@ migrate:
 		$(MAKE) migrate-diff; \
 		$(MAKE) migrate-up; \
 	fi
+
+# wipes everything
+db-clean:
+	@echo "Wiping everything from db..."
+	atlas schema clean -u "$(DB_URL)" --auto-approve
+
+db-seed:
+	@echo "Seeding database..."
+	psql "postgres://$(POSTGRES_USER):$(POSTGRES_PASS)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable" \
+		-f tools/seed.sql
+
+# reset back to seed data
+db-reset: db-clean migrate-up db-seed
+	@echo "Database restored to seed state."
