@@ -195,25 +195,18 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	}
 	orgCode := uint8(tempCode)
 
-	user, getUserErr := s.repo.Event.GetUserForCheckin(ctx, refIdUInt)
-	if getUserErr != nil {
-		if getUserErr != gorm.ErrRecordNotFound {
-			s.logger.Error().Err(getUserErr).
-				Uint64("participant ref_id", refIdUInt).
-				Str("function", "EventRepository.GetUserForCheckin")
-			return nil, &response.APIError{
-				Code:    response.ErrInternalError,
-				Message: "Internal DB error",
-				Status:  500,
-			}
-		}
-
-		// Possible for no record; user can be people with no account in our system
-		// TODO: API doesn't provide title, so where to get title if this participant isn't in our DB?
-		user = &entity.CheckinUserQuery{
-			TitleTH: "",
-			TitleEN: "",
-		}
+	userToInsert := entity.User{
+		RefID:       refIdUInt,
+		FirstnameTH: CUNEXSuccess.FirstNameTH,
+		SurnameTH:   CUNEXSuccess.LastNameTH,
+		TitleTH:     "",
+		FirstnameEN: CUNEXSuccess.FirstNameEN,
+		SurnameEN:   CUNEXSuccess.LastNameEN,
+		TitleEN:     "",
+	}
+	user, createUserErr := s.CreateUserIfNotExists(&userToInsert, ctx)
+	if createUserErr != nil {
+		return nil, createUserErr
 	}
 
 	event, getEventErr := s.repo.Event.GetEventForCheckin(ctx, eventIdUuid, userIdUuid)
@@ -271,29 +264,37 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	scanRecord := entity.EventParticipants{
-		EventID:          eventIdUuid,
-		ScannedTimestamp: *checkinTime,
-		ParticipantRefID: refIdUInt,
-		FirstName:        CUNEXSuccess.FirstNameEN,
-		SurName:          CUNEXSuccess.LastNameEN,
-		Organization:     orgEN,
-		ScannedLocation:  entity.Point{X: scannedLocX, Y: scannedLocY},
-		ScannerID:        &userIdUuid,
-	}
-	rowId, insertErr := s.repo.Event.InsertScanRecord(ctx, &scanRecord)
-	if insertErr != nil {
-		s.logger.Error().Err(insertErr).
-			Uint64("participant ref_id", refIdUInt).
-			Str("function", "EventRepository.InsertScanRecord")
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Internal DB error",
-			Status:  500,
+	checkInCode := ""
+	switch status {
+	case string(dtoRes.SUCCESS):
+		scanRecord := entity.EventParticipants{
+			EventID:          eventIdUuid,
+			ScannedTimestamp: *checkinTime,
+			ParticipantID:    user.ID,
+			Organization:     orgEN,
+			ScannedLocation:  entity.Point{X: scannedLocX, Y: scannedLocY},
+			ScannerID:        &userIdUuid,
 		}
+		rowId, insertErr := s.repo.Event.InsertScanRecord(ctx, &scanRecord)
+		if insertErr != nil {
+			s.logger.Error().Err(insertErr).
+				Uint64("participant ref_id", refIdUInt).
+				Str("function", "EventRepository.InsertScanRecord")
+			return nil, &response.APIError{
+				Code:    response.ErrInternalError,
+				Message: "Internal DB error",
+				Status:  500,
+			}
+		}
+
+		raw := fmt.Appendf(nil, "%s.%s", checkinTime.Format(time.RFC3339Nano), rowId.String())
+		checkInCode = b64.StdEncoding.EncodeToString(raw)
+
+	default:
+		raw := fmt.Appendf(nil, "%s.", checkinTime.Format(time.RFC3339Nano))
+		checkInCode = b64.StdEncoding.EncodeToString(raw)
 	}
 
-	rawCode := fmt.Appendf(nil, "%s.%s", checkinTime.Format("2006-01-02T15:04:05Z"), rowId.String())
 	responseBody := dtoRes.GetParticipantRes{
 		FirstnameTH:     nil,
 		SurnameTH:       nil,
@@ -306,7 +307,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		OrganizationEN:  nil,
 		CheckInTime:     *checkinTime,
 		Status:          status,
-		Code:            b64.StdEncoding.EncodeToString(rawCode),
+		Code:            checkInCode,
 		ProfileImageUrl: nil,
 	}
 
