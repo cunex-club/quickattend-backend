@@ -23,16 +23,16 @@ func (r *repository) GetManagedEvents(userID datatypes.UUID, search string, ctx 
 	if search != "" {
 		searchQuery := fmt.Sprintf("%%%s%%", search)
 
-		errGetEvents := tx.Table("events").
-			Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
-				"events.end_time", "events.location", "event_users.role", "events.evaluation_form").
-			Joins(`JOIN event_users ON event_users.user_id = ? 
-				AND event_users.event_id = events.id`,
+		errGetEvents := tx.Table("events e").
+			Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
+				"e.end_time", "e.location", "eu.role", "e.evaluation_form").
+			Joins(`JOIN event_users eu ON eu.user_id = ? 
+				AND eu.event_id = e.id`,
 				userID).
-			Where(`(events.name ILIKE ? OR events.organizer ILIKE ? OR events.description ILIKE ? OR events.location ILIKE ?
-				OR event_users.role::TEXT ILIKE ? OR events.evaluation_form ILIKE ?)`,
+			Where(`(e.name ILIKE ? OR e.organizer ILIKE ? OR e.description ILIKE ? OR e.location ILIKE ?
+				OR eu.role::TEXT ILIKE ? OR e.evaluation_form ILIKE ?)`,
 				searchQuery, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery).
-			Order("events.id").
+			Order("e.id").
 			Scan(&results).Error
 
 		if errGetEvents != nil {
@@ -41,13 +41,13 @@ func (r *repository) GetManagedEvents(userID datatypes.UUID, search string, ctx 
 		return &results, nil
 	}
 
-	errGetEvents := tx.Table("events").
-		Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
-			"events.end_time", "events.location", "event_users.role", "events.evaluation_form").
-		Joins(`JOIN event_users ON event_users.user_id = ? 
-			AND event_users.event_id = events.id`,
+	errGetEvents := tx.Table("events e").
+		Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
+			"e.end_time", "e.location", "eu.role", "e.evaluation_form").
+		Joins(`JOIN event_users eu ON eu.user_id = ? 
+			AND eu.event_id = e.id`,
 			userID).
-		Order("events.id").
+		Order("e.id").
 		Scan(&results).Error
 
 	if errGetEvents != nil {
@@ -59,38 +59,30 @@ func (r *repository) GetManagedEvents(userID datatypes.UUID, search string, ctx 
 func (r *repository) GetAttendedEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, int64, bool, error) {
 	tx := r.db.WithContext(ctx)
 
-	var user entity.User
-	errGetRefId := tx.Model(&user).Select("ref_id").Where("id = ?", userID).Scan(&user).Error
-	if errGetRefId != nil {
-		return nil, -1, false, errGetRefId
-	}
-
 	var subQuery *gorm.DB
 	if search != "" {
 		searchQuery := fmt.Sprintf("%%%s%%", search)
 
-		subQuery = tx.Table("events").
-			Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
-				"events.end_time", "events.location", "events.evaluation_form").
-			Joins(`JOIN event_participants ON event_participants.participant_ref_id = ? 
-				AND event_participants.event_id = events.id
-				`, user.RefID).
-			Where(`(events.name ILIKE ? OR events.organizer ILIKE ? OR events.description ILIKE ? OR events.location ILIKE ?
-				OR events.evaluation_form ILIKE ?)
+		subQuery = tx.Table("events e").
+			Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
+				"e.end_time", "e.location", "e.evaluation_form").
+			Joins(`JOIN event_participants ep ON ep.participant_id = ? 
+				AND ep.event_id = e.id
+				`, userID).
+			Where(`(e.name ILIKE ? OR e.organizer ILIKE ? OR e.description ILIKE ? OR e.location ILIKE ?
+				OR e.evaluation_form ILIKE ?)
 				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
 	} else {
-		subQuery = tx.Table("events").
-			Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
-				"events.end_time", "events.location", "events.evaluation_form").
-			Joins(`JOIN event_participants ON event_participants.participant_ref_id = ? 
-			AND event_participants.event_id = events.id
-			`, user.RefID)
+		subQuery = tx.Table("events e").
+			Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
+				"e.end_time", "e.location", "e.evaluation_form").
+			Joins(`JOIN event_participants ep ON ep.participant_id = ? 
+			AND ep.event_id = e.id
+			`, userID)
 	}
 
-	var total struct {
-		Count int64 `gorm:"column:total"`
-	}
-	countErr := tx.Raw(`SELECT COUNT(*) AS total FROM (?) AS subQuery`, subQuery).Scan(&total).Error
+	var count int64
+	countErr := tx.Raw(`SELECT COUNT(*) AS total FROM (?) AS subQuery`, subQuery).Scan(&count).Error
 	if countErr != nil {
 		return nil, -1, false, countErr
 	}
@@ -106,53 +98,45 @@ func (r *repository) GetAttendedEvents(userID datatypes.UUID, page int, pageSize
 	}
 
 	if len(rawResult) <= pageSize {
-		return &rawResult, total.Count, false, nil
+		return &rawResult, count, false, nil
 	}
 	clipped := rawResult[:pageSize]
-	return &clipped, total.Count, true, nil
+	return &clipped, count, true, nil
 }
 
 func (r *repository) GetDiscoveryEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, int64, bool, error) {
 	tx := r.db.WithContext(ctx)
 
-	var user entity.User
-	errGetRefId := tx.Model(&user).Select("ref_id").Where("id = ?", userID).Scan(&user).Error
-	if errGetRefId != nil {
-		return nil, -1, false, errGetRefId
-	}
-
 	var subQuery *gorm.DB
 	if search != "" {
 		searchQuery := fmt.Sprintf("%%%s%%", search)
 
-		subQuery = tx.Table("events").Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
-			"events.end_time", "events.location", "events.evaluation_form").
+		subQuery = tx.Table("events e").Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
+			"e.end_time", "e.location", "e.evaluation_form").
 			Where(`NOT EXISTS (
-					SELECT 1 FROM event_users WHERE event_users.event_id = events.id
-					AND event_users.user_id = ?
+					SELECT 1 FROM event_users eu WHERE eu.event_id = e.id
+					AND eu.user_id = ?
 				) AND NOT EXISTS (
-					SELECT 1 FROM event_participants WHERE event_participants.event_id = events.id
-					AND event_participants.participant_ref_id = ?
-				)`, userID, user.RefID).
-			Where(`(events.name ILIKE ? OR events.organizer ILIKE ? OR events.description ILIKE ? OR events.location ILIKE ?
-				OR events.evaluation_form ILIKE ?)
+					SELECT 1 FROM event_participants ep WHERE ep.event_id = e.id
+					AND ep.participant_id = ?
+				)`, userID, userID).
+			Where(`(e.name ILIKE ? OR e.organizer ILIKE ? OR e.description ILIKE ? OR e.location ILIKE ?
+				OR e.evaluation_form ILIKE ?)
 				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
 	} else {
-		subQuery = tx.Table("events").Select("events.id", "events.name", "events.organizer", "events.description", "events.start_time",
-			"events.end_time", "events.location", "events.evaluation_form").
+		subQuery = tx.Table("events e").Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
+			"e.end_time", "e.location", "e.evaluation_form").
 			Where(`NOT EXISTS (
-				SELECT 1 FROM event_users WHERE event_users.event_id = events.id
-				AND event_users.user_id = ?
+				SELECT 1 FROM event_users eu WHERE eu.event_id = e.id
+				AND eu.user_id = ?
 			) AND NOT EXISTS (
-				SELECT 1 FROM event_participants WHERE event_participants.event_id = events.id
-				AND event_participants.participant_ref_id = ?
-			)`, userID, user.RefID)
+				SELECT 1 FROM event_participants ep WHERE ep.event_id = e.id
+				AND ep.participant_id = ?
+			)`, userID, userID)
 	}
 
-	var total struct {
-		Count int64 `gorm:"column:total"`
-	}
-	countErr := tx.Raw(`SELECT COUNT(*) AS total FROM (?) AS subQuery`, subQuery).Scan(&total).Error
+	var count int64
+	countErr := tx.Raw(`SELECT COUNT(*) FROM (?) AS subQuery`, subQuery).Scan(&count).Error
 	if countErr != nil {
 		return nil, -1, false, countErr
 	}
@@ -168,8 +152,8 @@ func (r *repository) GetDiscoveryEvents(userID datatypes.UUID, page int, pageSiz
 	}
 
 	if len(rawResult) <= pageSize {
-		return &rawResult, total.Count, false, nil
+		return &rawResult, count, false, nil
 	}
 	clipped := rawResult[:pageSize]
-	return &clipped, total.Count, true, nil
+	return &clipped, count, true, nil
 }
