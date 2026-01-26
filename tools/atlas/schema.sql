@@ -61,16 +61,14 @@ CREATE TABLE event_participants (
   checkin_timestamp timestamptz,
   scanned_timestamp timestamptz NOT NULL,
   comment text,
-  participant_ref_id bigint NOT NULL,
-  first_name text NOT NULL,
-  sur_name text NOT NULL,
+  participant_id uuid NOT NULL,
   organization text NOT NULL,
   scanned_location point NOT NULL,
   scanner_id uuid NULL,
   CONSTRAINT fk_event_participants_event
     FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE,
-  CONSTRAINT fk_event_participants_user_ref
-    FOREIGN KEY (participant_ref_id) REFERENCES users (ref_id) ON UPDATE CASCADE ON DELETE CASCADE,
+  CONSTRAINT fk_event_participants_participant
+    FOREIGN KEY (participant_id) REFERENCES users (id) ON UPDATE CASCADE ON DELETE CASCADE,
   CONSTRAINT fk_event_participants_scanner
     FOREIGN KEY (scanner_id) REFERENCES users (id) ON UPDATE CASCADE ON DELETE SET NULL
 );
