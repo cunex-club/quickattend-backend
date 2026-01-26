@@ -92,7 +92,7 @@ CREATE INDEX idx_events_description_trgm ON events USING GIN (description gin_tr
 CREATE INDEX idx_events_location_trgm ON events USING GIN (location gin_trgm_ops);
 CREATE INDEX idx_events_evaluation_form_trgm ON events USING GIN (evaluation_form gin_trgm_ops);
 
-CREATE INDEX idx_event_whitelists_event_id ON events_whitelists (event_id);
+CREATE INDEX idx_event_whitelists_event_id ON event_whitelists (event_id);
 CREATE INDEX idx_event_users_event_id ON event_users (event_id);
 CREATE INDEX idx_event_allowed_faculties_event_id ON event_allowed_faculties (event_id);
 CREATE INDEX idx_event_agendas_event_id ON event_agendas (event_id);
