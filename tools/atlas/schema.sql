@@ -33,6 +33,7 @@ CREATE TABLE event_whitelists (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id uuid NOT NULL,
   attendee_ref_id bigint NOT NULL,
+  CONSTRAINT unique_event_and_ref_id UNIQUE (event_id, attendee_ref_id),
   CONSTRAINT fk_event_whitelist_event
     FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE,
   CONSTRAINT fk_event_whitelist_user
@@ -43,6 +44,7 @@ CREATE TABLE event_allowed_faculties (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id uuid NOT NULL,
   faculty_no int8 NOT NULL,
+  CONSTRAINT unique_event_and_faculty_no UNIQUE (event_id, faculty_no),
   CONSTRAINT fk_event_allowed_faculties_event
     FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE
 );
@@ -53,6 +55,7 @@ CREATE TABLE event_agendas (
   activity_name text NOT NULL,
   start_time timestamptz NOT NULL,
   end_time timestamptz NOT NULL,
+  CONSTRAINT unique_event_start_end UNIQUE (event_id, start_time, end_time),
   CONSTRAINT fk_event_agenda_event
     FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE
 );
@@ -63,10 +66,11 @@ CREATE TABLE event_participants (
   checkin_timestamp timestamptz,
   scanned_timestamp timestamptz NOT NULL,
   comment text,
-  participant_id uuid NOT NULL UNIQUE,
+  participant_id uuid NOT NULL,
   organization text NOT NULL,
   scanned_location point NOT NULL,
   scanner_id uuid NULL,
+  CONSTRAINT unique_event_and_participant UNIQUE (event_id, participant_id),
   CONSTRAINT fk_event_participants_event
     FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE,
   CONSTRAINT fk_event_participants_participant
@@ -80,6 +84,7 @@ CREATE TABLE event_users (
   role role NOT NULL,
   user_id uuid NOT NULL,
   event_id uuid NOT NULL,
+  CONSTRAINT unique_user_and_event UNIQUE (user_id, event_id),
   CONSTRAINT fk_event_users_event
     FOREIGN KEY (event_id) REFERENCES events (id) ON UPDATE CASCADE ON DELETE CASCADE,
   CONSTRAINT fk_event_users_user
