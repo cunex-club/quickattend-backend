@@ -132,8 +132,8 @@ type Event struct {
 
 type EventWhitelist struct {
 	ID            datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	EventID       datatypes.UUID `gorm:"type:uuid;not null;index:idx_event_whitelists_event_id" json:"event_id"`
-	AttendeeRefID uint64         `gorm:"type:bigint;not null" json:"attendee_ref_id"`
+	EventID       datatypes.UUID `gorm:"type:uuid;not null;index:unique_event_and_ref_id,unique" json:"event_id"`
+	AttendeeRefID uint64         `gorm:"type:bigint;not null;index:unique_event_and_ref_id,unique" json:"attendee_ref_id"`
 
 	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	User  User  `gorm:"foreignKey:AttendeeRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
@@ -141,29 +141,29 @@ type EventWhitelist struct {
 
 type EventAllowedFaculties struct {
 	ID        datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	EventID   datatypes.UUID `gorm:"type:uuid;not null;index:idx_event_allowed_faculties_event_id" json:"event_id"`
-	FacultyNO uint8          `gorm:"type:int8;not null" json:"faculty_no"`
+	EventID   datatypes.UUID `gorm:"type:uuid;not null;index:unique_event_and_faculty_no,unique" json:"event_id"`
+	FacultyNO uint8          `gorm:"type:int8;not null;index:unique_event_and_faculty_no,unique" json:"faculty_no"`
 
 	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type EventAgenda struct {
 	ID           datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	EventID      datatypes.UUID `gorm:"type:uuid;not null;index:idx_event_agendas_event_id" json:"event_id"`
+	EventID      datatypes.UUID `gorm:"type:uuid;not null;index:unique_event_start_end,unique" json:"event_id"`
 	ActivityName string         `gorm:"type:text;not null" json:"activity_name"`
-	StartTime    time.Time      `gorm:"type:timestamptz;not null" json:"start_time"`
-	EndTime      time.Time      `gorm:"type:timestamptz;not null" json:"end_time"`
+	StartTime    time.Time      `gorm:"type:timestamptz;not null;index:unique_event_start_end,unique" json:"start_time"`
+	EndTime      time.Time      `gorm:"type:timestamptz;not null;index:unique_event_start_end,unique" json:"end_time"`
 
 	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type EventParticipants struct {
 	ID               datatypes.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	EventID          datatypes.UUID  `gorm:"type:uuid;not null;index:idx_event_participants_event_id" json:"event_id"`
+	EventID          datatypes.UUID  `gorm:"type:uuid;not null;index:unique_event_and_participant,unique" json:"event_id"`
 	CheckinTimestamp *time.Time      `gorm:"type:timestamptz" json:"checkin_timestamp"`
 	ScannedTimestamp time.Time       `gorm:"type:timestamptz;not null" json:"scanned_timestamp"`
 	Comment          *string         `gorm:"type:text" json:"comment"`
-	ParticipantID    datatypes.UUID  `gorm:"type:uuid;not null;unique" json:"participant_id"`
+	ParticipantID    datatypes.UUID  `gorm:"type:uuid;not null;index:unique_event_and_participant,unique" json:"participant_id"`
 	Organization     string          `gorm:"type:text;not null" json:"organization"`
 	ScannedLocation  Point           `gorm:"type:point;not null" json:"scanned_location"`
 	ScannerID        *datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
