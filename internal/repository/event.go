@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 )
 
@@ -61,15 +62,27 @@ func (r *repository) GetEventForCheckin(ctx context.Context, eventId datatypes.U
 func (r *repository) CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, participantID datatypes.UUID) (*datatypes.UUID, error) {
 	withCtx := r.db.WithContext(ctx)
 
-	var rowId datatypes.UUID
-	checkErr := withCtx.Model(&entity.EventParticipants{}).Select("id").
+	var rowIdStr string
+	tx := withCtx.Model(&entity.EventParticipants{}).Select("id").
 		Where("event_id = ?", eventId).
 		Where("participant_id = ?", participantID).
-		Scan(&rowId).Error
-	if checkErr != nil {
-		return nil, checkErr
+		Scan(&rowIdStr)
+	if tx.Error != nil {
+		return nil, tx.Error
 	}
 
+	if tx.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	// parse string to datatypes.UUID
+	parsed, err := uuid.Parse(rowIdStr)
+	if err != nil {
+		return nil, err
+	}
+	b := make([]byte, 16)
+	copy(b, parsed[:])
+	rowId := datatypes.UUID(b)
 	return &rowId, nil
 }
 
