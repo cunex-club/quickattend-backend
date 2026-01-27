@@ -123,6 +123,7 @@ func (s *service) GetEventsService(userIDStr string, queryParams map[string]stri
 		return nil, nil, &response.APIError{
 			Code:    response.ErrBadRequest,
 			Message: "URL query parameter 'managed' must be boolean",
+			Status:  400,
 		}
 	}
 	switch managed {
