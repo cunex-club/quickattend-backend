@@ -76,6 +76,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	}
 	userIdUuid := datatypes.UUID(datatypes.BinUUIDFromString(userId))
 
+	// Request for participant profile
 	CUNEXGetQRURL := "https://culab-svc.azurewebsites.net/Service.svc/qrcodeinfo_for_all"
 	clientId := s.cfg.LLEConfig.ClientId
 	if clientId == "" {
@@ -175,6 +176,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 
 	}
 
+	// Format participant info from CU NEX API to fit our uses
 	refIdUInt, convertErr := strconv.ParseUint(CUNEXSuccess.RefId, 10, 64)
 	if convertErr != nil {
 		s.logger.Error().Err(convertErr).Str("Error", fmt.Sprintf("Invalid refID returned from CU NEX GET qrcode; could not convert %s to uint64", CUNEXSuccess.RefId))
@@ -195,6 +197,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	}
 	orgCode := uint8(tempCode)
 
+	// Insert participant now to allow inserting them into EventParticipants later
 	userToInsert := entity.User{
 		RefID:       refIdUInt,
 		FirstnameTH: CUNEXSuccess.FirstNameTH,
@@ -209,6 +212,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		return nil, createUserErr
 	}
 
+	// Get event info for checking scanning/check in permission
 	event, getEventErr := s.repo.Event.GetEventForCheckin(ctx, eventIdUuid, userIdUuid)
 	if getEventErr != nil {
 		if getEventErr == gorm.ErrRecordNotFound {
@@ -237,11 +241,13 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	status, checkinTime, errCheckStatus := s.CheckCheckinStatus(ctx, eventIdUuid, user.RefID, user.ID, string(event.AttendenceType), orgCode, event.EndTime)
+	status, checkinTime, rowId, errCheckStatus := s.CheckCheckinStatus(ctx, eventIdUuid, user.RefID, user.ID, string(event.AttendenceType), orgCode, event.EndTime)
 	if errCheckStatus != nil {
 		return nil, errCheckStatus
 	}
 
+	// Format org before proceeding with steps according to status
+	// to make EventParticipants insertion possible
 	var (
 		orgTH string
 		orgEN string
@@ -264,8 +270,14 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	checkInCode := ""
 	switch status {
+	case string(dtoRes.FAIL):
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "Failed to check in to the event (late or no permission).",
+			Status:  400,
+		}
+
 	case string(dtoRes.SUCCESS):
 		scanRecord := entity.EventParticipants{
 			EventID:          eventIdUuid,
@@ -275,7 +287,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 			ScannedLocation:  entity.Point{X: scannedLocX, Y: scannedLocY},
 			ScannerID:        &userIdUuid,
 		}
-		rowId, insertErr := s.repo.Event.InsertScanRecord(ctx, &scanRecord)
+		rowIdInsert, insertErr := s.repo.Event.InsertScanRecord(ctx, &scanRecord)
 		if insertErr != nil {
 			s.logger.Error().Err(insertErr).
 				Uint64("participant ref_id", refIdUInt).
@@ -287,14 +299,13 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 			}
 		}
 
-		raw := fmt.Appendf(nil, "%s.%s", checkinTime.Format(time.RFC3339Nano), rowId.String())
-		checkInCode = b64.StdEncoding.EncodeToString(raw)
-
-	default:
-		raw := fmt.Appendf(nil, "%s.", checkinTime.Format(time.RFC3339Nano))
-		checkInCode = b64.StdEncoding.EncodeToString(raw)
+		rowId = rowIdInsert
 	}
 
+	raw := fmt.Appendf(nil, "%s.%s", checkinTime.Format(time.RFC3339Nano), rowId.String())
+	checkInCode := b64.StdEncoding.EncodeToString(raw)
+
+	// Finally, format response according to revealed_fields of this event
 	responseBody := dtoRes.GetParticipantRes{
 		FirstnameTH:     nil,
 		SurnameTH:       nil,
@@ -337,7 +348,8 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	return &responseBody, nil
 }
 
-func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, participantId datatypes.UUID, attendanceType string, orgCode uint8, eventEndTime time.Time) (string, *time.Time, *response.APIError) {
+// returns (status, checkInTime, rowId (if duplication found), error)
+func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, participantId datatypes.UUID, attendanceType string, orgCode uint8, eventEndTime time.Time) (string, *time.Time, *datatypes.UUID, *response.APIError) {
 	now := time.Now().UTC()
 
 	// Must check if already checked in, regardless of attendance type
@@ -346,14 +358,14 @@ func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID
 		s.logger.Error().Err(err).
 			Str("participant id", participantId.String()).
 			Str("function", "EventRepository.CheckEventParticipation")
-		return "", nil, &response.APIError{
+		return "", nil, nil, &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "Internal DB error",
 			Status:  500,
 		}
 	}
 	if rowId != nil {
-		return string(dtoRes.DUPLICATE), &now, nil
+		return string(dtoRes.DUPLICATE), &now, rowId, nil
 	}
 
 	// If FACULTIES or WHITELIST, must check for access
@@ -363,7 +375,7 @@ func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID
 			s.logger.Error().Err(err).
 				Uint64("participant ref_id", participantRefId).
 				Str("function", "EventRepository.CheckEventAccess")
-			return "", nil, &response.APIError{
+			return "", nil, nil, &response.APIError{
 				Code:    response.ErrInternalError,
 				Message: "Internal DB error",
 				Status:  500,
@@ -371,14 +383,14 @@ func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID
 		}
 
 		if !allow {
-			return string(dtoRes.FAIL), &now, nil
+			return string(dtoRes.FAIL), &now, nil, nil
 		}
 	}
 
 	// Cannot check in if already past the event's ending time
 	if now.After(eventEndTime.UTC()) {
-		return string(dtoRes.LATE), &now, nil
+		return string(dtoRes.FAIL), &now, nil, nil
 	}
 
-	return string(dtoRes.SUCCESS), &now, nil
+	return string(dtoRes.SUCCESS), &now, nil, nil
 }
