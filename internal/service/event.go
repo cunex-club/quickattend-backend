@@ -341,8 +341,8 @@ func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID
 	now := time.Now().UTC()
 
 	// Must check if already checked in, regardless of attendance type
-	found, err := s.repo.Event.CheckEventParticipation(ctx, eventId, participantId)
-	if err != nil {
+	rowId, err := s.repo.Event.CheckEventParticipation(ctx, eventId, participantId)
+	if err != nil && err != gorm.ErrRecordNotFound {
 		s.logger.Error().Err(err).
 			Str("participant id", participantId.String()).
 			Str("function", "EventRepository.CheckEventParticipation")
@@ -352,7 +352,7 @@ func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID
 			Status:  500,
 		}
 	}
-	if found {
+	if rowId != nil {
 		return string(dtoRes.DUPLICATE), &now, nil
 	}
 
