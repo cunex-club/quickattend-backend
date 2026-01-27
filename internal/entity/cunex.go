@@ -10,11 +10,6 @@ type CUNEXUserResponse struct {
 	LastNameEN  string `json:"lastNameEN"`
 }
 
-type CUNEXGetQRErrorResponse struct {
-	ErrorCode string `json:"errorCode"`
-	Message   string `json:"message"`
-}
-
 type UserTypes string
 
 const (
