@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,19 +12,32 @@ import (
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 )
 
 type AuthService interface {
-	GetUserService(uint64, context.Context) (*entity.User, *response.APIError)
+	GetUserService(string, context.Context) (*dtoRes.GetAuthUserRes, *response.APIError)
 	VerifyCUNEXToken(string, context.Context) (*dtoRes.VerifyTokenRes, *response.APIError)
 	CreateUserIfNotExists(*entity.User, context.Context) (*entity.User, *response.APIError)
 }
 
-func (s *service) GetUserService(refID uint64, ctx context.Context) (*entity.User, *response.APIError) {
-	user, err := s.repo.Auth.GetUserByRefId(refID, ctx)
+func (s *service) GetUserService(userIDStr string, ctx context.Context) (*dtoRes.GetAuthUserRes, *response.APIError) {
+	uuidValidateErr := uuid.Validate(userIDStr)
+	if uuidValidateErr != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Failed to validate user_id as UUID",
+			Status:  500,
+		}
+	}
+
+	userID := datatypes.UUID(datatypes.BinUUIDFromString(userIDStr))
+
+	user, err := s.repo.Auth.GetUserById(userID, ctx)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, &response.APIError{
 			Code:    response.ErrNotFound,
@@ -40,7 +54,18 @@ func (s *service) GetUserService(refID uint64, ctx context.Context) (*entity.Use
 		}
 	}
 
-	return &user, nil
+	userDTO := dtoRes.GetAuthUserRes{
+		ID:          user.ID.String(),
+		RefID:       s.FormatRefIdToStr(user.RefID),
+		FirstnameTH: user.FirstnameTH,
+		SurnameTH:   user.SurnameTH,
+		TitleTH:     user.TitleTH,
+		FirstnameEN: user.FirstnameEN,
+		SurnameEN:   user.SurnameEN,
+		TitleEN:     user.TitleEN,
+	}
+
+	return &userDTO, nil
 }
 
 func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) (*entity.User, *response.APIError) {
@@ -66,7 +91,7 @@ func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) 
 	createdUser, createErr := s.repo.Auth.CreateUser(user, ctx)
 	if createErr != nil {
 		if errors.Is(createErr, gorm.ErrDuplicatedKey) {
-			existingUser, _ := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
+			existingUser, _ := s.repo.Auth.GetUserById(user.ID, ctx)
 			return &existingUser, nil
 		}
 
@@ -207,7 +232,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"user_id": createdUser.ID,
+			"user_id": createdUser.ID.String(),
 		})
 
 	JWTSecret := s.cfg.JWTSecret
@@ -232,4 +257,14 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	return &dtoRes.VerifyTokenRes{
 		AccessToken: access_token,
 	}, nil
+}
+
+func (s *service) FormatRefIdToStr(refId uint64) string {
+	str := fmt.Sprint(refId)
+	if len(str) < 8 {
+		// In case it's staff ref id with zeros at the start
+		// Student ref id cannot start with zero so it's fine
+		str = strings.Repeat("0", 8-len(str)) + str
+	}
+	return str
 }
