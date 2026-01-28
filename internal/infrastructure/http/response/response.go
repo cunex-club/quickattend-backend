@@ -9,6 +9,7 @@ const (
 	ErrNotFound      = "NOT_FOUND"
 	ErrValidation    = "VALIDATION_ERROR"
 	ErrInternalError = "INTERNAL_SERVER_ERROR"
+	ErrConflict = "CONFLICT"
 )
 
 type APIResponse struct {
@@ -38,6 +39,14 @@ type Pagination struct {
 
 func OK(c *fiber.Ctx, data any) error {
 	return c.Status(fiber.StatusOK).JSON(APIResponse{
+		Data:  data,
+		Error: nil,
+		Meta:  nil,
+	})
+}
+
+func Created(c *fiber.Ctx, data any) error {
+	return c.Status(fiber.StatusCreated).JSON(APIResponse{
 		Data:  data,
 		Error: nil,
 		Meta:  nil,

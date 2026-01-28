@@ -2,21 +2,107 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"strings"
+	"time"
 
-	"github.com/cunex-club/quickattend-backend/internal/entity"
-	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+
+	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
+	"github.com/cunex-club/quickattend-backend/internal/entity"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 )
 
 type EventService interface {
-	EventDeleteById(EventID string, ctx context.Context) *response.APIError
-	EventDuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
+	DeleteById(EventID string, ctx context.Context) *response.APIError
+	DuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
+	CheckIn(checkInReq dtoReq.CheckInReq, ctx context.Context) *response.APIError
 }
 
-func (s *service) EventDeleteById(EventId string, ctx context.Context) *response.APIError {
+func (s *service) CheckIn(checkInReq dtoReq.CheckInReq, ctx context.Context) *response.APIError {
+
+	decoded, err := base64.StdEncoding.DecodeString(checkInReq.EncodedOneTimeCode)
+	if err != nil {
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "failed to interpret one_time_code as base64 encoded",
+			Status:  400,
+		}
+	}
+
+	raw := string(decoded)
+	idx := strings.LastIndex(raw, ".")
+	if idx == -1 {
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "invalid one_time_code format",
+			Status:  400,
+		}
+	}
+
+	strTimeStamp := raw[:idx]
+	strCheckInRowId := raw[idx+1:]
+
+	checkInRowId, err := uuid.Parse(strCheckInRowId)
+	if err != nil {
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "failed to parse check-in target id",
+			Status:  400,
+		}
+	}
+
+	timeStamp, err := time.Parse(time.RFC3339, strTimeStamp)
+	if err != nil {
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "failed to parse timeStamp to go time",
+			Status:  400,
+		}
+	}
+
+	s.logger.Info().
+		Str("timeStamp", timeStamp.String()).
+		Str("checkInRowId", checkInRowId.String()).
+		Msg("Received timeStamp and target row-id to check-in Event-Participant")
+
+	if err := s.repo.Event.CheckIn(
+		checkInRowId,
+		timeStamp,
+		checkInReq.Comment,
+		ctx,
+	); err != nil {
+
+		if errors.Is(err, entity.ErrAlreadyCheckedIn) {
+			return &response.APIError{
+				Code:    response.ErrConflict,
+				Message: err.Error(),
+				Status:  409,
+			}
+		}
+
+		if errors.Is(err, entity.ErrCheckInTargetNotFound) {
+			return &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: err.Error(),
+				Status:  400,
+			}
+		}
+
+		return &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "internal db error",
+			Status:  500,
+		}
+	}
+
+	return nil
+}
+
+func (s *service) DeleteById(EventId string, ctx context.Context) *response.APIError {
 	event_id, parseErr := uuid.Parse(EventId)
 	if parseErr != nil {
 		return &response.APIError{
@@ -48,7 +134,7 @@ func (s *service) EventDeleteById(EventId string, ctx context.Context) *response
 			Str("action", "delete_event").
 			Msg("attempt deleting nil uuid")
 		return &response.APIError{
-			Code:    response.ErrNotFound,
+			Code:    response.ErrBadRequest,
 			Message: "nil uuid not allowed",
 			Status:  400,
 		}
@@ -70,7 +156,7 @@ func (s *service) EventDeleteById(EventId string, ctx context.Context) *response
 	return nil
 }
 
-func (s *service) EventDuplicateById(EventId string, ctx context.Context) (*entity.Event, *response.APIError) {
+func (s *service) DuplicateById(EventId string, ctx context.Context) (*entity.Event, *response.APIError) {
 	event_id, parseErr := uuid.Parse(EventId)
 	if parseErr != nil {
 		return nil, &response.APIError{

@@ -2,16 +2,58 @@ package repository
 
 import (
 	"context"
+	"time"
 
-	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"github.com/cunex-club/quickattend-backend/internal/entity"
 )
 
 type EventRepository interface {
 	FindById(uuid.UUID, context.Context) (*entity.Event, error)
 	DeleteById(uuid.UUID, context.Context) error
 	Create(*entity.Event, context.Context) (*entity.Event, error)
+	CheckIn(uuid.UUID, time.Time, string, context.Context) error
+}
+
+func (r *repository) CheckIn(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
+	if checkInRowId == uuid.Nil {
+		return entity.ErrNilUUID
+	}
+
+	result := r.db.WithContext(ctx).
+		Model(&entity.EventParticipants{}).
+		Where("id = ? AND checkin_timestamp IS NULL", checkInRowId).
+		Updates(map[string]any{
+			"checkin_timestamp": timeStamp,
+			"comment":           comment,
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		var exists bool
+		err := r.db.WithContext(ctx).
+			Model(&entity.EventParticipants{}).
+			Select("count(1) > 0").
+			Where("id = ?", checkInRowId).
+			Find(&exists).Error
+
+		if err != nil {
+			return err
+		}
+
+		if !exists {
+			return entity.ErrCheckInTargetNotFound
+		}
+
+		return entity.ErrAlreadyCheckedIn
+	}
+
+	return nil
 }
 
 func (r *repository) FindById(id uuid.UUID, ctx context.Context) (*entity.Event, error) {

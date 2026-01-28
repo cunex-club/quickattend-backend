@@ -10,9 +10,8 @@ CREATE TABLE "events" (
   "name" text NOT NULL,
   "organizer" text NOT NULL,
   "description" text NULL,
-  "date" timestamp NOT NULL,
-  "start_time" time NOT NULL,
-  "end_time" time NOT NULL,
+  "start_time" timestamp NOT NULL,
+  "end_time" timestamp NOT NULL,
   "location" text NOT NULL,
   "attendence_type" "attendence_type" NOT NULL,
   "allow_all_to_scan" boolean NOT NULL,
@@ -25,8 +24,8 @@ CREATE TABLE "event_agendas" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
   "activity_name" text NOT NULL,
-  "start_time" time NOT NULL,
-  "end_time" time NOT NULL,
+  "start_time" timestamptz NOT NULL,
+  "end_time" timestamptz NOT NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_event_agendas_event" FOREIGN KEY ("event_id") REFERENCES "events" ("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
@@ -55,7 +54,9 @@ CREATE TABLE "users" (
 CREATE TABLE "event_participants" (
   "id" uuid NOT NULL DEFAULT gen_random_uuid(),
   "event_id" uuid NOT NULL,
-  "checkin_timestamp" timestamptz NOT NULL,
+  "checkin_timestamp" timestamptz NULL,
+  "comment" text NULL,
+  "scanned_timestamp" timestamptz NOT NULL,
   "participant_ref_id" bigint NOT NULL,
   "first_name" text NOT NULL,
   "sur_name" text NOT NULL,
@@ -64,8 +65,7 @@ CREATE TABLE "event_participants" (
   "scanner_id" uuid NULL,
   PRIMARY KEY ("id"),
   CONSTRAINT "fk_event_participants_event" FOREIGN KEY ("event_id") REFERENCES "events" ("id") ON UPDATE CASCADE ON DELETE CASCADE,
-  CONSTRAINT "fk_event_participants_scanner" FOREIGN KEY ("scanner_id") REFERENCES "users" ("id") ON UPDATE CASCADE ON DELETE SET NULL,
-  CONSTRAINT "fk_event_participants_user" FOREIGN KEY ("participant_ref_id") REFERENCES "users" ("ref_id") ON UPDATE CASCADE ON DELETE CASCADE
+  CONSTRAINT "fk_event_participants_scanner" FOREIGN KEY ("scanner_id") REFERENCES "users" ("id") ON UPDATE CASCADE ON DELETE SET NULL
 );
 -- Create "event_users" table
 CREATE TABLE "event_users" (
