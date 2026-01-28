@@ -194,3 +194,18 @@ type GetOneEventWithTotalCount struct {
 	EvaluationForm  *string   `gorm:"column:evaluation_form"`
 	Role            *string   `gorm:"column:role"`
 }
+
+// ====================================================
+
+// for retrieving raw result from DB in GET /events
+type GetEventsQueryResult struct {
+	ID             datatypes.UUID `gorm:"column:id"`
+	Name           string         `gorm:"column:name"`
+	Organizer      string         `gorm:"column:organizer"`
+	Description    *string        `gorm:"column:description"`
+	StartTime      time.Time      `gorm:"column:start_time"`
+	EndTime        time.Time      `gorm:"column:end_time"`
+	Location       string         `gorm:"column:location"`
+	Role           *string        `gorm:"column:role"`
+	EvaluationForm *string        `gorm:"column:evaluation_form"`
+}
