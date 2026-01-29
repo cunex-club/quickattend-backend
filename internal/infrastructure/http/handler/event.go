@@ -12,6 +12,7 @@ type EventHandler interface {
 	Delete(c *fiber.Ctx) error
 	Duplicate(c *fiber.Ctx) error
 	CheckIn(c *fiber.Ctx) error
+	PostParticipantHandler(c *fiber.Ctx) error
 }
 
 func (h *Handler) Delete(c *fiber.Ctx) error {
@@ -51,4 +52,21 @@ func (h *Handler) CheckIn(c *fiber.Ctx) error {
 	}
 
 	return nil
+}
+
+func (h *Handler) PostParticipantHandler(c *fiber.Ctx) error {
+	code := c.Params("qrcode")
+	userId := c.Locals("user_id").(string)
+
+	var reqBody dtoReq.PostParticipantReqBody
+	parseBodyErr := c.BodyParser(&reqBody)
+	if parseBodyErr != nil {
+		return response.SendError(c, 400, response.ErrBadRequest, "Invalid request body")
+	}
+
+	res, serviceErr := h.Service.Event.PostParticipantService(code, reqBody.EventId, userId, reqBody.ScannedLocationX, reqBody.ScannedLocationY, c.UserContext())
+	if serviceErr != nil {
+		return response.SendError(c, serviceErr.Status, serviceErr.Code, serviceErr.Message)
+	}
+	return response.OK(c, res)
 }
