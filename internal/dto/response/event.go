@@ -2,6 +2,10 @@ package response
 
 import "time"
 
+type DuplicateEventRes struct {
+	DuplicatedEventId string `json:"event_id"`
+}
+
 type status string
 
 const (

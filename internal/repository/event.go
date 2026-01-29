@@ -3,13 +3,19 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type EventRepository interface {
+	FindById(uuid.UUID, context.Context) (*entity.Event, error)
+	DeleteById(uuid.UUID, context.Context) error
+	Create(*entity.Event, context.Context) (*entity.Event, error)
+	CheckIn(uuid.UUID, time.Time, string, context.Context) error
 	// For POST participant/:qrcode. Get user info not provided by CU NEX
 	GetUserForCheckin(ctx context.Context, refID uint64) (user *entity.CheckinUserQuery, err error)
 	// For POST participant/:qrcode. Get necessary event details for checking
@@ -19,6 +25,83 @@ type EventRepository interface {
 	// Check if user is in whitelist / allowed org or faculty of the event
 	CheckEventAccess(ctx context.Context, orgCode uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
 	InsertScanRecord(ctx context.Context, record *entity.EventParticipants) (rowId *datatypes.UUID, err error)
+}
+
+func (r *repository) CheckIn(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
+	if checkInRowId == uuid.Nil {
+		return entity.ErrNilUUID
+	}
+
+	result := r.db.WithContext(ctx).
+		Model(&entity.EventParticipants{}).
+		Where("id = ? AND checkin_timestamp IS NULL", checkInRowId).
+		Updates(map[string]any{
+			"checkin_timestamp": timeStamp,
+			"comment":           comment,
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		var exists bool
+		err := r.db.WithContext(ctx).
+			Model(&entity.EventParticipants{}).
+			Select("count(1) > 0").
+			Where("id = ?", checkInRowId).
+			Find(&exists).Error
+
+		if err != nil {
+			return err
+		}
+
+		if !exists {
+			return entity.ErrCheckInTargetNotFound
+		}
+
+		return entity.ErrAlreadyCheckedIn
+	}
+
+	return nil
+}
+
+func (r *repository) FindById(id uuid.UUID, ctx context.Context) (*entity.Event, error) {
+	var event entity.Event
+	err := r.db.WithContext(ctx).
+		Preload("EventWhitelist").
+		Preload("EventAllowedFaculties").
+		Preload("EventAgenda").
+		First(&event, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
+func (r *repository) DeleteById(id uuid.UUID, ctx context.Context) error {
+	if id == uuid.Nil {
+		return entity.ErrNilUUID
+	}
+
+	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.Event{})
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
+}
+
+func (r *repository) Create(event *entity.Event, ctx context.Context) (*entity.Event, error) {
+	if err := r.db.WithContext(ctx).Create(event).Error; err != nil {
+		return nil, err
+	}
+	return event, nil
 }
 
 func (r *repository) GetUserForCheckin(ctx context.Context, refID uint64) (*entity.CheckinUserQuery, error) {
