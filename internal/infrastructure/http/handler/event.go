@@ -19,13 +19,21 @@ type EventHandler interface {
 
 func (h *Handler) Delete(c *fiber.Ctx) error {
 	EventID := c.Params("id")
-
 	err := h.Service.Event.DeleteById(EventID, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
-
 	return response.Deleted(c, nil)
+}
+
+func (h *Handler) GetOneEventHandler(c *fiber.Ctx) error {
+	eventIdStr := c.Params("id")
+	userIdStr := c.Locals("user_id").(string)
+	res, err := h.Service.Event.GetOneEventService(eventIdStr, userIdStr, c.UserContext())
+	if err != nil {
+		return response.SendError(c, err.Status, err.Code, err.Message)
+	}
+	return response.OK(c, res)
 }
 
 func (h *Handler) Duplicate(c *fiber.Ctx) error {
@@ -70,18 +78,6 @@ func (h *Handler) PostParticipantHandler(c *fiber.Ctx) error {
 	if serviceErr != nil {
 		return response.SendError(c, serviceErr.Status, serviceErr.Code, serviceErr.Message)
 	}
-	return response.OK(c, res)
-}
-
-func (h *Handler) GetOneEventHandler(c *fiber.Ctx) error {
-	eventIdStr := c.Params("id")
-	userIdStr := c.Locals("user_id").(string)
-
-	res, err := h.Service.Event.GetOneEventService(eventIdStr, userIdStr, c.UserContext())
-	if err != nil {
-		return response.SendError(c, err.Status, err.Code, err.Message)
-	}
-
 	return response.OK(c, res)
 }
 
