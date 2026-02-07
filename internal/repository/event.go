@@ -36,7 +36,7 @@ func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, commen
 		Model(&entity.EventParticipants{}).
 		Where("id = ? AND checkin_timestamp IS NULL", checkInRowId).
 		Updates(map[string]any{
-			"checkin_timestamp": timeStamp,
+			"comment_timestamp": timeStamp,
 			"comment":           comment,
 		})
 
