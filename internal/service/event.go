@@ -25,7 +25,7 @@ import (
 
 type EventService interface {
 	DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError
-	DuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
+	DuplicateById(EventID string, userIDStr string, ctx context.Context) (*entity.Event, *response.APIError)
 	Comment(checkInReq dtoReq.CommentReq, ctx context.Context) *response.APIError
 	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
 
@@ -160,8 +160,8 @@ func (s *service) DeleteById(eventIDStr string, userIDStr string, ctx context.Co
 		if errors.Is(err, entity.ErrInsufficientPermissions) {
 			logger.Msg("user unauthorized")
 			return &response.APIError{
-				Code:    response.ErrUnauthorized,
-				Message: "user unauthorized",
+				Code:    response.ErrForbidden,
+				Message: "insufficient permissions",
 				Status:  403,
 			}
 		}
@@ -186,28 +186,59 @@ func (s *service) DeleteById(eventIDStr string, userIDStr string, ctx context.Co
 	return nil
 }
 
-func (s *service) DuplicateById(EventId string, ctx context.Context) (*entity.Event, *response.APIError) {
-	event_id, parseErr := uuid.Parse(EventId)
+func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context.Context) (*entity.Event, *response.APIError) {
+	eventID, parseErr := uuid.Parse(eventIDStr)
 	if parseErr != nil {
 		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "failed to parse event_id to uuid",
+			Code:    response.ErrBadRequest,
+			Message: "invalid event_id format",
 			Status:  400,
 		}
 	}
 
-	originalEvent, findErr := s.repo.Event.FindById(event_id, ctx)
+	if _, err := uuid.Parse(userIDStr); err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrUnauthorized,
+			Message: "invalid user_id format",
+			Status:  401,
+		}
+	}
+
+	isMember, authErr := s.repo.Event.IsUserEventAdmin(eventID, userIDStr, ctx)
+	if authErr != nil {
+		s.logger.Error().
+			Err(authErr).
+			Str("event_id", eventIDStr).
+			Str("user_id", userIDStr).
+			Str("action", "duplicate_event_auth").
+			Msg("failed to check event permissions")
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "internal db error",
+			Status:  500,
+		}
+	}
+
+	if !isMember {
+		return nil, &response.APIError{
+			Code:    response.ErrForbidden,
+			Message: "insufficient permissions",
+			Status:  403,
+		}
+	}
+
+	originalEvent, findErr := s.repo.Event.FindById(eventID, ctx)
 	if findErr != nil {
 		if errors.Is(findErr, gorm.ErrRecordNotFound) {
 			return nil, &response.APIError{
-				Code:    response.ErrBadRequest,
-				Message: "specified event not found",
-				Status:  400,
+				Code:    response.ErrNotFound,
+				Message: "event not found",
+				Status:  404,
 			}
 		}
 		s.logger.Error().
 			Err(findErr).
-			Str("event_id", EventId).
+			Str("event_id", eventIDStr).
 			Str("action", "duplicate_event_find").
 			Msg("failed to find event for duplication")
 		return nil, &response.APIError{
@@ -251,7 +282,7 @@ func (s *service) DuplicateById(EventId string, ctx context.Context) (*entity.Ev
 	if createErr != nil {
 		s.logger.Error().
 			Err(createErr).
-			Str("event_id", EventId).
+			Str("event_id", eventIDStr).
 			Str("action", "duplicate_event").
 			Msg("failed to duplicate event")
 		return nil, &response.APIError{

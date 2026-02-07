@@ -4,7 +4,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
-	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 )
 
@@ -19,8 +18,9 @@ type EventHandler interface {
 
 func (h *Handler) Delete(c *fiber.Ctx) error {
 	EventID := c.Params("id")
-	userIdStr := c.Locals("user_id").(string)
-	err := h.Service.Event.DeleteById(EventID, userIdStr, c.UserContext())
+	userIDStr := c.Locals("user_id").(string)
+
+	err := h.Service.Event.DeleteById(EventID, userIDStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
@@ -39,15 +39,14 @@ func (h *Handler) GetOneEventHandler(c *fiber.Ctx) error {
 
 func (h *Handler) Duplicate(c *fiber.Ctx) error {
 	EventID := c.Params("id")
+	userIDStr := c.Locals("user_id").(string)
 
-	createdEvent, err := h.Service.Event.DuplicateById(EventID, c.UserContext())
+	createdEvent, err := h.Service.Event.DuplicateById(EventID, userIDStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
 
-	return response.Created(c, dtoRes.DuplicateEventRes{
-		DuplicatedEventId: createdEvent.ID.String(),
-	})
+	return response.Created(c, createdEvent)
 }
 
 func (h *Handler) Comment(c *fiber.Ctx) error {
