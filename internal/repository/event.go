@@ -18,7 +18,7 @@ type EventRepository interface {
 	DeleteById(uuid.UUID, string, context.Context) error
 	Create(*entity.Event, context.Context) (*entity.Event, error)
 	Comment(uuid.UUID, time.Time, string, context.Context) error
-	IsUserEventAdmin(eventID uuid.UUID, userIDStr string, ctx context.Context) (bool, error)
+	IsUserEventOwner(eventID uuid.UUID, userIDStr string, ctx context.Context) (bool, error)
 
 	// For POST participant/:qrcode. Get user info not provided by CU NEX
 	GetUserForCheckin(ctx context.Context, refID uint64) (user *entity.CheckinUserQuery, err error)
@@ -403,10 +403,11 @@ func (r *repository) InsertScanRecord(ctx context.Context, record *entity.EventP
 	return &record.ID, nil
 }
 
-func (r *repository) IsUserEventAdmin(eventID uuid.UUID, userIDStr string, ctx context.Context) (bool, error) {
+// for duplicating events
+func (r *repository) IsUserEventOwner(eventID uuid.UUID, userIDStr string, ctx context.Context) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Table("event_users").
-		Where("event_id = ? AND user_id = ?", eventID, userIDStr).
+		Where("event_id = ? AND user_id = ? AND role = ?", eventID, userIDStr, entity.OWNER).
 		Count(&count).Error
 
 	if err != nil {

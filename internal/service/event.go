@@ -204,7 +204,7 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 		}
 	}
 
-	isMember, authErr := s.repo.Event.IsUserEventAdmin(eventID, userIDStr, ctx)
+	isOwner, authErr := s.repo.Event.IsUserEventOwner(eventID, userIDStr, ctx)
 	if authErr != nil {
 		s.logger.Error().
 			Err(authErr).
@@ -219,7 +219,7 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 		}
 	}
 
-	if !isMember {
+	if !isOwner {
 		return nil, &response.APIError{
 			Code:    response.ErrForbidden,
 			Message: "insufficient permissions",
