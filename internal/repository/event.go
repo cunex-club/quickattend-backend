@@ -16,7 +16,7 @@ type EventRepository interface {
 	FindById(uuid.UUID, context.Context) (*entity.Event, error)
 	DeleteById(uuid.UUID, context.Context) error
 	Create(*entity.Event, context.Context) (*entity.Event, error)
-	CheckIn(uuid.UUID, time.Time, string, context.Context) error
+	Comment(uuid.UUID, time.Time, string, context.Context) error
 	// For POST participant/:qrcode. Get user info not provided by CU NEX
 	GetUserForCheckin(ctx context.Context, refID uint64) (user *entity.CheckinUserQuery, err error)
 	// For POST participant/:qrcode. Get necessary event details for checking
@@ -32,7 +32,7 @@ type EventRepository interface {
 	GetDiscoveryEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
 }
 
-func (r *repository) CheckIn(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
+func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
 	if checkInRowId == uuid.Nil {
 		return entity.ErrNilUUID
 	}
@@ -41,7 +41,7 @@ func (r *repository) CheckIn(checkInRowId uuid.UUID, timeStamp time.Time, commen
 		Model(&entity.EventParticipants{}).
 		Where("id = ? AND checkin_timestamp IS NULL", checkInRowId).
 		Updates(map[string]any{
-			"checkin_timestamp": timeStamp,
+			"comment_timestamp": timeStamp,
 			"comment":           comment,
 		})
 

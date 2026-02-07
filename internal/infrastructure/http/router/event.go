@@ -10,10 +10,10 @@ func EventRoutes(r fiber.Router, h *handler.AllOfHandler, mw *middleware.Middlew
 	event := r.Group("/events", mw.AuthRequired())
 	event.Delete("/:id", h.EventHandler.Delete)
 	event.Post("/:id/duplicate", h.EventHandler.Duplicate)
-	event.Post("/check-in", h.EventHandler.CheckIn)
 	event.Get("/:id", h.EventHandler.GetOneEventHandler)
 	event.Get("/", h.EventHandler.GetEvents)
 
 	participant := r.Group("/participant", mw.AuthRequired())
+	participant.Put("/comment", h.EventHandler.Comment)
 	participant.Post("/:qrcode", h.EventHandler.PostParticipantHandler)
 }

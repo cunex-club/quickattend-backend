@@ -1,6 +1,6 @@
 package response
 
-type CheckInReq struct {
+type CommentReq struct {
 	Comment            string `json:"comment"`
 	EncodedOneTimeCode string `json:"one_time_code"`
 }

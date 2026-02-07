@@ -66,7 +66,7 @@ CREATE TABLE "event_agendas" (
 CREATE TABLE "event_participants" (
     "id" uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     "event_id" uuid NOT NULL,
-    "checkin_timestamp" timestamptz,
+    "comment_timestamp" timestamptz,
     "comment" text,
     "scanned_timestamp" timestamptz NOT NULL,
     "participant_id" uuid NOT NULL,

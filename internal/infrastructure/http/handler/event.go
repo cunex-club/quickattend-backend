@@ -11,7 +11,7 @@ import (
 type EventHandler interface {
 	Delete(c *fiber.Ctx) error
 	Duplicate(c *fiber.Ctx) error
-	CheckIn(c *fiber.Ctx) error
+	Comment(c *fiber.Ctx) error
 	PostParticipantHandler(c *fiber.Ctx) error
 	GetOneEventHandler(*fiber.Ctx) error
 	GetEvents(*fiber.Ctx) error
@@ -41,14 +41,14 @@ func (h *Handler) Duplicate(c *fiber.Ctx) error {
 	})
 }
 
-func (h *Handler) CheckIn(c *fiber.Ctx) error {
-	var req dtoReq.CheckInReq
+func (h *Handler) Comment(c *fiber.Ctx) error {
+	var req dtoReq.CommentReq
 
 	if err := c.BodyParser(&req); err != nil {
 		return response.SendError(c, 400, response.ErrBadRequest, "invalid JSON body")
 	}
 
-	err := h.Service.Event.CheckIn(req, c.UserContext())
+	err := h.Service.Event.Comment(req, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}

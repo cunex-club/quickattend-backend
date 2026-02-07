@@ -25,15 +25,15 @@ import (
 type EventService interface {
 	DeleteById(EventID string, ctx context.Context) *response.APIError
 	DuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
-	CheckIn(checkInReq dtoReq.CheckInReq, ctx context.Context) *response.APIError
+	Comment(checkInReq dtoReq.CommentReq, ctx context.Context) *response.APIError
 	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
 	GetEventsService(userIDStr string, queryParams map[string]string, ctx context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError)
 }
 
-func (s *service) CheckIn(checkInReq dtoReq.CheckInReq, ctx context.Context) *response.APIError {
+func (s *service) Comment(commentReq dtoReq.CommentReq, ctx context.Context) *response.APIError {
 
-	decoded, err := base64.StdEncoding.DecodeString(checkInReq.EncodedOneTimeCode)
+	decoded, err := base64.StdEncoding.DecodeString(commentReq.EncodedOneTimeCode)
 	if err != nil {
 		return &response.APIError{
 			Code:    response.ErrBadRequest,
@@ -78,10 +78,10 @@ func (s *service) CheckIn(checkInReq dtoReq.CheckInReq, ctx context.Context) *re
 		Str("checkInRowId", checkInRowId.String()).
 		Msg("Received timeStamp and target row-id to check-in Event-Participant")
 
-	if err := s.repo.Event.CheckIn(
+	if err := s.repo.Event.Comment(
 		checkInRowId,
 		timeStamp,
-		checkInReq.Comment,
+		commentReq.Comment,
 		ctx,
 	); err != nil {
 
