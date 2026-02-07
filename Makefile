@@ -27,9 +27,6 @@ tidy:
 test:
 	go test -v ./...
 
-seed:
-	# TODO: Implement seeding logic here
-	@echo "Seeding database... (not implemented)"
 
 compose-up:
 	docker compose up -d
@@ -47,8 +44,6 @@ migrate-diff:
 		--dir file://tools/atlas/migrations \
 		--to file://tools/atlas/schema.sql \
 		--dev-url "docker://postgres/18-alpine/dev?search_path=public"
-
-
 
 migrate:
 	@if atlas schema inspect -u "$(DB_URL)" | diff -q - tools/atlas/schema.sql > /dev/null; then \

@@ -117,17 +117,20 @@ func (p Point) Value() (driver.Value, error) {
 // ====================================================
 
 type Event struct {
-	ID             datatypes.UUID    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name           string            `gorm:"type:text;not null;index:idx_events_name_trgm,type:gin" json:"name"`
-	Organizer      string            `gorm:"type:text;not null;index:idx_events_organizer_trgm,type:gin" json:"organizer"`
-	Description    *string           `gorm:"type:text;index:idx_events_description_trgm,type:gin" json:"description"`
-	StartTime      time.Time         `gorm:"type:timestamptz;not null" json:"start_time"`
-	EndTime        time.Time         `gorm:"type:timestamptz;not null" json:"end_time"`
-	Location       string            `gorm:"type:text;not null;index:idx_events_location_trgm,type:gin" json:"location"`
-	AttendenceType attendence_type   `gorm:"type:attendence_type;not null" json:"attendance_type"`
-	AllowAllToScan bool              `gorm:"type:bool;not null" json:"allow_all_to_scan"`
-	EvaluationForm *string           `gorm:"type:text;index:idx_events_evaluation_form_trgm,type:gin" json:"evaluation_form"`
-	RevealedFields participant_field `gorm:"type:participant_data[];not null" json:"revealed_fields"`
+	ID                    datatypes.UUID          `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Name                  string                  `gorm:"type:text;not null;index:idx_events_name_trgm,type:gin" json:"name"`
+	Organizer             string                  `gorm:"type:text;not null;index:idx_events_organizer_trgm,type:gin" json:"organizer"`
+	Description           *string                 `gorm:"type:text;index:idx_events_description_trgm,type:gin" json:"description"`
+	StartTime             time.Time               `gorm:"type:timestamptz;not null" json:"start_time"`
+	EndTime               time.Time               `gorm:"type:timestamptz;not null" json:"end_time"`
+	Location              string                  `gorm:"type:text;not null;index:idx_events_location_trgm,type:gin" json:"location"`
+	AttendenceType        attendence_type         `gorm:"type:attendence_type;not null" json:"attendance_type"`
+	AllowAllToScan        bool                    `gorm:"type:bool;not null" json:"allow_all_to_scan"`
+	EvaluationForm        *string                 `gorm:"type:text;index:idx_events_evaluation_form_trgm,type:gin" json:"evaluation_form"`
+	RevealedFields        participant_field       `gorm:"type:participant_data[];not null" json:"revealed_fields"`
+	EventWhitelist        []EventWhitelist        `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_whitelist"`
+	EventAllowedFaculties []EventAllowedFaculties `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_allowed_faculties"`
+	EventAgenda           []EventAgenda           `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_agenda"`
 }
 
 type EventWhitelist struct {
@@ -168,9 +171,39 @@ type EventParticipants struct {
 	ScannedLocation  Point           `gorm:"type:point;not null" json:"scanned_location"`
 	ScannerID        *datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
 
-	Event                      Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	ParticipantRefIDForeignKey User  `gorm:"foreignKey:ParticipantRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
+	Event                   Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ParticipantIDForeignKey User  `gorm:"foreignKey:ParticipantID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	ScannerIDForeignKey     User  `gorm:"foreignKey:ScannerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
+}
+
+// ====================================================
+
+// For retrieving result from DB in EventRepository.GetUserForCheckin
+type CheckinUserQuery struct {
+	TitleTH string `gorm:"column:title_th"`
+	TitleEN string `gorm:"column:title_en"`
+}
+
+// For retrieving result from DB in EventRepository.GetUserForCheckin
+type CheckinEventQuery struct {
+	AttendenceType  attendence_type   `gorm:"column:attendence_type"`
+	EndTime         time.Time         `gorm:"column:end_time"`
+	AllowAllToScan  bool              `gorm:"column:allow_all_to_scan"`
+	RevealedFields  participant_field `gorm:"column:revealed_fields"`
+	ThisUserCanScan bool              `gorm:"column:this_user_can_scan"`
+}
+
+// For inserting record in EventRepository.InsertScanRecord
+type ScanRecordInsert struct {
+	ID               datatypes.UUID `gorm:"column:id"`
+	EventID          datatypes.UUID `gorm:"column:event_id"`
+	ScannedTimestamp time.Time      `gorm:"column:scanned_timestamp"`
+	ParticipantRefID uint64         `gorm:"column:participant_ref_id"`
+	FirstNameEN      string         `gorm:"column:first_name"`
+	SurNameEN        string         `gorm:"column:sur_name"`
+	OrganizationEN   string         `gorm:"column:organization"`
+	ScannedLocation  Point          `gorm:"column:scanned_location"`
+	ScannerID        datatypes.UUID `gorm:"column:scanner_id"`
 }
 
 // ====================================================

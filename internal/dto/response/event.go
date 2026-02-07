@@ -1,8 +1,34 @@
 package response
 
-import (
-	"time"
+import "time"
+
+type DuplicateEventRes struct {
+	DuplicatedEventId string `json:"event_id"`
+}
+
+type status string
+
+const (
+	SUCCESS   status = "success"
+	DUPLICATE status = "duplicate"
+	FAIL      status = "fail"
 )
+
+type GetParticipantRes struct {
+	FirstnameTH     *string   `json:"firstname_th"`
+	SurnameTH       *string   `json:"surname_th"`
+	TitleTH         *string   `json:"title_th"`
+	FirstnameEN     *string   `json:"firstname_en"`
+	SurnameEN       *string   `json:"surname_en"`
+	TitleEN         *string   `json:"title_en"`
+	RefID           *string   `json:"ref_id"`
+	OrganizationTH  *string   `json:"organization_th"`
+	OrganizationEN  *string   `json:"organization_en"`
+	CheckInTime     time.Time `json:"check_in_time"`
+	Status          string    `json:"status"`
+	Code            string    `json:"code"`
+	ProfileImageUrl *string   `json:"profile_image_url"`
+}
 
 type GetOneEventAgenda struct {
 	ActivityName string    `json:"activity_name"`
