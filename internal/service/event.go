@@ -13,17 +13,18 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+
 	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
-	"github.com/google/uuid"
-	"gorm.io/datatypes"
-	"gorm.io/gorm"
 )
 
 type EventService interface {
-	DeleteById(EventID string, ctx context.Context) *response.APIError
+	DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError
 	DuplicateById(EventID string, ctx context.Context) (*entity.Event, *response.APIError)
 	Comment(checkInReq dtoReq.CommentReq, ctx context.Context) *response.APIError
 	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
@@ -112,50 +113,69 @@ func (s *service) Comment(commentReq dtoReq.CommentReq, ctx context.Context) *re
 	return nil
 }
 
-func (s *service) DeleteById(EventId string, ctx context.Context) *response.APIError {
-	event_id, parseErr := uuid.Parse(EventId)
+func (s *service) DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError {
+	eventID, parseErr := uuid.Parse(eventIDStr)
 	if parseErr != nil {
 		return &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "failed to parse event_id to uuid",
-			Status:  500,
-		}
-	}
-
-	eventDeleteErr := s.repo.Event.DeleteById(event_id, ctx)
-
-	if errors.Is(eventDeleteErr, gorm.ErrRecordNotFound) {
-		s.logger.Error().
-			Err(eventDeleteErr).
-			Str("event_id", EventId).
-			Str("action", "delete_event").
-			Msg("event not found")
-		return &response.APIError{
-			Code:    response.ErrNotFound,
-			Message: "event not found",
-			Status:  404,
-		}
-	}
-
-	if errors.Is(eventDeleteErr, entity.ErrNilUUID) {
-		s.logger.Error().
-			Err(eventDeleteErr).
-			Str("event_id", EventId).
-			Str("action", "delete_event").
-			Msg("attempt deleting nil uuid")
-		return &response.APIError{
 			Code:    response.ErrBadRequest,
-			Message: "nil uuid not allowed",
+			Message: "invalid event_id format",
 			Status:  400,
 		}
 	}
 
-	if eventDeleteErr != nil {
-		s.logger.Error().
-			Err(eventDeleteErr).
-			Str("event_id", EventId).
-			Str("action", "delete_event").
-			Msg("service failed to delete event")
+	if _, err := uuid.Parse(userIDStr); err != nil {
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "invalid user_id format",
+			Status:  400,
+		}
+	}
+
+	if eventID == uuid.Nil {
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "nil event_id not allowed",
+			Status:  400,
+		}
+	}
+
+	err := s.repo.Event.DeleteById(eventID, userIDStr, ctx)
+
+	if err != nil {
+		logger := s.logger.Error().
+			Err(err).
+			Str("event_id", eventIDStr).
+			Str("user_id", userIDStr).
+			Str("action", "delete_event")
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Msg("event not found")
+			return &response.APIError{
+				Code:    response.ErrNotFound,
+				Message: "event not found",
+				Status:  404,
+			}
+		}
+
+		if errors.Is(err, entity.ErrInsufficientPermissions) {
+			logger.Msg("user unauthorized")
+			return &response.APIError{
+				Code:    response.ErrUnauthorized,
+				Message: "user unauthorized",
+				Status:  403,
+			}
+		}
+
+		if errors.Is(err, entity.ErrNilUUID) {
+			logger.Msg("attempt deleting nil uuid")
+			return &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: "nil uuid not allowed",
+				Status:  400,
+			}
+		}
+
+		logger.Msg("service failed to delete event")
 		return &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "internal db error",

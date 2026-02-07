@@ -19,7 +19,8 @@ type EventHandler interface {
 
 func (h *Handler) Delete(c *fiber.Ctx) error {
 	EventID := c.Params("id")
-	err := h.Service.Event.DeleteById(EventID, c.UserContext())
+	userIdStr := c.Locals("user_id").(string)
+	err := h.Service.Event.DeleteById(EventID, userIdStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}

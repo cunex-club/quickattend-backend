@@ -6,17 +6,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+
+	"github.com/cunex-club/quickattend-backend/internal/entity"
 )
 
 type EventRepository interface {
 	FindById(uuid.UUID, context.Context) (*entity.Event, error)
-	DeleteById(uuid.UUID, context.Context) error
+	DeleteById(uuid.UUID, string, context.Context) error
 	Create(*entity.Event, context.Context) (*entity.Event, error)
 	Comment(uuid.UUID, time.Time, string, context.Context) error
+
 	// For POST participant/:qrcode. Get user info not provided by CU NEX
 	GetUserForCheckin(ctx context.Context, refID uint64) (user *entity.CheckinUserQuery, err error)
 	// For POST participant/:qrcode. Get necessary event details for checking
@@ -86,23 +88,32 @@ func (r *repository) FindById(id uuid.UUID, ctx context.Context) (*entity.Event,
 	return &event, nil
 }
 
-func (r *repository) DeleteById(id uuid.UUID, ctx context.Context) error {
-	if id == uuid.Nil {
-		return entity.ErrNilUUID
-	}
+func (r *repository) DeleteById(id uuid.UUID, userIdStr string, ctx context.Context) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 
-	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.Event{})
-	if result.Error != nil {
-		return result.Error
-	}
+		var event entity.Event
+		if err := tx.Select("id").First(&event, "id = ?", id).Error; err != nil {
+			// gorm.ErrRecordNotFound
+			return err
+		}
 
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
+		var isOwner int64
+		err := tx.Table("event_users").
+			Where("event_id = ? AND user_id = ? AND role = ?", id, userIdStr, entity.OWNER).
+			Count(&isOwner).Error
 
-	return nil
+		if err != nil {
+			return err
+		}
 
+		if isOwner == 0 {
+			return entity.ErrInsufficientPermissions
+		}
+
+		return tx.Delete(&event).Error
+	})
 }
+
 func (r *repository) GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (*entity.GetOneEventWithTotalCount, *[]entity.GetOneEventAgenda, error) {
 	withCtx := r.db.WithContext(ctx)
 
