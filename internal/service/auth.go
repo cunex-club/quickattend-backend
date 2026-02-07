@@ -120,7 +120,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	tokenValidationUrl := ""
+	tokenValidationUrl := "https://culab-svc.azurewebsites.net/Service.svc/webprofile"
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", tokenValidationUrl, nil)

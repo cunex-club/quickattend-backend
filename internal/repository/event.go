@@ -15,7 +15,7 @@ type EventRepository interface {
 	FindById(uuid.UUID, context.Context) (*entity.Event, error)
 	DeleteById(uuid.UUID, context.Context) error
 	Create(*entity.Event, context.Context) (*entity.Event, error)
-	CheckIn(uuid.UUID, time.Time, string, context.Context) error
+	Comment(uuid.UUID, time.Time, string, context.Context) error
 	// For POST participant/:qrcode. Get user info not provided by CU NEX
 	GetUserForCheckin(ctx context.Context, refID uint64) (user *entity.CheckinUserQuery, err error)
 	// For POST participant/:qrcode. Get necessary event details for checking
@@ -27,7 +27,7 @@ type EventRepository interface {
 	InsertScanRecord(ctx context.Context, record *entity.EventParticipants) (rowId *datatypes.UUID, err error)
 }
 
-func (r *repository) CheckIn(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
+func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
 	if checkInRowId == uuid.Nil {
 		return entity.ErrNilUUID
 	}
