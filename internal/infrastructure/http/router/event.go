@@ -14,4 +14,5 @@ func EventRoutes(r fiber.Router, h *handler.AllOfHandler, mw *middleware.Middlew
 	participant := r.Group("/participant", mw.AuthRequired())
 	participant.Put("/comment", h.EventHandler.Comment)
 	participant.Post("/:qrcode", h.EventHandler.PostParticipantHandler)
+	event.Get("/:id", h.EventHandler.GetOneEventHandler)
 }

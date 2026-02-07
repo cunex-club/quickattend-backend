@@ -205,3 +205,40 @@ type ScanRecordInsert struct {
 	ScannedLocation  Point          `gorm:"column:scanned_location"`
 	ScannerID        datatypes.UUID `gorm:"column:scanner_id"`
 }
+
+// ====================================================
+
+// for retrieving agenda query result in GET /events/:id
+type GetOneEventAgenda struct {
+	ActivityName string    `gorm:"column:activity_name"`
+	StartTime    time.Time `gorm:"column:start_time"`
+	EndTime      time.Time `gorm:"column:end_time"`
+}
+
+// for retrieving event details and total participant count in GET /events/:id
+type GetOneEventWithTotalCount struct {
+	Name            string    `gorm:"column:name"`
+	Organizer       string    `gorm:"column:organizer"`
+	Description     *string   `gorm:"column:description"`
+	StartTime       time.Time `gorm:"column:start_time"`
+	EndTime         time.Time `gorm:"column:end_time"`
+	Location        string    `gorm:"column:location"`
+	TotalRegistered uint16    `gorm:"column:total_registered"`
+	EvaluationForm  *string   `gorm:"column:evaluation_form"`
+	Role            *string   `gorm:"column:role"`
+}
+
+// ====================================================
+
+// for retrieving raw result from DB in GET /events
+type GetEventsQueryResult struct {
+	ID             datatypes.UUID `gorm:"column:id"`
+	Name           string         `gorm:"column:name"`
+	Organizer      string         `gorm:"column:organizer"`
+	Description    *string        `gorm:"column:description"`
+	StartTime      time.Time      `gorm:"column:start_time"`
+	EndTime        time.Time      `gorm:"column:end_time"`
+	Location       string         `gorm:"column:location"`
+	Role           *string        `gorm:"column:role"`
+	EvaluationForm *string        `gorm:"column:evaluation_form"`
+}
