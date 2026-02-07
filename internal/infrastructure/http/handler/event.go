@@ -41,12 +41,12 @@ func (h *Handler) Duplicate(c *fiber.Ctx) error {
 	EventID := c.Params("id")
 	userIDStr := c.Locals("user_id").(string)
 
-	createdEvent, err := h.Service.Event.DuplicateById(EventID, userIDStr, c.UserContext())
+	res, err := h.Service.Event.DuplicateById(EventID, userIDStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
 
-	return response.Created(c, createdEvent)
+	return response.Created(c, res)
 }
 
 func (h *Handler) Comment(c *fiber.Ctx) error {

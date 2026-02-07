@@ -25,7 +25,7 @@ import (
 
 type EventService interface {
 	DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError
-	DuplicateById(EventID string, userIDStr string, ctx context.Context) (*entity.Event, *response.APIError)
+	DuplicateById(EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
 	Comment(checkInReq dtoReq.CommentReq, ctx context.Context) *response.APIError
 	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
 
@@ -186,7 +186,7 @@ func (s *service) DeleteById(eventIDStr string, userIDStr string, ctx context.Co
 	return nil
 }
 
-func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context.Context) (*entity.Event, *response.APIError) {
+func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError) {
 	eventID, parseErr := uuid.Parse(eventIDStr)
 	if parseErr != nil {
 		return nil, &response.APIError{
@@ -292,7 +292,9 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 		}
 	}
 
-	return createdEvent, nil
+	return &dtoRes.DuplicateEventRes{
+		DuplicatedEventId: createdEvent.ID.String(),
+	}, nil
 }
 
 func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
