@@ -210,10 +210,18 @@ type Event struct {
 type EventWhitelist struct {
 	ID            datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	EventID       datatypes.UUID `gorm:"type:uuid;not null" json:"event_id"`
-	AttendeeRefID uint64         `gorm:"type:bigint;not null" json:"attendee_ref_id"`
+	AttendeeRefID uint64         `gorm:"type:bigint;not null;index;uniqueIndex:uniq_event_pending_attendee" json:"attendee_ref_id"`
 
 	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	User  User  `gorm:"foreignKey:AttendeeRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+}
+
+type EventWhitelistPending struct {
+	ID            datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	EventID       datatypes.UUID `gorm:"type:uuid;not null;index;uniqueIndex:uniq_event_pending_attendee" json:"event_id"`
+	AttendeeRefID uint64         `gorm:"type:bigint;not null;index;uniqueIndex:uniq_event_pending_attendee" json:"attendee_ref_id"`
+
+	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
 type EventAllowedFaculties struct {
@@ -256,12 +264,4 @@ type CreateEventPayload struct {
 	Whitelist        []EventWhitelist
 	AllowedFaculties []EventAllowedFaculties
 	EventUsersInput  []EventUserInput
-}
-
-type UpdateEventPayload struct {
-	EventUpdates     map[string]any
-	Agendas          *[]EventAgenda
-	Whitelist        *[]EventWhitelist
-	AllowedFaculties *[]EventAllowedFaculties
-	EventUsers       *[]EventUser
 }

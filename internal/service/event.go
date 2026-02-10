@@ -76,11 +76,17 @@ func buildCreateOrUpdatePayload(req dtoReq.CreateEventReq) (entity.CreateEventPa
 		return entity.CreateEventPayload{}, err
 	}
 
+	// derive event date (midnight Thai time in UTC)
+	stTH := startTime.In(thaiLoc)
+	y, m, d := stTH.Date()
+	eventDateThaiMidnightUTC := time.Date(y, m, d, 0, 0, 0, 0, thaiLoc).UTC()
+	
 	event := entity.Event{
 		Name:        req.Name,
 		Organizer:   req.Organizer,
 		Description: req.Description,
 
+		Date:      eventDateThaiMidnightUTC,
 		StartTime: startTime,
 		EndTime:   endTime,
 

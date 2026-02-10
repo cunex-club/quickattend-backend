@@ -3,13 +3,12 @@ package repository
 import (
 	"context"
 	"fmt"
-	"sort"
-	"strings"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type EventRepository interface {
@@ -35,15 +34,31 @@ func (r *repository) CreateEvent(ctx context.Context, payload entity.CreateEvent
 		}
 
 		if len(payload.Whitelist) > 0 {
-			if err := validateWhitelistUsersExist(ctx, tx, payload.Whitelist); err != nil {
-				return err
-			}
-
 			for i := range payload.Whitelist {
 				payload.Whitelist[i].EventID = payload.Event.ID
 			}
-			if err := tx.Create(&payload.Whitelist).Error; err != nil {
+
+			wlOK, wlPend, err := splitWhitelistAndPending(ctx, tx, payload.Whitelist)
+			if err != nil {
 				return err
+			}
+
+			if len(wlOK) > 0 {
+				if err := tx.Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "event_id"}, {Name: "attendee_ref_id"}},
+					DoNothing: true,
+				}).Create(&wlOK).Error; err != nil {
+					return err
+				}
+			}
+
+			if len(wlPend) > 0 {
+				if err := tx.Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "event_id"}, {Name: "attendee_ref_id"}},
+					DoNothing: true,
+				}).Create(&wlPend).Error; err != nil {
+					return err
+				}
 			}
 		}
 
@@ -88,7 +103,6 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 			return err
 		}
 
-		// Update main event fields (replace semantics)
 		if err := tx.Model(&existing).Updates(map[string]any{
 			"name":              payload.Event.Name,
 			"organizer":         payload.Event.Organizer,
@@ -105,11 +119,13 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 			return err
 		}
 
-		// Delete all dependent rows (replace all)
 		if err := tx.Where("event_id = ?", existing.ID).Delete(&entity.EventAgenda{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("event_id = ?", existing.ID).Delete(&entity.EventWhitelist{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("event_id = ?", existing.ID).Delete(&entity.EventWhitelistPending{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("event_id = ?", existing.ID).Delete(&entity.EventAllowedFaculties{}).Error; err != nil {
@@ -119,7 +135,6 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 			return err
 		}
 
-		// Re-create dependents from payload
 		if len(payload.Agendas) > 0 {
 			for i := range payload.Agendas {
 				payload.Agendas[i].EventID = existing.ID
@@ -130,15 +145,31 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 		}
 
 		if len(payload.Whitelist) > 0 {
-			if err := validateWhitelistUsersExist(ctx, tx, payload.Whitelist); err != nil {
-				return err
-			}
-
 			for i := range payload.Whitelist {
 				payload.Whitelist[i].EventID = existing.ID
 			}
-			if err := tx.Create(&payload.Whitelist).Error; err != nil {
+
+			wlOK, wlPend, err := splitWhitelistAndPending(ctx, tx, payload.Whitelist)
+			if err != nil {
 				return err
+			}
+
+			if len(wlOK) > 0 {
+				if err := tx.Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "event_id"}, {Name: "attendee_ref_id"}},
+					DoNothing: true,
+				}).Create(&wlOK).Error; err != nil {
+					return err
+				}
+			}
+
+			if len(wlPend) > 0 {
+				if err := tx.Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "event_id"}, {Name: "attendee_ref_id"}},
+					DoNothing: true,
+				}).Create(&wlPend).Error; err != nil {
+					return err
+				}
 			}
 		}
 
@@ -171,7 +202,66 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 	return &res, nil
 }
 
-// buildEventUsersFromInput maps ref_id (Student ID) -> user_id(uuid) ด้วย query ครั้งเดียว แล้วสร้าง []EventUser
+func splitWhitelistAndPending(ctx context.Context, tx *gorm.DB, wl []entity.EventWhitelist) ([]entity.EventWhitelist, []entity.EventWhitelistPending, error) {
+	if len(wl) == 0 {
+		return nil, nil, nil
+	}
+
+	refIDs := make([]uint64, 0, len(wl))
+	seenRef := map[uint64]struct{}{}
+	for _, x := range wl {
+		if _, ok := seenRef[x.AttendeeRefID]; ok {
+			continue
+		}
+		seenRef[x.AttendeeRefID] = struct{}{}
+		refIDs = append(refIDs, x.AttendeeRefID)
+	}
+
+	var existing []uint64
+	if err := tx.WithContext(ctx).
+		Model(&entity.User{}).
+		Where("ref_id IN ?", refIDs).
+		Pluck("ref_id", &existing).Error; err != nil {
+		return nil, nil, err
+	}
+
+	existSet := map[uint64]struct{}{}
+	for _, id := range existing {
+		existSet[id] = struct{}{}
+	}
+
+	okOut := make([]entity.EventWhitelist, 0, len(wl))
+	pendOut := make([]entity.EventWhitelistPending, 0)
+
+	seenPairOK := map[string]struct{}{}
+	seenPairPend := map[string]struct{}{}
+
+	for _, x := range wl {
+		key := fmt.Sprintf("%s:%d", x.EventID.String(), x.AttendeeRefID)
+
+		if _, ok := existSet[x.AttendeeRefID]; ok {
+			if _, dup := seenPairOK[key]; dup {
+				continue
+			}
+			seenPairOK[key] = struct{}{}
+			okOut = append(okOut, x)
+			continue
+		}
+
+		if _, dup := seenPairPend[key]; dup {
+			continue
+		}
+		seenPairPend[key] = struct{}{}
+		pendOut = append(pendOut, entity.EventWhitelistPending{
+			EventID:       x.EventID,
+			AttendeeRefID: x.AttendeeRefID,
+		})
+	}
+
+	return okOut, pendOut, nil
+}
+
+// buildEventUsersFromInput maps ref_id -> user_id(uuid) แล้วสร้าง []EventUser
 func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatypes.UUID, in []entity.EventUserInput) ([]entity.EventUser, error) {
 	if len(in) == 0 {
 		return nil, nil
@@ -218,58 +308,4 @@ func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatype
 	}
 
 	return out, nil
-}
-
-func validateWhitelistUsersExist(ctx context.Context, tx *gorm.DB, wl []entity.EventWhitelist) error {
-	if len(wl) == 0 {
-		return nil
-	}
-
-	refIDs := make([]uint64, 0, len(wl))
-	seen := map[uint64]struct{}{}
-	for _, x := range wl {
-		if _, ok := seen[x.AttendeeRefID]; ok {
-			continue
-		}
-		seen[x.AttendeeRefID] = struct{}{}
-		refIDs = append(refIDs, x.AttendeeRefID)
-	}
-
-	var existing []uint64
-	if err := tx.WithContext(ctx).
-		Model(&entity.User{}).
-		Where("ref_id IN ?", refIDs).
-		Pluck("ref_id", &existing).Error; err != nil {
-		return err
-	}
-
-	existSet := map[uint64]struct{}{}
-	for _, id := range existing {
-		existSet[id] = struct{}{}
-	}
-
-	missing := make([]uint64, 0)
-	for _, id := range refIDs {
-		if _, ok := existSet[id]; !ok {
-			missing = append(missing, id)
-		}
-	}
-
-	if len(missing) == 0 {
-		return nil
-	}
-
-	sort.Slice(missing, func(i, j int) bool { return missing[i] < missing[j] })
-	return fmt.Errorf("unknown attendee ref_id in attendee whitelist: %s", joinUint64(missing))
-}
-
-func joinUint64(nums []uint64) string {
-	if len(nums) == 0 {
-		return ""
-	}
-	out := make([]string, 0, len(nums))
-	for _, n := range nums {
-		out = append(out, fmt.Sprintf("%d", n))
-	}
-	return strings.Join(out, ",")
 }

@@ -44,46 +44,39 @@ func (s *service) GetUserService(refID uint64, ctx context.Context) (*entity.Use
 }
 
 func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) (*entity.User, *response.APIError) {
-	foundUser, findErr := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
-	if findErr == nil {
-		return &foundUser, nil
-	}
+	result, findErr := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
 
-	if !errors.Is(findErr, gorm.ErrRecordNotFound) {
-		s.logger.Error().
-			Err(findErr).
-			Uint64("user_ref_id", user.RefID).
-			Str("action", "query_user").
-			Msg("service failed to query user by ref_id")
+	if findErr != nil {
+		if !errors.Is(findErr, gorm.ErrRecordNotFound) {
+			s.logger.Error().Err(findErr).Uint64("user_ref_id", user.RefID).Msg("failed to query user")
+			return nil, &response.APIError{Code: response.ErrInternalError, Message: "internal db error", Status: 500}
+		}
 
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "internal db error",
-			Status:  500,
+		// user not found → create
+		created, createErr := s.repo.Auth.CreateUser(user, ctx)
+		if createErr != nil {
+			if !errors.Is(createErr, gorm.ErrDuplicatedKey) {
+				s.logger.Error().Err(createErr).Uint64("user_ref_id", user.RefID).Msg("failed to create user")
+				return nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to create user", Status: 500}
+			}
+			// race condition: someone else created it → re-fetch
+			created2, err2 := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
+			if err2 != nil {
+				return nil, &response.APIError{Code: response.ErrInternalError, Message: "internal db error", Status: 500}
+			}
+			result = created2
+		} else {
+			result = *created
 		}
 	}
 
-	createdUser, createErr := s.repo.Auth.CreateUser(user, ctx)
-	if createErr != nil {
-		if errors.Is(createErr, gorm.ErrDuplicatedKey) {
-			existingUser, _ := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
-			return &existingUser, nil
-		}
-
-		s.logger.Error().
-			Err(createErr).
-			Uint64("user_ref_id", user.RefID).
-			Str("action", "create_user").
-			Msg("service failed to create user")
-
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "failed to create user",
-			Status:  500,
-		}
+	// sync pending whitelist — ทำครั้งเดียวตรงนี้
+	if err := s.repo.Auth.SyncWhitelistPendingToWhitelist(ctx, result.RefID); err != nil {
+		s.logger.Error().Err(err).Uint64("user_ref_id", result.RefID).Msg("sync whitelist pending failed")
+		return nil, &response.APIError{Code: response.ErrInternalError, Message: "internal db error", Status: 500}
 	}
 
-	return createdUser, nil
+	return &result, nil
 }
 
 func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.VerifyTokenRes, *response.APIError) {
