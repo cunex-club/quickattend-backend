@@ -5,11 +5,13 @@ import (
 	"fmt"
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type AuthRepository interface {
+	GetUserById(datatypes.UUID, context.Context) (entity.User, error)
 	GetUserByRefId(uint64, context.Context) (entity.User, error)
 	CreateUser(*entity.User, context.Context) (*entity.User, error)
 
@@ -18,9 +20,15 @@ type AuthRepository interface {
 	SyncWhitelistPendingToWhitelist(ctx context.Context, refID uint64) error
 }
 
-func (r *repository) GetUserByRefId(refId uint64, ctx context.Context) (entity.User, error) {
+func (r *repository) GetUserById(userID datatypes.UUID, ctx context.Context) (entity.User, error) {
 	var user entity.User
-	err := r.db.WithContext(ctx).First(&user, &entity.User{RefID: refId}).Error
+	err := r.db.WithContext(ctx).First(&user, &entity.User{ID: userID}).Error
+	return user, err
+}
+
+func (r *repository) GetUserByRefId(refID uint64, ctx context.Context) (entity.User, error) {
+	var user entity.User
+	err := r.db.WithContext(ctx).First(&user, &entity.User{RefID: refID}).Error
 	return user, err
 }
 
