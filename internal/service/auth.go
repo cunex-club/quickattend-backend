@@ -69,25 +69,26 @@ func (s *service) GetUserService(userIDStr string, ctx context.Context) (*dtoRes
 }
 
 func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) (*entity.User, *response.APIError) {
-    existing, err := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
-    if err == nil {
-        return &existing, nil
-    }
-    if !errors.Is(err, gorm.ErrRecordNotFound) {
-        s.logger.Error().Err(err).Uint64("user_ref_id", user.RefID).Msg("query_user failed")
-        return nil, &response.APIError{Code: response.ErrInternalError, Message: "internal db error", Status: 500}
-    }
+	existing, err := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
+	if err == nil {
+		return &existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		s.logger.Error().Err(err).Uint64("user_ref_id", user.RefID).Str("action", "query_user").Msg("query_user failed")
+		return nil, &response.APIError{Code: response.ErrInternalError, Message: "internal db error", Status: 500}
+	}
 
-    created, createErr := s.repo.Auth.CreateUser(user, ctx)
-    if createErr != nil {
-        if errors.Is(createErr, gorm.ErrDuplicatedKey) {
-            ex, _ := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
-            return &ex, nil
-        }
-        s.logger.Error().Err(createErr).Uint64("user_ref_id", user.RefID).Msg("create_user failed")
-        return nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to create user", Status: 500}
-    }
-    return created, nil
+	created, createErr := s.repo.Auth.CreateUser(user, ctx)
+	if createErr != nil {
+		if errors.Is(createErr, gorm.ErrDuplicatedKey) {
+			ex, _ := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
+			return &ex, nil
+		}
+		s.logger.Error().Err(createErr).Uint64("user_ref_id", user.RefID).Str("action", "create_user").Msg("create_user failed")
+		return nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to create user", Status: 500}
+	}
+
+	return created, nil
 }
 
 
@@ -203,6 +204,14 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 			Message: createdUserErr.Message,
 			Status:  createdUserErr.Status,
 		}
+	}
+
+	if err := s.repo.Auth.SyncWhitelistPendingToWhitelist(ctx, createdUser.RefID); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", createdUser.RefID).
+			Str("action", "sync_whitelist_pending").
+			Msg("failed to sync whitelist pending to whitelist")
 	}
 
 	var (

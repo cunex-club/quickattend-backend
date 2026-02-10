@@ -287,7 +287,7 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 			"start_time":        payload.Event.StartTime,
 			"end_time":          payload.Event.EndTime,
 			"location":          payload.Event.Location,
-			"attendance_type":   payload.Event.AttendenceType,
+			"attendence_type":   payload.Event.AttendenceType,
 			"allow_all_to_scan": payload.Event.AllowAllToScan,
 			"evaluation_form":   payload.Event.EvaluationForm,
 			"revealed_fields":   payload.Event.RevealedFields,
@@ -437,19 +437,29 @@ func splitWhitelistAndPending(ctx context.Context, tx *gorm.DB, wl []entity.Even
 	return okOut, pendOut, nil
 }
 
-// buildEventUsersFromInput maps ref_id -> user_id(uuid) แล้วสร้าง []EventUser
 func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatypes.UUID, in []entity.EventUserInput) ([]entity.EventUser, error) {
 	if len(in) == 0 {
 		return nil, nil
 	}
 
-	refIDs := make([]uint64, 0, len(in))
-	seen := map[uint64]struct{}{}
+	// dedup by ref_id (ถ้า ref_id ซ้ำแต่ role ต่างกัน -> error)
+	dedup := make([]entity.EventUserInput, 0, len(in))
+	seenRole := make(map[uint64]string, len(in))
+
 	for _, x := range in {
-		if _, ok := seen[x.RefID]; ok {
+		rs := string(x.Role) // role underlying type = string
+		if old, ok := seenRole[x.RefID]; ok {
+			if old != rs {
+				return nil, fmt.Errorf("duplicate ref_id with different role in managers_and_staff: %d", x.RefID)
+			}
 			continue
 		}
-		seen[x.RefID] = struct{}{}
+		seenRole[x.RefID] = rs
+		dedup = append(dedup, x)
+	}
+
+	refIDs := make([]uint64, 0, len(dedup))
+	for _, x := range dedup {
 		refIDs = append(refIDs, x.RefID)
 	}
 
@@ -457,29 +467,22 @@ func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatype
 	if err := tx.WithContext(ctx).Where("ref_id IN ?", refIDs).Find(&users).Error; err != nil {
 		return nil, err
 	}
+
 	userByRef := make(map[uint64]entity.User, len(users))
 	for _, u := range users {
 		userByRef[u.RefID] = u
 	}
 
-	out := make([]entity.EventUser, 0, len(in))
-	seenPair := map[string]struct{}{}
-	for _, x := range in {
+	out := make([]entity.EventUser, 0, len(dedup))
+	for _, x := range dedup {
 		u, ok := userByRef[x.RefID]
 		if !ok {
 			return nil, fmt.Errorf("unknown ref_id in managers_and_staff: %d", x.RefID)
 		}
-
-		key := fmt.Sprintf("%d:%s", x.RefID, x.Role)
-		if _, ok := seenPair[key]; ok {
-			continue
-		}
-		seenPair[key] = struct{}{}
-
 		out = append(out, entity.EventUser{
 			EventID: eventID,
 			UserID:  u.ID,
-			Role:    x.Role,
+			Role:    x.Role, // ✅ ใช้ role value เดิมได้เลย
 		})
 	}
 

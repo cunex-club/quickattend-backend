@@ -213,7 +213,7 @@ type EventWhitelist struct {
 }
 
 type EventWhitelistPending struct {
-	ID            datatypes.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
+	ID            datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	EventID       datatypes.UUID `gorm:"type:uuid;not null;index;uniqueIndex:uniq_event_pending_attendee" json:"event_id"`
 	AttendeeRefID uint64         `gorm:"type:bigint;not null;index;uniqueIndex:uniq_event_pending_attendee" json:"attendee_ref_id"`
 
@@ -249,9 +249,9 @@ type EventParticipants struct {
 	ScannedLocation  Point           `gorm:"type:point;not null" json:"scanned_location"`
 	ScannerID        *datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
 
-	Event                      Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	ParticipantRefIDForeignKey User  `gorm:"foreignKey:ParticipantRefID;references:RefID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	ScannerIDForeignKey        User  `gorm:"foreignKey:ScannerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
+	Event       Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Participant User  `gorm:"foreignKey:ParticipantID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Scanner     User  `gorm:"foreignKey:ScannerID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 }
 
 // ====================================================

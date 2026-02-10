@@ -371,7 +371,7 @@ func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput,
 	}
 
 	out := make([]entity.EventUserInput, 0, len(in))
-	seen := map[string]struct{}{}
+	seenRole := make(map[uint64]string, len(in)) // ref_id -> role string
 
 	for _, m := range in {
 		r, err := entity.ParseRole(m.Role)
@@ -379,18 +379,21 @@ func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput,
 			return nil, err
 		}
 
-		key := fmt.Sprintf("%d:%s", m.RefID, r)
-		if _, ok := seen[key]; ok {
+		rs := string(r)
+		if old, ok := seenRole[m.RefID]; ok {
+			if old != rs {
+				return nil, fmt.Errorf("duplicate ref_id with different role in managers_and_staff: %d", m.RefID)
+			}
 			continue
 		}
 
-		seen[key] = struct{}{}
-
+		seenRole[m.RefID] = rs
 		out = append(out, entity.EventUserInput{
 			RefID: m.RefID,
 			Role:  r,
 		})
 	}
+
 	return out, nil
 }
 
