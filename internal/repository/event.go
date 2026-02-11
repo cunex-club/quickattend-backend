@@ -30,7 +30,8 @@ type EventRepository interface {
 	CheckEventAccess(ctx context.Context, orgCode uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
 	InsertScanRecord(ctx context.Context, record *entity.EventParticipants) (rowId *datatypes.UUID, err error)
 
-	GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (eventWithCount *entity.GetOneEventWithTotalCount, agenda *[]entity.GetOneEventAgenda, err error)
+	GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (result *entity.GetOneEventQuery, err error)
+
 	GetManagedEvents(userID datatypes.UUID, search string, ctx context.Context) (res *[]entity.GetEventsQueryResult, err error)
 	GetAttendedEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
 	GetDiscoveryEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
@@ -115,34 +116,32 @@ func (r *repository) DeleteById(id uuid.UUID, userIdStr string, ctx context.Cont
 	})
 }
 
-func (r *repository) GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (*entity.GetOneEventWithTotalCount, *[]entity.GetOneEventAgenda, error) {
+func (r *repository) GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (*entity.GetOneEventQuery, error) {
 	withCtx := r.db.WithContext(ctx)
 
-	var agenda []entity.GetOneEventAgenda
-	agendaErr := withCtx.Model(&entity.EventAgenda{}).Select("activity_name", "start_time", "end_time").
-		Where("event_id = ?", eventId).
-		Order("start_time").
-		Scan(&agenda).Error
-	if agendaErr != nil {
-		return nil, nil, agendaErr
+	var result entity.GetOneEventQuery
+	err := withCtx.
+		Model(&entity.Event{}).
+		Preload("EventUser.User").
+		Preload("EventAgenda", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("start_time")
+		}).
+		Select("events.*",
+			"eu.role AS role",
+			"COUNT(DISTINCT ep.participant_id) AS total_registered",
+		).
+		Joins("LEFT JOIN event_participants ep ON events.id = ep.event_id").
+		Joins("LEFT JOIN event_users eu ON events.id = eu.event_id AND eu.user_id = ?", userId).
+		Where("events.id = ?", eventId).
+		Group("events.id, eu.role").
+		First(&result).
+		Error
+
+	if err != nil {
+		return nil, err
 	}
 
-	var eventWithCount entity.GetOneEventWithTotalCount
-	eventErr := withCtx.Table("events e").
-		Select("e.name", "e.organizer", "e.description", "e.start_time",
-			"e.end_time", "e.location", "e.evaluation_form", "eu.role",
-			"COUNT(DISTINCT ep.participant_id) AS total_registered").
-		Joins("LEFT JOIN event_participants ep ON e.id = ep.event_id").
-		Joins("LEFT JOIN event_users eu ON e.id = eu.event_id AND eu.user_id = ?", userId).
-		Where("e.id = ?", eventId).
-		Group("e.id").
-		Group("eu.role").
-		Scan(&eventWithCount).Error
-	if eventErr != nil {
-		return nil, nil, eventErr
-	}
-
-	return &eventWithCount, &agenda, nil
+	return &result, nil
 }
 
 func (r *repository) GetManagedEvents(userID datatypes.UUID, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, error) {

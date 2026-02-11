@@ -36,6 +36,16 @@ type GetOneEventAgenda struct {
 	EndTime      time.Time `json:"end_time"`
 }
 
+type GetOneEventUser struct {
+	FirstnameTH string `json:"firstname_th"`
+	SurnameTH   string `json:"surname_th"`
+	TitleTH     string `json:"title_th"`
+	FirstnameEN string `json:"firstname_en"`
+	SurnameEN   string `json:"surname_en"`
+	TitleEN     string `json:"title_en"`
+	Role        string `json:"role"`
+}
+
 type GetOneEventRes struct {
 	Name            string              `json:"name"`
 	Organizer       string              `json:"organizer"`
@@ -45,8 +55,11 @@ type GetOneEventRes struct {
 	Location        string              `json:"location"`
 	TotalRegistered uint16              `json:"total_registered"`
 	EvaluationForm  *string             `json:"evaluation_form"`
+	AllowAllToScan  bool                `json:"allow_all_to_scan"`
+	RevealedFields  []string            `json:"revealed_fields"`
 	Role            *string             `json:"role"`
 	Agenda          []GetOneEventAgenda `json:"agenda"`
+	User            []GetOneEventUser   `json:"users"`
 }
 
 type GetEventsRes struct {

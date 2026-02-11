@@ -131,6 +131,7 @@ type Event struct {
 	EventWhitelist        []EventWhitelist        `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_whitelist"`
 	EventAllowedFaculties []EventAllowedFaculties `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_allowed_faculties"`
 	EventAgenda           []EventAgenda           `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_agenda"`
+	EventUser             []EventUser             `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_users"`
 }
 
 type EventWhitelist struct {
@@ -184,7 +185,7 @@ type CheckinUserQuery struct {
 	TitleEN string `gorm:"column:title_en"`
 }
 
-// For retrieving result from DB in EventRepository.GetUserForCheckin
+// For retrieving result from DB in EventRepository.GetEventForCheckin
 type CheckinEventQuery struct {
 	AttendenceType  attendence_type   `gorm:"column:attendence_type"`
 	EndTime         time.Time         `gorm:"column:end_time"`
@@ -208,24 +209,11 @@ type ScanRecordInsert struct {
 
 // ====================================================
 
-// for retrieving agenda query result in GET /events/:id
-type GetOneEventAgenda struct {
-	ActivityName string    `gorm:"column:activity_name"`
-	StartTime    time.Time `gorm:"column:start_time"`
-	EndTime      time.Time `gorm:"column:end_time"`
-}
-
 // for retrieving event details and total participant count in GET /events/:id
-type GetOneEventWithTotalCount struct {
-	Name            string    `gorm:"column:name"`
-	Organizer       string    `gorm:"column:organizer"`
-	Description     *string   `gorm:"column:description"`
-	StartTime       time.Time `gorm:"column:start_time"`
-	EndTime         time.Time `gorm:"column:end_time"`
-	Location        string    `gorm:"column:location"`
-	TotalRegistered uint16    `gorm:"column:total_registered"`
-	EvaluationForm  *string   `gorm:"column:evaluation_form"`
-	Role            *string   `gorm:"column:role"`
+type GetOneEventQuery struct {
+	Event
+	Role            *string `gorm:"column:role"`
+	TotalRegistered uint16  `gorm:"column:total_registered"`
 }
 
 // ====================================================

@@ -691,7 +691,7 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 	}
 	userId := datatypes.UUID(datatypes.BinUUIDFromString(userIdStr))
 
-	eventWithCount, agenda, err := s.repo.Event.GetOneEvent(eventId, userId, ctx)
+	result, err := s.repo.Event.GetOneEvent(eventId, userId, ctx)
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, &response.APIError{
@@ -711,8 +711,8 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 	}
 
 	agendaDTO := []dtoRes.GetOneEventAgenda{}
-	if len(*agenda) > 0 {
-		for _, slot := range *agenda {
+	if len(result.EventAgenda) > 0 {
+		for _, slot := range result.EventAgenda {
 			agendaDTO = append(agendaDTO, dtoRes.GetOneEventAgenda{
 				ActivityName: slot.ActivityName,
 				StartTime:    slot.StartTime.UTC(),
@@ -721,17 +721,42 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
+	usersDTO := []dtoRes.GetOneEventUser{}
+	if len(result.EventUser) > 0 {
+		for _, user := range result.EventUser {
+			u := user.User
+			usersDTO = append(usersDTO, dtoRes.GetOneEventUser{
+				FirstnameTH: u.FirstnameTH,
+				SurnameTH:   u.SurnameTH,
+				TitleTH:     u.TitleTH,
+				FirstnameEN: u.FirstnameEN,
+				SurnameEN:   u.SurnameEN,
+				TitleEN:     u.TitleEN,
+				Role:        string(user.Role),
+			})
+		}
+	}
+
+	revealedFields := []string{}
+	for _, field := range result.RevealedFields {
+		if field != "" {
+			revealedFields = append(revealedFields, string(field))
+		}
+	}
 	finalRes := dtoRes.GetOneEventRes{
-		Name:            eventWithCount.Name,
-		Organizer:       eventWithCount.Organizer,
-		Description:     eventWithCount.Description,
-		StartTime:       eventWithCount.StartTime.UTC(),
-		EndTime:         eventWithCount.EndTime.UTC(),
-		Location:        eventWithCount.Location,
-		TotalRegistered: eventWithCount.TotalRegistered,
-		EvaluationForm:  eventWithCount.EvaluationForm,
+		Name:            result.Name,
+		Organizer:       result.Organizer,
+		Description:     result.Description,
+		StartTime:       result.StartTime.UTC(),
+		EndTime:         result.EndTime.UTC(),
+		Location:        result.Location,
+		TotalRegistered: result.TotalRegistered,
+		EvaluationForm:  result.EvaluationForm,
+		AllowAllToScan:  result.AllowAllToScan,
+		RevealedFields:  revealedFields,
+		Role:            result.Role,
 		Agenda:          agendaDTO,
-		Role:            eventWithCount.Role,
+		User:            usersDTO,
 	}
 
 	return &finalRes, nil
