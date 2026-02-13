@@ -87,7 +87,7 @@ func (s *service) Comment(commentReq dtoReq.CommentReq, ctx context.Context) *re
 		ctx,
 	); err != nil {
 
-		if errors.Is(err, entity.ErrAlreadyCheckedIn) {
+		if errors.Is(err, entity.ErrAlreadyCommented) {
 			return &response.APIError{
 				Code:    response.ErrConflict,
 				Message: err.Error(),

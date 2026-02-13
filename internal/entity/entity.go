@@ -4,7 +4,7 @@ import "errors"
 
 var (
 	ErrNilUUID = errors.New("uuid cannot be nil")
-	ErrAlreadyCheckedIn = errors.New("already checked in")
+	ErrAlreadyCommented = errors.New("already commented")
 	ErrCheckInTargetNotFound = errors.New("check in target not found")
 	ErrInsufficientPermissions = errors.New("insufficient permissions")
 )

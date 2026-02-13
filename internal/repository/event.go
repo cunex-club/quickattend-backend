@@ -70,7 +70,7 @@ func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, commen
 			return entity.ErrCheckInTargetNotFound
 		}
 
-		return entity.ErrAlreadyCheckedIn
+		return entity.ErrAlreadyCommented
 	}
 
 	return nil
