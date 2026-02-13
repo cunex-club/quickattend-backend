@@ -44,7 +44,8 @@ func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, commen
 
 	result := r.db.WithContext(ctx).
 		Model(&entity.EventParticipants{}).
-		Where("id = ? AND comment_timestamp IS NULL", checkInRowId).
+		// Where("id = ? AND comment_timestamp IS NULL", checkInRowId).
+		Where("id = ?", checkInRowId).
 		Updates(map[string]any{
 			"comment_timestamp": timeStamp,
 			"comment":           comment,
