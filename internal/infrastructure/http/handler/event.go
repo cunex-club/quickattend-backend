@@ -5,6 +5,7 @@ import (
 
 	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
+	"github.com/cunex-club/quickattend-backend/internal/service"
 )
 
 type EventHandler interface {
@@ -88,13 +89,51 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 		return response.SendError(c, 500, response.ErrInternalError, "Failed to assert user_id as a string")
 	}
 
-	res, pagination, err := h.Service.Event.GetEventsService(userIDStr, params, c.UserContext())
-	if err != nil {
-		return response.SendError(c, err.Status, err.Code, err.Message)
+	validated, validateErr := h.Service.Event.GetEventsValidateArgs(userIDStr, params)
+	if validateErr != nil {
+		return response.SendError(c, validateErr.Status, validateErr.Code, validateErr.Message)
 	}
 
-	if pagination != nil {
-		return response.Paginated(c, res, *pagination)
+	switch validated.MyEvents {
+	case service.Discovery:
+		args := service.GetEventsWithPaginationArgs{
+			UserID:   validated.UserID,
+			Page:     validated.Page,
+			PageSize: validated.PageSize,
+			Search:   validated.Search,
+			Ctx:      c.UserContext(),
+		}
+
+		res, pag, err := h.Service.Event.GetDiscoveryEventsService(&args)
+		if err != nil {
+			return response.SendError(c, err.Status, err.Code, err.Message)
+		}
+		return response.Paginated(c, res, *pag)
+
+	case service.PastEvents:
+		args := service.GetEventsWithPaginationArgs{
+			UserID:   validated.UserID,
+			Page:     validated.Page,
+			PageSize: validated.PageSize,
+			Search:   validated.Search,
+			Ctx:      c.UserContext(),
+		}
+
+		res, pag, err := h.Service.Event.GetPastEventsService(&args)
+		if err != nil {
+			return response.SendError(c, err.Status, err.Code, err.Message)
+		}
+		return response.Paginated(c, res, *pag)
+
+	case service.MyEvents:
+		res, err := h.Service.Event.GetMyEventsService(validated.UserID, validated.Search, c.UserContext())
+		if err != nil {
+			return response.SendError(c, err.Status, err.Code, err.Message)
+		}
+		return response.OK(c, res)
+
+	default:
+		// Should not happen
+		return response.SendError(c, 500, response.ErrInternalError, "Unknown GetEventsMode from Event service")
 	}
-	return response.OK(c, res)
 }

@@ -218,7 +218,7 @@ type GetOneEventQuery struct {
 
 // ====================================================
 
-// for retrieving raw result from DB in GET /events
+// for getting My Events and Past Events from DB in GET /events
 type GetEventsQueryResult struct {
 	ID             datatypes.UUID `gorm:"column:id"`
 	Name           string         `gorm:"column:name"`
@@ -229,4 +229,17 @@ type GetEventsQueryResult struct {
 	Location       string         `gorm:"column:location"`
 	Role           *string        `gorm:"column:role"`
 	EvaluationForm *string        `gorm:"column:evaluation_form"`
+}
+
+// for getting Discovery Events from DB in GET /events
+type GetDiscoveryEvents struct {
+	ID             datatypes.UUID `gorm:"column:id"`
+	Name           string         `gorm:"column:name"`
+	Organizer      string         `gorm:"column:organizer"`
+	Description    *string        `gorm:"column:description"`
+	StartTime      time.Time      `gorm:"column:start_time"`
+	EndTime        time.Time      `gorm:"column:end_time"`
+	Location       string         `gorm:"column:location"`
+	EvaluationForm *string        `gorm:"column:evaluation_form"`
+	LocationPoint  Point          `gorm:"column:location_point"`
 }
