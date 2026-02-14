@@ -1,6 +1,8 @@
 package response
 
-import "time"
+import (
+	"time"
+)
 
 type DuplicateEventRes struct {
 	DuplicatedEventId string `json:"event_id"`
@@ -70,6 +72,19 @@ type GetEventsRes struct {
 	StartTime      time.Time `json:"start_time"`
 	EndTime        time.Time `json:"end_time"`
 	Location       string    `json:"location"`
-	Role           *string   `json:"role,omitempty"`
+	Role           *string   `json:"role"`
 	EvaluationForm *string   `json:"evaluation_form"`
+}
+
+type GetDiscoveryEventsRes struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Organizer      string    `json:"organizer"`
+	Description    *string   `json:"description"`
+	StartTime      time.Time `json:"start_time"`
+	EndTime        time.Time `json:"end_time"`
+	Location       string    `json:"location"`
+	EvaluationForm *string   `json:"evaluation_form"`
+	// LocationLat    float64   `json:"location_lat"`
+	// LocationLong   float64   `json:"location_long"`
 }

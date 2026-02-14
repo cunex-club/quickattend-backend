@@ -32,9 +32,17 @@ type EventRepository interface {
 
 	GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (result *entity.GetOneEventQuery, err error)
 
-	GetManagedEvents(userID datatypes.UUID, search string, ctx context.Context) (res *[]entity.GetEventsQueryResult, err error)
-	GetAttendedEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
-	GetDiscoveryEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
+	GetMyEvents(args *GetEventsArguments) (res *[]entity.GetEventsQueryResult, err error)
+	GetPastEvents(args *GetEventsArguments) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
+	GetDiscoveryEvents(args *GetEventsArguments) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
+}
+
+type GetEventsArguments struct {
+	UserID   datatypes.UUID
+	Page     int
+	PageSize int
+	Search   string
+	Ctx      context.Context
 }
 
 func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
@@ -144,19 +152,20 @@ func (r *repository) GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, 
 	return &result, nil
 }
 
-func (r *repository) GetManagedEvents(userID datatypes.UUID, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, error) {
-	tx := r.db.WithContext(ctx)
+func (r *repository) GetMyEvents(args *GetEventsArguments) (*[]entity.GetEventsQueryResult, error) {
+	withCtx := r.db.WithContext(args.Ctx)
 
 	var results []entity.GetEventsQueryResult
-	if search != "" {
-		searchQuery := fmt.Sprintf("%%%s%%", search)
+	if args.Search != "" {
+		searchQuery := fmt.Sprintf("%%%s%%", args.Search)
 
-		errGetEvents := tx.Table("events e").
+		errGetEvents := withCtx.Table("events e").
 			Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
 				"e.end_time", "e.location", "eu.role", "e.evaluation_form").
 			Joins(`JOIN event_users eu ON eu.user_id = ? 
 				AND eu.event_id = e.id`,
-				userID).
+				args.UserID).
+			Where(`NOW() <= e.end_time`).
 			Where(`(e.name ILIKE ? OR e.organizer ILIKE ? OR e.description ILIKE ? OR e.location ILIKE ?
 				OR eu.role::TEXT ILIKE ? OR e.evaluation_form ILIKE ?)`,
 				searchQuery, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery).
@@ -169,12 +178,13 @@ func (r *repository) GetManagedEvents(userID datatypes.UUID, search string, ctx 
 		return &results, nil
 	}
 
-	errGetEvents := tx.Table("events e").
+	errGetEvents := withCtx.Table("events e").
 		Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
 			"e.end_time", "e.location", "eu.role", "e.evaluation_form").
 		Joins(`JOIN event_users eu ON eu.user_id = ? 
 			AND eu.event_id = e.id`,
-			userID).
+			args.UserID).
+		Where(`NOW() <= e.end_time`).
 		Order("e.id").
 		Scan(&results).Error
 
@@ -184,60 +194,63 @@ func (r *repository) GetManagedEvents(userID datatypes.UUID, search string, ctx 
 	return &results, nil
 }
 
-func (r *repository) GetAttendedEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, int64, bool, error) {
-	tx := r.db.WithContext(ctx)
+func (r *repository) GetPastEvents(args *GetEventsArguments) (*[]entity.GetEventsQueryResult, int64, bool, error) {
+	withCtx := r.db.WithContext(args.Ctx)
+
+	eventUsers := withCtx.Model(&entity.EventUser{}).
+		Select("event_id", "role").
+		Where("user_id = ?", args.UserID)
+
+	eventParticipants := withCtx.Model(&entity.EventParticipants{}).
+		Select("event_id", "NULL AS role").
+		Where("participant_id = ?", args.UserID)
 
 	var subQuery *gorm.DB
-	if search != "" {
-		searchQuery := fmt.Sprintf("%%%s%%", search)
-
-		subQuery = tx.Table("events e").
-			Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
-				"e.end_time", "e.location", "e.evaluation_form").
-			Joins(`JOIN event_participants ep ON ep.participant_id = ? 
-				AND ep.event_id = e.id
-				`, userID).
+	if args.Search != "" {
+		searchQuery := fmt.Sprintf("%%%s%%", args.Search)
+		subQuery = withCtx.
+			Joins("(? UNION ?) AS filter", eventUsers, eventParticipants).
+			Joins("JOIN events e ON e.id = filter.event_id").
+			Where(`NOW() > e.end_time`).
 			Where(`(e.name ILIKE ? OR e.organizer ILIKE ? OR e.description ILIKE ? OR e.location ILIKE ?
 				OR e.evaluation_form ILIKE ?)
 				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
 	} else {
-		subQuery = tx.Table("events e").
-			Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
-				"e.end_time", "e.location", "e.evaluation_form").
-			Joins(`JOIN event_participants ep ON ep.participant_id = ? 
-			AND ep.event_id = e.id
-			`, userID)
+		subQuery = withCtx.
+			Joins("(? UNION ?) AS filter", eventUsers, eventParticipants).
+			Joins("JOIN events e ON e.id = filter.event_id").
+			Where(`NOW() > e.end_time`)
 	}
 
 	var count int64
-	countErr := tx.Raw(`SELECT COUNT(*) AS total FROM (?) AS subQuery`, subQuery).Scan(&count).Error
+	countErr := withCtx.Raw(`SELECT COUNT(*) AS total FROM (?) AS subQuery`, subQuery).Scan(&count).Error
 	if countErr != nil {
 		return nil, -1, false, countErr
 	}
 
 	var rawResult []entity.GetEventsQueryResult
-	getEventsErr := tx.Raw(`SELECT subQuery.* FROM (?) AS subQuery
+	getEventsErr := withCtx.Raw(`SELECT subQuery.* FROM (?) AS subQuery
 		ORDER BY subQuery.id
 		OFFSET ?
 		LIMIT ?
-	`, subQuery, page*pageSize, pageSize+1).Scan(&rawResult).Error
+	`, subQuery, args.Page*args.PageSize, args.PageSize+1).Scan(&rawResult).Error
 	if getEventsErr != nil {
 		return nil, -1, false, getEventsErr
 	}
 
-	if len(rawResult) <= pageSize {
+	if len(rawResult) <= args.PageSize {
 		return &rawResult, count, false, nil
 	}
-	clipped := rawResult[:pageSize]
+	clipped := rawResult[:args.PageSize]
 	return &clipped, count, true, nil
 }
 
-func (r *repository) GetDiscoveryEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (*[]entity.GetEventsQueryResult, int64, bool, error) {
-	tx := r.db.WithContext(ctx)
+func (r *repository) GetDiscoveryEvents(args *GetEventsArguments) (*[]entity.GetEventsQueryResult, int64, bool, error) {
+	tx := r.db.WithContext(args.Ctx)
 
 	var subQuery *gorm.DB
-	if search != "" {
-		searchQuery := fmt.Sprintf("%%%s%%", search)
+	if args.Search != "" {
+		searchQuery := fmt.Sprintf("%%%s%%", args.Search)
 
 		subQuery = tx.Table("events e").Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
 			"e.end_time", "e.location", "e.evaluation_form").
@@ -247,7 +260,7 @@ func (r *repository) GetDiscoveryEvents(userID datatypes.UUID, page int, pageSiz
 				) AND NOT EXISTS (
 					SELECT 1 FROM event_participants ep WHERE ep.event_id = e.id
 					AND ep.participant_id = ?
-				)`, userID, userID).
+				)`, args.UserID, args.UserID).
 			Where(`(e.name ILIKE ? OR e.organizer ILIKE ? OR e.description ILIKE ? OR e.location ILIKE ?
 				OR e.evaluation_form ILIKE ?)
 				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
@@ -260,7 +273,7 @@ func (r *repository) GetDiscoveryEvents(userID datatypes.UUID, page int, pageSiz
 			) AND NOT EXISTS (
 				SELECT 1 FROM event_participants ep WHERE ep.event_id = e.id
 				AND ep.participant_id = ?
-			)`, userID, userID)
+			)`, args.UserID, args.UserID)
 	}
 
 	var count int64
@@ -274,15 +287,15 @@ func (r *repository) GetDiscoveryEvents(userID datatypes.UUID, page int, pageSiz
 		ORDER BY subQuery.id
 		OFFSET ?
 		LIMIT ?
-	`, subQuery, page*pageSize, pageSize+1).Scan(&rawResult).Error
+	`, subQuery, args.Page*args.PageSize, args.PageSize+1).Scan(&rawResult).Error
 	if getEventsErr != nil {
 		return nil, -1, false, getEventsErr
 	}
 
-	if len(rawResult) <= pageSize {
+	if len(rawResult) <= args.PageSize {
 		return &rawResult, count, false, nil
 	}
-	clipped := rawResult[:pageSize]
+	clipped := rawResult[:args.PageSize]
 	return &clipped, count, true, nil
 }
 
