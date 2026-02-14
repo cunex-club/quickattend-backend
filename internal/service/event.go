@@ -300,14 +300,14 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
 	if code == "" {
 		return nil, &response.APIError{
-			Code:    response.ErrBadRequest,
+			Code:    "INVALID_QR",
 			Message: "Missing URL path parameter 'qrcode'",
 			Status:  400,
 		}
 	}
 	if len(code) != 10 {
 		return nil, &response.APIError{
-			Code:    response.ErrBadRequest,
+			Code:    "INVALID_QR",
 			Message: "URL path parameter 'qrcode' must have length of 10",
 			Status:  400,
 		}
@@ -322,7 +322,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 		if !isDigit {
 			return nil, &response.APIError{
-				Code:    response.ErrBadRequest,
+				Code:    "INVALID_QR",
 				Message: "URL path parameter 'qrcode' contains non-number character(s)",
 				Status:  400,
 			}
@@ -344,9 +344,9 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		s.logger.Error().Err(userIdErr).
 			Str("user_id", userId)
 		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Invalid user_id from JWT claim",
-			Status:  500,
+			Code:    response.ErrBadRequest,
+			Message: "Invalid format of user_id from JWT claim",
+			Status:  400,
 		}
 	}
 	userIdUuid := datatypes.UUID(datatypes.BinUUIDFromString(userId))
@@ -428,9 +428,9 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	case 403:
 		// Expired or invalid QR
 		return nil, &response.APIError{
-			Code:    response.ErrNotFound,
-			Message: "qrcode not found (expired or invalid)",
-			Status:  404,
+			Code:    "INVALID_QR",
+			Message: "qrcode expired or invalid",
+			Status:  400,
 		}
 
 	case 500:
@@ -445,7 +445,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		s.logger.Error().Str("Error", fmt.Sprintf("Response with unexpected status code from CU NEX GET qrcode: %d", resp.StatusCode))
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Unknown response from CU NEX GET qrcode",
+			Message: "Response with unknown status code from CU NEX GET qrcode",
 			Status:  500,
 		}
 
@@ -492,7 +492,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	if getEventErr != nil {
 		if getEventErr == gorm.ErrRecordNotFound {
 			return nil, &response.APIError{
-				Code:    response.ErrNotFound,
+				Code:    "EVENT_NOT_FOUND",
 				Message: "Event with this id not found",
 				Status:  404,
 			}
@@ -510,7 +510,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 
 	if !event.AllowAllToScan && !event.ThisUserCanScan {
 		return nil, &response.APIError{
-			Code:    response.ErrForbidden,
+			Code:    "SCANNER_NO_PERMISSION",
 			Message: "This user doesn't have permission to be a scanner for this event",
 			Status:  403,
 		}
@@ -548,9 +548,9 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	switch status {
 	case string(dtoRes.FAIL):
 		return nil, &response.APIError{
-			Code:    response.ErrBadRequest,
+			Code:    "PARTICIPANT_NO_PERMISSION",
 			Message: "Failed to check in to the event (late or no permission).",
-			Status:  400,
+			Status:  403,
 		}
 
 	case string(dtoRes.SUCCESS):
