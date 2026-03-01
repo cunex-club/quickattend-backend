@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/base64"
-	b64 "encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -607,7 +606,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	}
 
 	raw := fmt.Appendf(nil, "%s.%s", checkinTime.Format(time.RFC3339Nano), rowId.String())
-	checkInCode := b64.StdEncoding.EncodeToString(raw)
+	checkInCode := base64.StdEncoding.EncodeToString(raw)
 
 	// Finally, format response according to revealed_fields of this event
 	responseBody := dtoRes.GetParticipantRes{
