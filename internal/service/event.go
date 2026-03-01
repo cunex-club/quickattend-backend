@@ -738,7 +738,7 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
-	agendaDTO := []dtoRes.GetOneEventAgenda{}
+	agendaDTO := make([]dtoRes.GetOneEventAgenda, 0, len(result.EventAgenda))
 	if len(result.EventAgenda) > 0 {
 		for _, slot := range result.EventAgenda {
 			agendaDTO = append(agendaDTO, dtoRes.GetOneEventAgenda{
@@ -749,7 +749,7 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
-	usersDTO := []dtoRes.GetOneEventUser{}
+	usersDTO := make([]dtoRes.GetOneEventUser, 0, len(result.EventUser))
 	if len(result.EventUser) > 0 {
 		for _, user := range result.EventUser {
 			u := user.User
@@ -765,7 +765,7 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
-	revealedFields := []string{}
+	revealedFields := make([]string, 0, len(result.RevealedFields))
 	for _, field := range result.RevealedFields {
 		if field != "" {
 			revealedFields = append(revealedFields, string(field))
@@ -924,8 +924,8 @@ func (s *service) GetMyEventsService(userID datatypes.UUID, search string, ctx c
 		}
 	}
 
-	final := []dtoRes.GetEventsRes{}
-	s._GetEventsDTOFormat(res, &final)
+	final := make([]dtoRes.GetEventsRes, 0, len(*res))
+	s.getEventsDTOFormat(res, &final)
 	return &final, nil
 }
 
@@ -951,8 +951,8 @@ func (s *service) GetPastEventsService(args *GetEventsWithPaginationArgs) (*[]dt
 		}
 	}
 
-	final := []dtoRes.GetEventsRes{}
-	s._GetEventsDTOFormat(res, &final)
+	final := make([]dtoRes.GetEventsRes, 0, len(*res))
+	s.getEventsDTOFormat(res, &final)
 	return &final, &response.Pagination{
 		Page:     args.Page,
 		PageSize: args.PageSize,
@@ -983,8 +983,8 @@ func (s *service) GetDiscoveryEventsService(args *GetEventsWithPaginationArgs) (
 		}
 	}
 
-	final := []dtoRes.GetDiscoveryEventsRes{}
-	s._GetDiscoveryEventsDTOFormat(res, &final)
+	final := make([]dtoRes.GetDiscoveryEventsRes, 0, len(*res))
+	s.getDiscoveryEventsDTOFormat(res, &final)
 	return &final, &response.Pagination{
 		Page:     args.Page,
 		PageSize: args.PageSize,
@@ -993,7 +993,7 @@ func (s *service) GetDiscoveryEventsService(args *GetEventsWithPaginationArgs) (
 	}, nil
 }
 
-func (s *service) _GetEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, result *[]dtoRes.GetEventsRes) {
+func (s *service) getEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, result *[]dtoRes.GetEventsRes) {
 	length := len(*rawResult)
 	if length > 0 {
 		for i := 0; i < length; i++ {
@@ -1013,7 +1013,7 @@ func (s *service) _GetEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, 
 }
 
 // TODO: change rawResult type to the one for discovery, and add lat + long to DTO
-func (s *service) _GetDiscoveryEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, result *[]dtoRes.GetDiscoveryEventsRes) {
+func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, result *[]dtoRes.GetDiscoveryEventsRes) {
 	length := len(*rawResult)
 	if length > 0 {
 		for i := 0; i < length; i++ {
