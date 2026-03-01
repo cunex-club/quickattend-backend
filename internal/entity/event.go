@@ -122,7 +122,7 @@ type Event struct {
 	Organizer             string                  `gorm:"type:text;not null;index:idx_events_organizer_trgm,type:gin" json:"organizer"`
 	Description           *string                 `gorm:"type:text;index:idx_events_description_trgm,type:gin" json:"description"`
 	StartTime             time.Time               `gorm:"type:timestamptz;not null" json:"start_time"`
-	EndTime               time.Time               `gorm:"type:timestamptz;not null" json:"end_time"`
+	EndTime               time.Time               `gorm:"type:timestamptz;not null;index:idx_events_end_time" json:"end_time"`
 	Location              string                  `gorm:"type:text;not null;index:idx_events_location_trgm,type:gin" json:"location"`
 	AttendenceType        attendence_type         `gorm:"type:attendence_type;not null" json:"attendance_type"`
 	AllowAllToScan        bool                    `gorm:"type:bool;not null" json:"allow_all_to_scan"`

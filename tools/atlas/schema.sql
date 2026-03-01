@@ -96,6 +96,7 @@ CREATE TABLE "event_users" (
         REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
 
+CREATE INDEX idx_events_end_time ON events (end_time);
 CREATE INDEX idx_events_name_trgm ON events USING GIN (name gin_trgm_ops);
 CREATE INDEX idx_events_organizer_trgm ON events USING GIN (organizer gin_trgm_ops);
 CREATE INDEX idx_events_description_trgm ON events USING GIN (description gin_trgm_ops);
