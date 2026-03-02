@@ -14,9 +14,9 @@ import (
 type AttendanceType string
 
 const (
-	AttendanceAll       AttendanceType = "all"
-	AttendanceWhitelist AttendanceType = "whitelist"
-	AttendanceFaculties AttendanceType = "faculties"
+	AttendanceAll       AttendanceType = "ALL"
+	AttendanceWhitelist AttendanceType = "WHITELIST"
+	AttendanceFaculties AttendanceType = "FACULTIES"
 )
 
 func (at *AttendanceType) Scan(value any) error {
@@ -43,11 +43,11 @@ func (at AttendanceType) Value() (driver.Value, error) {
 
 func ParseAttendanceType(s string) (AttendanceType, error) {
 	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "all":
+	case "ALL":
 		return AttendanceAll, nil
-	case "whitelist":
+	case "WHITELIST":
 		return AttendanceWhitelist, nil
-	case "faculties":
+	case "FACULTIES":
 		return AttendanceFaculties, nil
 	default:
 		return "", fmt.Errorf("invalid attendance_type")
@@ -68,10 +68,10 @@ func (at AttendanceType) Valid() bool {
 type ParticipantData string
 
 const (
-	ParticipantName         ParticipantData = "name"
-	ParticipantOrganization ParticipantData = "organization"
-	ParticipantRefID        ParticipantData = "refid"
-	ParticipantPhoto        ParticipantData = "photo"
+	ParticipantName         ParticipantData = "NAME"
+	ParticipantOrganization ParticipantData = "ORGANIZATION"
+	ParticipantRefID        ParticipantData = "REFID"
+	ParticipantPhoto        ParticipantData = "PHOTO"
 )
 
 type ParticipantField []ParticipantData
@@ -130,13 +130,13 @@ func (pf ParticipantField) Value() (driver.Value, error) {
 
 func ParseParticipantData(s string) (ParticipantData, error) {
 	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "name":
+	case "NAME":
 		return ParticipantName, nil
-	case "organization":
+	case "ORGANIZATION":
 		return ParticipantOrganization, nil
-	case "refid":
+	case "REFID":
 		return ParticipantRefID, nil
-	case "photo":
+	case "PHOTO":
 		return ParticipantPhoto, nil
 	default:
 		return "", fmt.Errorf("invalid participant field: %s", s)
