@@ -36,10 +36,7 @@ type EventRepository interface {
 	GetMyEvents(args *GetEventsArguments) (res *[]entity.GetEventsQueryResult, err error)
 	GetPastEvents(args *GetEventsArguments) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
 	GetDiscoveryEvents(args *GetEventsArguments) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
-	GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (eventWithCount *entity.GetOneEventWithTotalCount, agenda *[]entity.GetOneEventAgenda, err error)
-	GetManagedEvents(userID datatypes.UUID, search string, ctx context.Context) (res *[]entity.GetEventsQueryResult, err error)
-	GetAttendedEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
-	GetDiscoveryEvents(userID datatypes.UUID, page int, pageSize int, search string, ctx context.Context) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
+
 	CreateEvent(ctx context.Context, payload entity.CreateEventPayload) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, payload entity.CreateEventPayload) (*dtoRes.UpdateEventRes, error)
 }
@@ -357,7 +354,7 @@ func (r *repository) CheckEventAccess(ctx context.Context, orgCode uint8, refID 
 	var found bool
 
 	switch attendanceType {
-	case string(entity.FACULTIES):
+	case string(entity.AttendanceFaculties):
 		checkErr := withCtx.Raw(`SELECT EXISTS (
 			SELECT 1 FROM event_allowed_faculties
 			WHERE event_id = ? AND faculty_no = ?
@@ -368,7 +365,7 @@ func (r *repository) CheckEventAccess(ctx context.Context, orgCode uint8, refID 
 
 		return found, nil
 
-	case string(entity.WHITELIST):
+	case string(entity.AttendanceWhitelist):
 		checkErr := withCtx.Raw(`SELECT EXISTS (
 			SELECT 1 FROM event_whitelists
 			WHERE event_id = ? AND attendee_ref_id = ?

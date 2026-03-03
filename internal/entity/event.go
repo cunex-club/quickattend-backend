@@ -190,17 +190,21 @@ func (p Point) Value() (driver.Value, error) {
 const ThaiTZ = "Asia/Bangkok"
 
 type Event struct {
-	ID             datatypes.UUID    `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name           string            `gorm:"type:text;not null;index:idx_events_name_trgm,type:gin" json:"name"`
-	Organizer      string            `gorm:"type:text;not null;index:idx_events_organizer_trgm,type:gin" json:"organizer"`
-	Description    *string           `gorm:"type:text;index:idx_events_description_trgm,type:gin" json:"description"`
-	StartTime      time.Time         `gorm:"type:timestamptz;not null" json:"start_time"`
-	EndTime        time.Time         `gorm:"type:timestamptz;not null" json:"end_time"`
-	Location       string            `gorm:"type:text;not null;index:idx_events_location_trgm,type:gin" json:"location"`
-	AttendenceType AttendanceType   `gorm:"type:attendence_type;not null" json:"attendance_type"`
-	AllowAllToScan bool              `gorm:"type:bool;not null" json:"allow_all_to_scan"`
-	EvaluationForm *string           `gorm:"type:text;index:idx_events_evaluation_form_trgm,type:gin" json:"evaluation_form"`
-	RevealedFields ParticipantField `gorm:"type:participant_data[];not null" json:"revealed_fields"`
+	ID                    datatypes.UUID          `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Name                  string                  `gorm:"type:text;not null;index:idx_events_name_trgm,type:gin" json:"name"`
+	Organizer             string                  `gorm:"type:text;not null;index:idx_events_organizer_trgm,type:gin" json:"organizer"`
+	Description           *string                 `gorm:"type:text;index:idx_events_description_trgm,type:gin" json:"description"`
+	StartTime             time.Time               `gorm:"type:timestamptz;not null" json:"start_time"`
+	EndTime               time.Time               `gorm:"type:timestamptz;not null" json:"end_time"`
+	Location              string                  `gorm:"type:text;not null;index:idx_events_location_trgm,type:gin" json:"location"`
+	AttendenceType        AttendanceType          `gorm:"type:attendence_type;not null" json:"attendance_type"`
+	AllowAllToScan        bool                    `gorm:"type:bool;not null" json:"allow_all_to_scan"`
+	EvaluationForm        *string                 `gorm:"type:text;index:idx_events_evaluation_form_trgm,type:gin" json:"evaluation_form"`
+	RevealedFields        ParticipantField        `gorm:"type:participant_data[];not null" json:"revealed_fields"`
+	EventWhitelist        []EventWhitelist        `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_whitelist"`
+	EventAllowedFaculties []EventAllowedFaculties `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_allowed_faculties"`
+	EventAgenda           []EventAgenda           `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_agenda"`
+	EventUser             []EventUser             `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_users"`
 }
 
 type EventWhitelist struct {
@@ -264,11 +268,11 @@ type CheckinUserQuery struct {
 
 // For retrieving result from DB in EventRepository.GetEventForCheckin
 type CheckinEventQuery struct {
-	AttendenceType  attendence_type   `gorm:"column:attendence_type"`
-	EndTime         time.Time         `gorm:"column:end_time"`
-	AllowAllToScan  bool              `gorm:"column:allow_all_to_scan"`
-	RevealedFields  participant_field `gorm:"column:revealed_fields"`
-	ThisUserCanScan bool              `gorm:"column:this_user_can_scan"`
+	AttendenceType  AttendanceType   `gorm:"column:attendence_type"`
+	EndTime         time.Time        `gorm:"column:end_time"`
+	AllowAllToScan  bool             `gorm:"column:allow_all_to_scan"`
+	RevealedFields  ParticipantField `gorm:"column:revealed_fields"`
+	ThisUserCanScan bool             `gorm:"column:this_user_can_scan"`
 }
 
 // For inserting record in EventRepository.InsertScanRecord

@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -33,7 +32,7 @@ type EventService interface {
 	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
 
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
-	GetEventsService(userIDStr string, queryParams map[string]string, ctx context.Context) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError)
+	
 	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, updates dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error)
 
@@ -633,7 +632,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 
 	for _, field := range event.RevealedFields {
 		switch field {
-		case entity.NAME:
+		case entity.ParticipantName:
 			responseBody.FirstnameTH = &CUNEXSuccess.FirstNameTH
 			responseBody.FirstnameEN = &CUNEXSuccess.FirstNameEN
 			responseBody.TitleTH = &user.TitleTH
@@ -641,14 +640,14 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 			responseBody.SurnameEN = &CUNEXSuccess.LastNameEN
 			responseBody.TitleEN = &user.TitleEN
 
-		case entity.ORGANIZATION:
+		case entity.ParticipantOrganization:
 			responseBody.OrganizationTH = &orgTH
 			responseBody.OrganizationEN = &orgEN
 
-		case entity.PHOTO:
+		case entity.ParticipantPhoto:
 			responseBody.ProfileImageUrl = &CUNEXSuccess.ProfileImageUrl
 
-		case entity.REFID:
+		case entity.ParticipantRefID:
 			temp := s.FormatRefIdToStr(refIdUInt)
 			responseBody.RefID = &temp
 		}
@@ -678,7 +677,7 @@ func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID
 	}
 
 	// If FACULTIES or WHITELIST, must check for access
-	if attendanceType == string(entity.FACULTIES) || attendanceType == string(entity.WHITELIST) {
+	if attendanceType == string(entity.AttendanceFaculties) || attendanceType == string(entity.AttendanceWhitelist) {
 		allow, err := s.repo.Event.CheckEventAccess(ctx, orgCode, participantRefId, attendanceType, eventId)
 		if err != nil {
 			s.logger.Error().Err(err).
