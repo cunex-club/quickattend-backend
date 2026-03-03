@@ -76,6 +76,14 @@ type GetEventsRes struct {
 	EvaluationForm *string   `json:"evaluation_form"`
 }
 
+type CreateEventRes struct {
+	ID string `json:"id"`
+}
+
+type UpdateEventRes struct {
+	ID string `json:"id"`
+}
+
 type GetDiscoveryEventsRes struct {
 	ID             string    `json:"id"`
 	Name           string    `json:"name"`

@@ -1,4 +1,4 @@
-package response
+package request
 
 type VerifyTokenReq struct {
 	Token string `json:"token"`

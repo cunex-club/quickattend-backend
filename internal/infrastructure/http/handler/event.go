@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"errors"
+
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/gofiber/fiber/v2"
 
 	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
-	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
-	"github.com/cunex-club/quickattend-backend/internal/service"
+	"gorm.io/gorm"
 )
 
 type EventHandler interface {
@@ -15,6 +17,19 @@ type EventHandler interface {
 	PostParticipantHandler(c *fiber.Ctx) error
 	GetOneEventHandler(*fiber.Ctx) error
 	GetEvents(*fiber.Ctx) error
+	CreateEvent(c *fiber.Ctx) error
+	UpdateEvent(c *fiber.Ctx) error
+}
+
+func (h *Handler) Delete(c *fiber.Ctx) error {
+	EventID := c.Params("id")
+	userIDStr := c.Locals("user_id").(string)
+
+	err := h.Service.Event.DeleteById(EventID, userIDStr, c.UserContext())
+	if err != nil {
+		return response.SendError(c, err.Status, err.Code, err.Message)
+	}
+	return response.Deleted(c, nil)
 }
 
 func (h *Handler) Delete(c *fiber.Ctx) error {
@@ -136,4 +151,68 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 		// Should not happen
 		return response.SendError(c, 500, response.ErrInternalError, "Unknown GetEventsMode from Event service")
 	}
+}
+
+func (h *Handler) CreateEvent(c *fiber.Ctx) error {
+	var req dtoReq.CreateEventReq
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	res, err := h.Service.Event.CreateEvent(c.Context(), req)
+	if err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
+	}
+
+	return response.Created(c, res)
+}
+
+func (h *Handler) UpdateEvent(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var req dtoReq.UpdateEventReq
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	res, err := h.Service.Event.UpdateEvent(c.Context(), id, req)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.SendError(c, fiber.StatusNotFound, response.ErrNotFound, "not found")
+		}
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
+	}
+	return response.OK(c, res)
+}
+
+func (h *Handler) CreateEvent(c *fiber.Ctx) error {
+	var req dtoReq.CreateEventReq
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	res, err := h.Service.Event.CreateEvent(c.Context(), req)
+	if err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
+	}
+
+	return response.Created(c, res)
+}
+
+func (h *Handler) UpdateEvent(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var req dtoReq.UpdateEventReq
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	res, err := h.Service.Event.UpdateEvent(c.Context(), id, req)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.SendError(c, fiber.StatusNotFound, response.ErrNotFound, "not found")
+		}
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
+	}
+	return response.OK(c, res)
 }
