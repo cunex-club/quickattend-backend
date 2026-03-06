@@ -16,7 +16,7 @@ VALUES
 -- =========================
 INSERT INTO events (
   id, name, organizer, description,
-  start_time, end_time, location,
+  start_time, end_time, location, location_point,
   attendence_type, allow_all_to_scan,
   evaluation_form, revealed_fields
   )
@@ -30,6 +30,7 @@ VALUES
   NOW() - INTERVAL '1 day',
   NOW() + INTERVAL '1 day',
   'Main Hall',
+  POINT(100.5018, 13.7563),
   'ALL',
   true,
   'https://forms.example.com/open-tech',
@@ -44,6 +45,7 @@ VALUES
   NOW() - INTERVAL '1 hour',
   NOW() + INTERVAL '1 hour',
   'Main Hall',
+  POINT(100.5018, 13.7563),
   'ALL',
   true,
   'https://forms.example.com/open-tech',
@@ -59,6 +61,7 @@ VALUES
   NOW(),
   NOW() + INTERVAL '3 hours',
   'Meeting Room A',
+  POINT(100.5030, 13.7570),
   'WHITELIST',
   false,
   NULL,
@@ -74,6 +77,7 @@ VALUES
   NOW() + INTERVAL '2 days',
   NOW() + INTERVAL '3 days',
   'Conference Center',
+  POINT(100.5040, 13.7580),
   'FACULTIES',
   true,
   'https://forms.example.com/research',
@@ -228,6 +232,7 @@ WITH user_111_events AS (
       NOW() - INTERVAL '2 hours' AS start_time,
       NOW() - INTERVAL '1 hour' AS end_time,
       'sjdkncdk' AS location,
+      POINT(100.5050, 13.10) AS location_point,
       'ALL'::attendence_type AS attendence_type,
       TRUE AS allow_all_to_scan,
       'https eval ' || i AS evaluation_form,
@@ -243,6 +248,7 @@ WITH user_111_events AS (
       NOW() - INTERVAL '1 hour' AS start_time,
       NOW() + INTERVAL '2 hours' AS end_time,
       'building xyz' AS location,
+      POINT(101, 13.668) AS location_point,
       'ALL'::attendence_type AS attendence_type,
       FALSE AS allow_all_to_scan,
       NULL AS evaluation_form,
@@ -254,12 +260,12 @@ WITH user_111_events AS (
 inserted_events AS (
   INSERT INTO events (
     id, name, organizer, description,
-    start_time, end_time, location,
+    start_time, end_time, location, location_point,
     attendence_type, allow_all_to_scan,
     evaluation_form, revealed_fields
   )
   SELECT id, name, organizer, description,
-    start_time, end_time, location,
+    start_time, end_time, location, location_point,
     attendence_type, allow_all_to_scan,
     evaluation_form, revealed_fields 
   FROM user_111_events
