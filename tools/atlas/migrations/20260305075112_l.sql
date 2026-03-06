@@ -13,6 +13,7 @@ CREATE TABLE "events" (
   "start_time" timestamptz NOT NULL,
   "end_time" timestamptz NOT NULL,
   "location" text NOT NULL,
+  "location_point" point NOT NULL,
   "attendence_type" "attendence_type" NOT NULL,
   "allow_all_to_scan" boolean NOT NULL,
   "evaluation_form" text NULL,
@@ -21,6 +22,8 @@ CREATE TABLE "events" (
 );
 -- Create index "idx_events_description_trgm" to table: "events"
 CREATE INDEX "idx_events_description_trgm" ON "events" USING gin ("description" gin_trgm_ops);
+-- Create index "idx_events_end_time" to table: "events"
+CREATE INDEX "idx_events_end_time" ON "events" ("end_time");
 -- Create index "idx_events_evaluation_form_trgm" to table: "events"
 CREATE INDEX "idx_events_evaluation_form_trgm" ON "events" USING gin ("evaluation_form" gin_trgm_ops);
 -- Create index "idx_events_location_trgm" to table: "events"
