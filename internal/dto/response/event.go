@@ -85,6 +85,6 @@ type GetDiscoveryEventsRes struct {
 	EndTime        time.Time `json:"end_time"`
 	Location       string    `json:"location"`
 	EvaluationForm *string   `json:"evaluation_form"`
-	// LocationLat    float64   `json:"location_lat"`
-	// LocationLong   float64   `json:"location_long"`
+	LocationLat    float64   `json:"location_lat"`
+	LocationLong   float64   `json:"location_long"`
 }

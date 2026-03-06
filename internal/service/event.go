@@ -1012,20 +1012,21 @@ func (s *service) getEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, r
 	}
 }
 
-// TODO: change rawResult type to the one for discovery, and add lat + long to DTO
-func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, result *[]dtoRes.GetDiscoveryEventsRes) {
-	length := len(*rawResult)
-	if length > 0 {
-		for i := 0; i < length; i++ {
+func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetDiscoveryEvents, result *[]dtoRes.GetDiscoveryEventsRes) {
+	deref := *rawResult
+	if len(deref) > 0 {
+		for i := 0; i < len(deref); i++ {
 			*result = append(*result, dtoRes.GetDiscoveryEventsRes{
-				ID:             (*rawResult)[i].ID.String(),
-				Name:           (*rawResult)[i].Name,
-				Organizer:      (*rawResult)[i].Organizer,
-				Description:    (*rawResult)[i].Description,
-				StartTime:      (*rawResult)[i].StartTime.UTC(),
-				EndTime:        (*rawResult)[i].EndTime.UTC(),
-				Location:       (*rawResult)[i].Location,
-				EvaluationForm: (*rawResult)[i].EvaluationForm,
+				ID:             deref[i].ID.String(),
+				Name:           deref[i].Name,
+				Organizer:      deref[i].Organizer,
+				Description:    deref[i].Description,
+				StartTime:      deref[i].StartTime.UTC(),
+				EndTime:        deref[i].EndTime.UTC(),
+				Location:       deref[i].Location,
+				EvaluationForm: deref[i].EvaluationForm,
+				LocationLat:    deref[i].LocationPoint.Y,
+				LocationLong:   deref[i].LocationPoint.X,
 			})
 		}
 	}
