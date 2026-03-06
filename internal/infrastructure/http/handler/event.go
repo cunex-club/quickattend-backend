@@ -89,7 +89,9 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 		return response.SendError(c, 500, response.ErrInternalError, "Failed to assert user_id as a string")
 	}
 
-	validated, validateErr := h.Service.Event.GetEventsValidateArgs(userIDStr, params)
+	ctx := c.UserContext()
+
+	validated, validateErr := h.Service.Event.GetEventsValidateArgs(userIDStr, params, ctx)
 	if validateErr != nil {
 		return response.SendError(c, validateErr.Status, validateErr.Code, validateErr.Message)
 	}
@@ -101,7 +103,7 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 			Page:     validated.Page,
 			PageSize: validated.PageSize,
 			Search:   validated.Search,
-			Ctx:      c.UserContext(),
+			Ctx:      ctx,
 		}
 
 		res, pag, err := h.Service.Event.GetDiscoveryEventsService(&args)
@@ -116,7 +118,7 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 			Page:     validated.Page,
 			PageSize: validated.PageSize,
 			Search:   validated.Search,
-			Ctx:      c.UserContext(),
+			Ctx:      ctx,
 		}
 
 		res, pag, err := h.Service.Event.GetPastEventsService(&args)
