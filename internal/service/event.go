@@ -400,15 +400,12 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	client := &http.Client{
-		Timeout: time.Second * 10,
-	}
 	req, formNewReqErr := http.NewRequest(http.MethodGet, CUNEXGetQRURL, nil)
 	if formNewReqErr != nil {
 		s.logger.Error().Err(formNewReqErr).Str("Error", "Failed to form new HTTP request for CU NEX GET qrcode")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Failed to perform HTTP request for CU NEX GET qrcode",
+			Message: "Failed to form HTTP request for CU NEX GET qrcode",
 			Status:  500,
 		}
 	}
@@ -420,11 +417,12 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	req.Header.Set("ClientId", clientId)
 	req.Header.Set("ClientSecret", clientSecret)
 
-	resp, doErr := client.Do(req)
+	resp, doErr := s.httpClient.Do(req)
 	if doErr != nil {
+		s.logger.Error().Err(doErr).Msg("Failed to perform request for CU NEX GET qrcode")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Failed to send request for CU NEX GET qrcode",
+			Message: "Failed to perform request for CU NEX GET qrcode",
 			Status:  500,
 		}
 	}
