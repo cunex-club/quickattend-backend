@@ -23,6 +23,7 @@ CREATE TABLE "events" (
     "start_time" timestamptz NOT NULL,
     "end_time" timestamptz NOT NULL,
     "location" text NOT NULL,
+    "location_point" point NOT NULL,
     "attendence_type" attendence_type NOT NULL,
     "allow_all_to_scan" boolean NOT NULL,
     "evaluation_form" text,
