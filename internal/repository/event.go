@@ -501,6 +501,7 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 			"start_time":        payload.Event.StartTime,
 			"end_time":          payload.Event.EndTime,
 			"location":          payload.Event.Location,
+			"location_point":    payload.Event.LocationPoint,
 			"attendence_type":   payload.Event.AttendenceType,
 			"allow_all_to_scan": payload.Event.AllowAllToScan,
 			"evaluation_form":   payload.Event.EvaluationForm,

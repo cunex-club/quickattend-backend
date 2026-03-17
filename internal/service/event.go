@@ -32,7 +32,7 @@ type EventService interface {
 	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
 
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
-	
+
 	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, updates dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error)
 
@@ -1093,6 +1093,11 @@ func buildCreateOrUpdatePayload(req dtoReq.CreateEventReq) (entity.CreateEventPa
 		return entity.CreateEventPayload{}, err
 	}
 
+	locationPoint := entity.Point{
+		X: req.LocationLat,
+		Y: req.LocationLong,
+	}
+
 	event := entity.Event{
 		Name:        req.Name,
 		Organizer:   req.Organizer,
@@ -1102,6 +1107,7 @@ func buildCreateOrUpdatePayload(req dtoReq.CreateEventReq) (entity.CreateEventPa
 		EndTime:   endTime,
 
 		Location:       req.Location,
+		LocationPoint:  locationPoint,
 		AttendenceType: at,
 		AllowAllToScan: *req.AllowAllToScan,
 		EvaluationForm: &req.EvaluationForm,

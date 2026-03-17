@@ -20,8 +20,10 @@ type CreateEventReq struct {
 	EndTime   string `json:"end_time" validate:"required"`   // RFC3339 UTC
 	Timezone  string `json:"timezone" validate:"required"`   // e.g. Asia/Bangkok
 
-	Location string            `json:"location" validate:"required"`
-	Agenda   []CreateAgendaReq `json:"agenda" validate:"dive"`
+	Location     string            `json:"location" validate:"required"`
+	LocationLat  float64           `json:"location_lat"`
+	LocationLong float64           `json:"location_long"`
+	Agenda       []CreateAgendaReq `json:"agenda" validate:"dive"`
 
 	AttendanceType string   `json:"attendance_type" validate:"required,oneof=all whitelist faculties"`
 	Attendee       []any    `json:"attendee" validate:"required"`
