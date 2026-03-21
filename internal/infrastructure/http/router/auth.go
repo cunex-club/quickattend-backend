@@ -8,7 +8,7 @@ import (
 
 func AuthRoutes(r fiber.Router, h *handler.AllOfHandler, mw *middleware.Middleware) {
 	// login by CU NEX callback
-	r.Post("/callback", h.AuthHandler.AuthCallback)
+	r.Get("/callback", h.AuthHandler.AuthCallback)
 
 	auth := r.Group("/auth")
 

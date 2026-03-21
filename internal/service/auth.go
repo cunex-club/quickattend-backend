@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cunex-club/quickattend-backend/internal/entity"
-	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
+	"github.com/cunex-club/quickattend-backend/internal/entity"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 )
 
 type AuthService interface {
@@ -168,11 +168,11 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusExpectationFailed {
+	if resp.StatusCode == http.StatusNoContent {
 		return nil, &response.APIError{
 			Code:    response.ErrUnauthorized,
 			Message: "invalid token",
-			Status:  resp.StatusCode,
+			Status:  http.StatusUnauthorized,
 		}
 	}
 
