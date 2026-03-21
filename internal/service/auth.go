@@ -120,7 +120,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	tokenValidationUrl := "https://culab-svc.azurewebsites.net/Service.svc/webprofile"
+	tokenValidationUrl := "https://culab-svc.azurewebsites.net/Service.svc/profile"
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", tokenValidationUrl, nil)
@@ -176,7 +176,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	var UserData entity.CUNEXUserResponse
+	var UserData entity.CUNEXProfileResponse
 	if err := json.NewDecoder(resp.Body).Decode(&UserData); err != nil {
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
@@ -199,10 +199,10 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		RefID:       convRefId,
 		FirstnameTH: UserData.FirstNameTH,
 		SurnameTH:   UserData.LastNameTH,
-		TitleTH:     "",
-		FirstnameEN: UserData.FirstnameEN,
+		FirstnameEN: UserData.FirstNameEN,
 		SurnameEN:   UserData.LastNameEN,
-		TitleEN:     "",
+		TitleTH:     UserData.TitleNameTH,
+		TitleEN:     UserData.TitleNameEN,
 	}
 
 	// // ### MOCK USER DATA ###
