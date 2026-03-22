@@ -35,7 +35,7 @@ type EventRepository interface {
 
 	GetMyEvents(args *GetEventsArguments) (res *[]entity.GetEventsQueryResult, err error)
 	GetPastEvents(args *GetEventsArguments) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
-	GetDiscoveryEvents(args *GetEventsArguments) (res *[]entity.GetEventsQueryResult, total int64, hasNext bool, err error)
+	GetDiscoveryEvents(args *GetEventsArguments) (res *[]entity.GetDiscoveryEvents, total int64, hasNext bool, err error)
 
 	CreateEvent(ctx context.Context, payload entity.CreateEventPayload) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, payload entity.CreateEventPayload) (*dtoRes.UpdateEventRes, error)
@@ -234,11 +234,11 @@ func (r *repository) GetPastEvents(args *GetEventsArguments) (*[]entity.GetEvent
 	return &clipped, count, true, nil
 }
 
-func (r *repository) GetDiscoveryEvents(args *GetEventsArguments) (*[]entity.GetEventsQueryResult, int64, bool, error) {
+func (r *repository) GetDiscoveryEvents(args *GetEventsArguments) (*[]entity.GetDiscoveryEvents, int64, bool, error) {
 	withCtx := r.db.WithContext(args.Ctx)
 
 	subQuery := withCtx.Table("events e").Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
-		"e.end_time", "e.location", "e.evaluation_form").
+		"e.end_time", "e.location", "e.evaluation_form", "e.location_point").
 		Where(`NOT EXISTS (
 			SELECT 1 FROM event_users eu WHERE eu.event_id = e.id
 			AND eu.user_id = ?
@@ -260,7 +260,7 @@ func (r *repository) GetDiscoveryEvents(args *GetEventsArguments) (*[]entity.Get
 		return nil, -1, false, countErr
 	}
 
-	var rawResult []entity.GetEventsQueryResult
+	var rawResult []entity.GetDiscoveryEvents
 	getEventsErr := withCtx.Raw(`SELECT subQuery.* FROM (?) AS subQuery
 		ORDER BY subQuery.id
 		OFFSET ?

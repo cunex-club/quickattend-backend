@@ -1,6 +1,9 @@
 package main
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/database"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/handler"
@@ -30,7 +33,7 @@ func main() {
 	log.Info().Msg("Successfully connected to the database")
 
 	repos := repository.NewRepository(db)
-	services := service.NewService(repos, cfg, &log.Logger)
+	services := service.NewService(repos, cfg, &log.Logger, &http.Client{Timeout: 10 * time.Second})
 	handlers := handler.NewHandler(&services, &log.Logger, validator.New())
 
 	app := fiber.New()

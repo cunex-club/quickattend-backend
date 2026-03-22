@@ -36,7 +36,7 @@ type EventService interface {
 	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, updates dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error)
 
-	GetEventsValidateArgs(userIDStr string, queryParams map[string]string) (validated *GetEventsValidateArgsReturn, err *response.APIError)
+	GetEventsValidateArgs(userIDStr string, queryParams map[string]string, ctx context.Context) (validated *GetEventsValidateArgsReturn, err *response.APIError)
 	GetMyEventsService(userID datatypes.UUID, search string, ctx context.Context) (res *[]dtoRes.GetEventsRes, err *response.APIError)
 	GetDiscoveryEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetDiscoveryEventsRes, pagination *response.Pagination, err *response.APIError)
 	GetPastEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetEventsRes, pagination *response.Pagination, err *response.APIError)
@@ -405,15 +405,12 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	client := &http.Client{
-		Timeout: time.Second * 10,
-	}
 	req, formNewReqErr := http.NewRequest(http.MethodGet, CUNEXGetQRURL, nil)
 	if formNewReqErr != nil {
 		s.logger.Error().Err(formNewReqErr).Str("Error", "Failed to form new HTTP request for CU NEX GET qrcode")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Failed to perform HTTP request for CU NEX GET qrcode",
+			Message: "Failed to form HTTP request for CU NEX GET qrcode",
 			Status:  500,
 		}
 	}
@@ -425,11 +422,12 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	req.Header.Set("ClientId", clientId)
 	req.Header.Set("ClientSecret", clientSecret)
 
-	resp, doErr := client.Do(req)
+	resp, doErr := s.httpClient.Do(req)
 	if doErr != nil {
+		s.logger.Error().Err(doErr).Msg("Failed to perform request for CU NEX GET qrcode")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Failed to send request for CU NEX GET qrcode",
+			Message: "Failed to perform request for CU NEX GET qrcode",
 			Status:  500,
 		}
 	}
@@ -795,7 +793,7 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 	return &finalRes, nil
 }
 
-func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string]string) (validated *GetEventsValidateArgsReturn, err *response.APIError) {
+func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string]string, ctx context.Context) (validated *GetEventsValidateArgsReturn, err *response.APIError) {
 	uuidValidationErr := uuid.Validate(userIDStr)
 	if uuidValidationErr != nil {
 		return nil, &response.APIError{
@@ -805,6 +803,28 @@ func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string
 		}
 	}
 	userID := datatypes.UUID(datatypes.BinUUIDFromString(userIDStr))
+
+	// // User must exist
+	_, userErr := s.repo.Auth.GetUserById(userID, ctx)
+	if userErr != nil {
+		if userErr == gorm.ErrRecordNotFound {
+			return nil, &response.APIError{
+				Code:    response.ErrNotFound,
+				Message: "User not found",
+				Status:  404,
+			}
+		}
+
+		s.logger.Error().Err(userErr).
+			Str("user_id", userIDStr).
+			Str("function", "AuthRepository.GetUserById").
+			Msg(fmt.Sprintf("Internal DB error: %s", userErr.Error()))
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB error on getting user",
+			Status:  500,
+		}
+	}
 
 	pageQuery, pageOk := queryParams["page"]
 	var page int
@@ -1017,20 +1037,21 @@ func (s *service) getEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, r
 	}
 }
 
-// TODO: change rawResult type to the one for discovery, and add lat + long to DTO
-func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, result *[]dtoRes.GetDiscoveryEventsRes) {
-	length := len(*rawResult)
-	if length > 0 {
-		for i := 0; i < length; i++ {
+func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetDiscoveryEvents, result *[]dtoRes.GetDiscoveryEventsRes) {
+	deref := *rawResult
+	if len(deref) > 0 {
+		for i := 0; i < len(deref); i++ {
 			*result = append(*result, dtoRes.GetDiscoveryEventsRes{
-				ID:             (*rawResult)[i].ID.String(),
-				Name:           (*rawResult)[i].Name,
-				Organizer:      (*rawResult)[i].Organizer,
-				Description:    (*rawResult)[i].Description,
-				StartTime:      (*rawResult)[i].StartTime.UTC(),
-				EndTime:        (*rawResult)[i].EndTime.UTC(),
-				Location:       (*rawResult)[i].Location,
-				EvaluationForm: (*rawResult)[i].EvaluationForm,
+				ID:             deref[i].ID.String(),
+				Name:           deref[i].Name,
+				Organizer:      deref[i].Organizer,
+				Description:    deref[i].Description,
+				StartTime:      deref[i].StartTime.UTC(),
+				EndTime:        deref[i].EndTime.UTC(),
+				Location:       deref[i].Location,
+				EvaluationForm: deref[i].EvaluationForm,
+				LocationLat:    deref[i].LocationPoint.Y,
+				LocationLong:   deref[i].LocationPoint.X,
 			})
 		}
 	}

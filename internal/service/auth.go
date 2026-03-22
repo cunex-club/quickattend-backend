@@ -103,7 +103,6 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 
 	tokenValidationUrl := "https://culab-svc.azurewebsites.net/Service.svc/webprofile"
 
-	client := &http.Client{}
 	req, err := http.NewRequest("GET", tokenValidationUrl, nil)
 	if err != nil {
 		return nil, &response.APIError{
@@ -139,7 +138,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	q.Add("token", token)
 	req.URL.RawQuery = q.Encode()
 
-	resp, err := client.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
