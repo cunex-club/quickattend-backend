@@ -149,6 +149,10 @@ func (h *Handler) CreateEvent(c *fiber.Ctx) error {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
 	}
 
+	if err := h.Validator.Struct(req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
 	res, err := h.Service.Event.CreateEvent(c.Context(), req)
 	if err != nil {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
@@ -162,6 +166,10 @@ func (h *Handler) UpdateEvent(c *fiber.Ctx) error {
 
 	var req dtoReq.UpdateEventReq
 	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	if err := h.Validator.Struct(req); err != nil {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
 	}
 
