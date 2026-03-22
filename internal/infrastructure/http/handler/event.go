@@ -165,6 +165,10 @@ func (h *Handler) CreateEvent(c *fiber.Ctx) error {
 
 func (h *Handler) UpdateEvent(c *fiber.Ctx) error {
 	id := c.Params("id")
+	userIdStr, ok := c.Locals("user_id").(string)
+	if !ok {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "expect string user_id in JWT")
+	}
 
 	var req dtoReq.UpdateEventReq
 	if err := c.BodyParser(&req); err != nil {
@@ -175,7 +179,7 @@ func (h *Handler) UpdateEvent(c *fiber.Ctx) error {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
 	}
 
-	res, err := h.Service.Event.UpdateEvent(c.Context(), id, req)
+	res, err := h.Service.Event.UpdateEvent(c.Context(), id, userIdStr, req)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.SendError(c, fiber.StatusNotFound, response.ErrNotFound, "not found")

@@ -34,7 +34,7 @@ type EventService interface {
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
 
 	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error)
-	UpdateEvent(ctx context.Context, id string, updates dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error)
+	UpdateEvent(ctx context.Context, id string, userId string, updates dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error)
 
 	GetEventsValidateArgs(userIDStr string, queryParams map[string]string, ctx context.Context) (validated *GetEventsValidateArgsReturn, err *response.APIError)
 	GetMyEventsService(userID datatypes.UUID, search string, ctx context.Context) (res *[]dtoRes.GetEventsRes, err *response.APIError)
@@ -1065,7 +1065,24 @@ func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*
 	return s.repo.Event.CreateEvent(ctx, payload)
 }
 
-func (s *service) UpdateEvent(ctx context.Context, id string, req dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error) {
+func (s *service) UpdateEvent(ctx context.Context, id string, userId string, req dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error) {
+	idUUID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, errors.New("Invalid event id")
+	}
+	userIdUUID, err := uuid.Parse(userId)
+	if err != nil {
+		return nil, errors.New("Invalid user id")
+	}
+
+	role, err := s.repo.Event.GetUserRoleInEvent(idUUID, userIdUUID, ctx)
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+	if role == nil || (*role != string(entity.OWNER) && *role != string(entity.MANAGER)) {
+		return nil, errors.New("Cannot update event; user is not owner or manager")
+	}
+
 	payload, err := buildCreateOrUpdatePayload(dtoReq.CreateEventReq(req))
 	if err != nil {
 		return nil, err
