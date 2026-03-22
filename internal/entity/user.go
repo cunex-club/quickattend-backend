@@ -2,6 +2,8 @@ package entity
 
 import (
 	"database/sql/driver"
+	"fmt"
+	"strings"
 
 	"gorm.io/datatypes"
 )
@@ -15,12 +17,37 @@ const (
 )
 
 func (r *role) Scan(value any) error {
-	*r = role(value.(string))
-	return nil
+	if value == nil {
+		*r = ""
+		return nil
+	}
+	switch v := value.(type) {
+	case string:
+		*r = role(v)
+		return nil
+	case []byte:
+		*r = role(string(v))
+		return nil
+	default:
+		return fmt.Errorf("cannot scan %T into role", value)
+	}
 }
 
 func (r role) Value() (driver.Value, error) {
 	return string(r), nil
+}
+
+func ParseRole(s string) (role, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "owner":
+		return OWNER, nil
+	case "staff":
+		return STAFF, nil
+	case "manager":
+		return MANAGER, nil
+	default:
+		return "", fmt.Errorf("invalid role")
+	}
 }
 
 // ====================================================
@@ -44,4 +71,9 @@ type EventUser struct {
 
 	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	User  User  `gorm:"foreignKey:UserID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+}
+
+type EventUserInput struct {
+	RefID uint64
+	Role  role
 }
