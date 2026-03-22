@@ -42,7 +42,7 @@ func (at AttendanceType) Value() (driver.Value, error) {
 }
 
 func ParseAttendanceType(s string) (AttendanceType, error) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
 	case "ALL":
 		return AttendanceAll, nil
 	case "WHITELIST":
@@ -129,7 +129,7 @@ func (pf ParticipantField) Value() (driver.Value, error) {
 }
 
 func ParseParticipantData(s string) (ParticipantData, error) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
 	case "NAME":
 		return ParticipantName, nil
 	case "ORGANIZATION":
