@@ -8,7 +8,7 @@ type CreateAgendaReq struct {
 
 type ManagerStaffReq struct {
 	RefID uint64 `json:"ref_id" validate:"required"`
-	Role  string `json:"role" validate:"required,oneof=owner staff manager"`
+	Role  string `json:"role" validate:"required,oneof=OWNER STAFF MANAGER"`
 }
 
 type CreateEventReq struct {
@@ -25,9 +25,9 @@ type CreateEventReq struct {
 	LocationLong float64           `json:"location_long"`
 	Agenda       []CreateAgendaReq `json:"agenda" validate:"dive"`
 
-	AttendanceType string   `json:"attendance_type" validate:"required,oneof=all whitelist faculties"`
+	AttendanceType string   `json:"attendance_type" validate:"required,oneof=ALL WHITELIST FACULTIES"`
 	Attendee       []any    `json:"attendee" validate:"required"`
-	RevealedFields []string `json:"revealed_fields" validate:"required,min=1,dive,oneof=name organization refid photo"`
+	RevealedFields []string `json:"revealed_fields" validate:"required,min=1,dive,oneof=NAME ORGANIZATION REFID PHOTO"`
 
 	ManagersAndStaff []ManagerStaffReq `json:"managers_and_staff" validate:"dive"`
 
