@@ -23,6 +23,7 @@ CREATE TABLE "events" (
     "start_time" timestamptz NOT NULL,
     "end_time" timestamptz NOT NULL,
     "location" text NOT NULL,
+    "location_point" point NOT NULL,
     "attendence_type" attendence_type NOT NULL,
     "allow_all_to_scan" boolean NOT NULL,
     "evaluation_form" text,
@@ -93,6 +94,16 @@ CREATE TABLE "event_users" (
     CONSTRAINT "fk_event_users_user" FOREIGN KEY ("user_id") 
         REFERENCES "users"("id") ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT "fk_event_users_event" FOREIGN KEY ("event_id") 
+        REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE "event_whitelist_pendings" (
+    "id" uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    "event_id" uuid NOT NULL,
+    "attendee_ref_id" bigint NOT NULL,
+
+    CONSTRAINT "whitelist_pendings_unique_event_and_ref_id" UNIQUE ("event_id", "attendee_ref_id"),
+    CONSTRAINT "fk_event_whitelist_pendings_event" FOREIGN KEY ("event_id") 
         REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
 
