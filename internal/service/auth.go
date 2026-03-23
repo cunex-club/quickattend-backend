@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cunex-club/quickattend-backend/internal/entity"
-	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
+	"github.com/cunex-club/quickattend-backend/internal/entity"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 )
 
 type AuthService interface {
@@ -101,7 +101,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	tokenValidationUrl := "https://culab-svc.azurewebsites.net/Service.svc/webprofile"
+	tokenValidationUrl := "https://culab-svc.azurewebsites.net/Service.svc/profile"
 
 	req, err := http.NewRequest("GET", tokenValidationUrl, nil)
 	if err != nil {
@@ -148,15 +148,15 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusExpectationFailed {
+	if resp.StatusCode == http.StatusNoContent {
 		return nil, &response.APIError{
 			Code:    response.ErrUnauthorized,
 			Message: "invalid token",
-			Status:  resp.StatusCode,
+			Status:  http.StatusUnauthorized,
 		}
 	}
 
-	var UserData entity.CUNEXUserResponse
+	var UserData entity.CUNEXProfileResponse
 	if err := json.NewDecoder(resp.Body).Decode(&UserData); err != nil {
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
@@ -179,10 +179,10 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		RefID:       convRefId,
 		FirstnameTH: UserData.FirstNameTH,
 		SurnameTH:   UserData.LastNameTH,
-		TitleTH:     "",
-		FirstnameEN: UserData.FirstnameEN,
+		FirstnameEN: UserData.FirstNameEN,
 		SurnameEN:   UserData.LastNameEN,
-		TitleEN:     "",
+		TitleTH:     UserData.TitleNameTH,
+		TitleEN:     UserData.TitleNameEN,
 	}
 
 	// // ### MOCK USER DATA ###

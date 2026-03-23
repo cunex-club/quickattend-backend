@@ -1,13 +1,20 @@
 package entity
 
-type CUNEXUserResponse struct {
-	UserId      string `json:"userId"`
-	UserType    string `json:"userType"`
-	RefId       string `json:"refId"`
-	FirstNameTH string `json:"firstNameTH"`
-	LastNameTH  string `json:"lastNameTH"`
-	FirstnameEN string `json:"firstNameEN"`
-	LastNameEN  string `json:"lastNameEN"`
+type CUNEXProfileResponse struct {
+	Email         *string `json:"email"`
+	FacultyCode   string  `json:"facultyCode"`
+	FacultyNameEN string  `json:"facultyNameEN"`
+	FacultyNameTH string  `json:"facultyNameTH"`
+	FirstNameEN   string  `json:"firstNameEN"`
+	FirstNameTH   string  `json:"firstNameTH"`
+	LastNameEN    string  `json:"lastNameEN"`
+	LastNameTH    string  `json:"lastNameTH"`
+	RefId         string  `json:"refId"`
+	StudentYear   string  `json:"studentYear"`
+	TitleNameEN   string  `json:"titleNameEN"`
+	TitleNameTH   string  `json:"titleNameTH"`
+	UserId        string  `json:"userId"`
+	UserType      string  `json:"userType"`
 }
 
 type UserTypes string
