@@ -23,6 +23,8 @@ import (
 	"github.com/cunex-club/quickattend-backend/internal/repository"
 )
 
+var thaiLoc = time.FixedZone(entity.ThaiTZ, 7*3600)
+
 type EventService interface {
 	DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError
 	DuplicateById(EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
@@ -31,7 +33,10 @@ type EventService interface {
 
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
 
-	GetEventsValidateArgs(userIDStr string, queryParams map[string]string) (validated *GetEventsValidateArgsReturn, err *response.APIError)
+	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error)
+	UpdateEvent(ctx context.Context, id string, userId string, updates dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error)
+
+	GetEventsValidateArgs(userIDStr string, queryParams map[string]string, ctx context.Context) (validated *GetEventsValidateArgsReturn, err *response.APIError)
 	GetMyEventsService(userID datatypes.UUID, search string, ctx context.Context) (res *[]dtoRes.GetEventsRes, err *response.APIError)
 	GetDiscoveryEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetDiscoveryEventsRes, pagination *response.Pagination, err *response.APIError)
 	GetPastEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetEventsRes, pagination *response.Pagination, err *response.APIError)
@@ -400,15 +405,12 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	client := &http.Client{
-		Timeout: time.Second * 10,
-	}
 	req, formNewReqErr := http.NewRequest(http.MethodGet, CUNEXGetQRURL, nil)
 	if formNewReqErr != nil {
 		s.logger.Error().Err(formNewReqErr).Str("Error", "Failed to form new HTTP request for CU NEX GET qrcode")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Failed to perform HTTP request for CU NEX GET qrcode",
+			Message: "Failed to form HTTP request for CU NEX GET qrcode",
 			Status:  500,
 		}
 	}
@@ -420,11 +422,12 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	req.Header.Set("ClientId", clientId)
 	req.Header.Set("ClientSecret", clientSecret)
 
-	resp, doErr := client.Do(req)
+	resp, doErr := s.httpClient.Do(req)
 	if doErr != nil {
+		s.logger.Error().Err(doErr).Msg("Failed to perform request for CU NEX GET qrcode")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Failed to send request for CU NEX GET qrcode",
+			Message: "Failed to perform request for CU NEX GET qrcode",
 			Status:  500,
 		}
 	}
@@ -627,7 +630,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 
 	for _, field := range event.RevealedFields {
 		switch field {
-		case entity.NAME:
+		case entity.ParticipantName:
 			responseBody.FirstnameTH = &CUNEXSuccess.FirstNameTH
 			responseBody.FirstnameEN = &CUNEXSuccess.FirstNameEN
 			responseBody.TitleTH = &user.TitleTH
@@ -635,14 +638,14 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 			responseBody.SurnameEN = &CUNEXSuccess.LastNameEN
 			responseBody.TitleEN = &user.TitleEN
 
-		case entity.ORGANIZATION:
+		case entity.ParticipantOrganization:
 			responseBody.OrganizationTH = &orgTH
 			responseBody.OrganizationEN = &orgEN
 
-		case entity.PHOTO:
+		case entity.ParticipantPhoto:
 			responseBody.ProfileImageUrl = &CUNEXSuccess.ProfileImageUrl
 
-		case entity.REFID:
+		case entity.ParticipantRefID:
 			temp := s.FormatRefIdToStr(refIdUInt)
 			responseBody.RefID = &temp
 		}
@@ -672,7 +675,7 @@ func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID
 	}
 
 	// If FACULTIES or WHITELIST, must check for access
-	if attendanceType == string(entity.FACULTIES) || attendanceType == string(entity.WHITELIST) {
+	if attendanceType == string(entity.AttendanceFaculties) || attendanceType == string(entity.AttendanceWhitelist) {
 		allow, err := s.repo.Event.CheckEventAccess(ctx, orgCode, participantRefId, attendanceType, eventId)
 		if err != nil {
 			s.logger.Error().Err(err).
@@ -790,7 +793,7 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 	return &finalRes, nil
 }
 
-func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string]string) (validated *GetEventsValidateArgsReturn, err *response.APIError) {
+func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string]string, ctx context.Context) (validated *GetEventsValidateArgsReturn, err *response.APIError) {
 	uuidValidationErr := uuid.Validate(userIDStr)
 	if uuidValidationErr != nil {
 		return nil, &response.APIError{
@@ -800,6 +803,28 @@ func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string
 		}
 	}
 	userID := datatypes.UUID(datatypes.BinUUIDFromString(userIDStr))
+
+	// // User must exist
+	_, userErr := s.repo.Auth.GetUserById(userID, ctx)
+	if userErr != nil {
+		if userErr == gorm.ErrRecordNotFound {
+			return nil, &response.APIError{
+				Code:    response.ErrNotFound,
+				Message: "User not found",
+				Status:  404,
+			}
+		}
+
+		s.logger.Error().Err(userErr).
+			Str("user_id", userIDStr).
+			Str("function", "AuthRepository.GetUserById").
+			Msg(fmt.Sprintf("Internal DB error: %s", userErr.Error()))
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB error on getting user",
+			Status:  500,
+		}
+	}
 
 	pageQuery, pageOk := queryParams["page"]
 	var page int
@@ -1012,21 +1037,323 @@ func (s *service) getEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, r
 	}
 }
 
-// TODO: change rawResult type to the one for discovery, and add lat + long to DTO
-func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetEventsQueryResult, result *[]dtoRes.GetDiscoveryEventsRes) {
-	length := len(*rawResult)
-	if length > 0 {
-		for i := 0; i < length; i++ {
+func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetDiscoveryEvents, result *[]dtoRes.GetDiscoveryEventsRes) {
+	deref := *rawResult
+	if len(deref) > 0 {
+		for i := 0; i < len(deref); i++ {
 			*result = append(*result, dtoRes.GetDiscoveryEventsRes{
-				ID:             (*rawResult)[i].ID.String(),
-				Name:           (*rawResult)[i].Name,
-				Organizer:      (*rawResult)[i].Organizer,
-				Description:    (*rawResult)[i].Description,
-				StartTime:      (*rawResult)[i].StartTime.UTC(),
-				EndTime:        (*rawResult)[i].EndTime.UTC(),
-				Location:       (*rawResult)[i].Location,
-				EvaluationForm: (*rawResult)[i].EvaluationForm,
+				ID:             deref[i].ID.String(),
+				Name:           deref[i].Name,
+				Organizer:      deref[i].Organizer,
+				Description:    deref[i].Description,
+				StartTime:      deref[i].StartTime.UTC(),
+				EndTime:        deref[i].EndTime.UTC(),
+				Location:       deref[i].Location,
+				EvaluationForm: deref[i].EvaluationForm,
+				LocationLat:    deref[i].LocationPoint.Y,
+				LocationLong:   deref[i].LocationPoint.X,
 			})
 		}
 	}
+}
+
+func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error) {
+	payload, err := buildCreateOrUpdatePayload(req)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.Event.CreateEvent(ctx, payload)
+}
+
+func (s *service) UpdateEvent(ctx context.Context, id string, userId string, req dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error) {
+	idUUID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, errors.New("Invalid event id")
+	}
+	userIdUUID, err := uuid.Parse(userId)
+	if err != nil {
+		return nil, errors.New("Invalid user id")
+	}
+
+	role, err := s.repo.Event.GetUserRoleInEvent(idUUID, userIdUUID, ctx)
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+	if role == nil || (*role != string(entity.OWNER) && *role != string(entity.MANAGER)) {
+		return nil, errors.New("Cannot update event; user is not owner or manager")
+	}
+
+	payload, err := buildCreateOrUpdatePayload(dtoReq.CreateEventReq(req))
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.Event.UpdateEvent(ctx, id, payload)
+}
+
+func buildCreateOrUpdatePayload(req dtoReq.CreateEventReq) (entity.CreateEventPayload, error) {
+	if err := validateThaiTimezone(req.Timezone); err != nil {
+		return entity.CreateEventPayload{}, err
+	}
+
+	if req.AllowAllToScan == nil {
+		return entity.CreateEventPayload{}, fmt.Errorf("allow_all_to_scan is required")
+	}
+
+	at, err := entity.ParseAttendanceType(req.AttendanceType)
+	if err != nil {
+		return entity.CreateEventPayload{}, err
+	}
+
+	// Time parsing and validation
+	startTime, err := parseTime(req.StartTime)
+	if err != nil {
+		return entity.CreateEventPayload{}, err
+	}
+	endTime, err := parseTime(req.EndTime)
+	if err != nil {
+		return entity.CreateEventPayload{}, err
+	}
+
+	if !endTime.After(startTime) {
+		return entity.CreateEventPayload{}, fmt.Errorf("end_time must be after start_time")
+	}
+	if !isSameDay(startTime, endTime) {
+		return entity.CreateEventPayload{}, fmt.Errorf("start_time and end_time must be on the same day in timezone %s", entity.ThaiTZ)
+	}
+
+	// attendance_type=all -> attendee must be empty
+	if at == entity.AttendanceAll && len(req.Attendee) != 0 {
+		return entity.CreateEventPayload{}, fmt.Errorf("attendee must be empty when attendance_type=all")
+	}
+
+	revealedFields, err := entity.ParseParticipantFields(req.RevealedFields)
+	if err != nil {
+		return entity.CreateEventPayload{}, err
+	}
+
+	locationPoint := entity.Point{
+		X: req.LocationLat,
+		Y: req.LocationLong,
+	}
+
+	event := entity.Event{
+		Name:        req.Name,
+		Organizer:   req.Organizer,
+		Description: &req.Description,
+
+		StartTime: startTime,
+		EndTime:   endTime,
+
+		Location:       req.Location,
+		LocationPoint:  locationPoint,
+		AttendenceType: at,
+		AllowAllToScan: *req.AllowAllToScan,
+		EvaluationForm: &req.EvaluationForm,
+		RevealedFields: revealedFields,
+	}
+
+	agendas, err := buildAgendas(req.Agenda, startTime, endTime)
+	if err != nil {
+		return entity.CreateEventPayload{}, err
+	}
+
+	whitelist, faculties, err := buildAttendanceTargets(at, req.Attendee)
+	if err != nil {
+		return entity.CreateEventPayload{}, err
+	}
+
+	// managers_and_staff -> EventUsersInput (ref_id + parsed role)
+	eventUsersInput, err := buildEventUsersInput(req.ManagersAndStaff)
+	if err != nil {
+		return entity.CreateEventPayload{}, err
+	}
+
+	return entity.CreateEventPayload{
+		Event:            event,
+		Agendas:          agendas,
+		Whitelist:        whitelist,
+		AllowedFaculties: faculties,
+		EventUsersInput:  eventUsersInput,
+	}, nil
+
+}
+
+func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput, error) {
+	if len(in) == 0 {
+		return nil, nil
+	}
+
+	out := make([]entity.EventUserInput, 0, len(in))
+	seenRole := make(map[uint64]string, len(in)) // ref_id -> role string
+
+	for _, m := range in {
+		r, err := entity.ParseRole(m.Role)
+		if err != nil {
+			return nil, err
+		}
+
+		rs := string(r)
+		if old, ok := seenRole[m.RefID]; ok {
+			if old != rs {
+				return nil, fmt.Errorf("duplicate ref_id with different role in managers_and_staff: %d", m.RefID)
+			}
+			continue
+		}
+
+		seenRole[m.RefID] = rs
+		out = append(out, entity.EventUserInput{
+			RefID: m.RefID,
+			Role:  r,
+		})
+	}
+
+	return out, nil
+}
+
+// validateThaiTimezone enforces client timezone to be Asia/Bangkok only.
+func validateThaiTimezone(tz string) error {
+	if strings.TrimSpace(tz) != entity.ThaiTZ {
+		return fmt.Errorf("timezone must be %s", entity.ThaiTZ)
+	}
+	return nil
+}
+
+// parseTime parses RFC3339 and enforces that it is UTC (Z / +00:00).
+func parseTime(v string) (time.Time, error) {
+	t, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(v))
+	if err != nil {
+		return time.Time{}, err
+	}
+	_, off := t.Zone()
+	if off != 0 {
+		return time.Time{}, fmt.Errorf("time must be UTC (use Z / +00:00)")
+	}
+	return t.UTC(), nil
+}
+
+// isSameDay checks whether two UTC instants are on the same calendar day in Thai timezone.
+func isSameDay(aUTC, bUTC time.Time) bool {
+	a := aUTC.In(thaiLoc)
+	b := bUTC.In(thaiLoc)
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	return ay == by && am == bm && ad == bd
+}
+
+// isSameDay checks whether two UTC instants are on the same calendar day in Thai timezone.
+func buildAgendas(in []dtoReq.CreateAgendaReq, eventStartUTC, eventEndUTC time.Time) ([]entity.EventAgenda, error) {
+	if len(in) == 0 {
+		return nil, nil
+	}
+
+	out := make([]entity.EventAgenda, 0, len(in))
+	for _, a := range in {
+		st, err := parseTime(a.StartTime)
+		if err != nil {
+			return nil, err
+		}
+		et, err := parseTime(a.EndTime)
+		if err != nil {
+			return nil, err
+		}
+
+		if !et.After(st) {
+			return nil, fmt.Errorf("agenda end_time must be after start_time")
+		}
+		if !isSameDay(st, et) {
+			return nil, fmt.Errorf("agenda start_time and end_time must be on the same day in timezone %s", entity.ThaiTZ)
+		}
+		if st.Before(eventStartUTC) || et.After(eventEndUTC) {
+			return nil, fmt.Errorf("agenda time must be within event start_time and end_time")
+		}
+
+		out = append(out, entity.EventAgenda{
+			ActivityName: a.ActivityName,
+			StartTime:    st,
+			EndTime:      et,
+		})
+	}
+	return out, nil
+}
+
+// buildAttendanceTargets converts attendee list into whitelist/faculty rows based on attendance_type.
+func buildAttendanceTargets(at entity.AttendanceType, attendee []any) ([]entity.EventWhitelist, []entity.EventAllowedFaculties, error) {
+	switch at {
+	case entity.AttendanceAll:
+		return nil, nil, nil
+
+	case entity.AttendanceWhitelist:
+		if len(attendee) == 0 {
+			return nil, nil, fmt.Errorf("attendee is required")
+		}
+		out := make([]entity.EventWhitelist, 0, len(attendee))
+		for _, v := range attendee {
+			ref, err := anyToUint64(v)
+			if err != nil {
+				return nil, nil, err
+			}
+			out = append(out, entity.EventWhitelist{AttendeeRefID: ref})
+		}
+		return out, nil, nil
+
+	case entity.AttendanceFaculties:
+		if len(attendee) == 0 {
+			return nil, nil, fmt.Errorf("attendee is required")
+		}
+		out := make([]entity.EventAllowedFaculties, 0, len(attendee))
+		for _, v := range attendee {
+			fno, err := anyToUint8(v)
+			if err != nil {
+				return nil, nil, err
+			}
+			out = append(out, entity.EventAllowedFaculties{FacultyNO: fno})
+		}
+		return nil, out, nil
+
+	default:
+		return nil, nil, fmt.Errorf("invalid attendance_type")
+	}
+}
+
+// anyToUint64 converts JSON number/string into uint64.
+func anyToUint64(v any) (uint64, error) {
+	switch x := v.(type) {
+	case uint64:
+		return x, nil
+	case int:
+		if x < 0 {
+			return 0, fmt.Errorf("invalid number")
+		}
+		return uint64(x), nil
+	case int64:
+		if x < 0 {
+			return 0, fmt.Errorf("invalid number")
+		}
+		return uint64(x), nil
+	case float64:
+		if x < 0 {
+			return 0, fmt.Errorf("invalid number")
+		}
+		return uint64(x), nil
+	case string:
+		u, err := strconv.ParseUint(strings.TrimSpace(x), 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return u, nil
+	default:
+		return 0, fmt.Errorf("invalid type: %T", v)
+	}
+}
+
+// anyToUint8 converts JSON number/string into uint8.
+func anyToUint8(v any) (uint8, error) {
+	u, err := anyToUint64(v)
+	if err != nil {
+		return 0, err
+	}
+	if u > 255 {
+		return 0, fmt.Errorf("out of range")
+	}
+	return uint8(u), nil
 }

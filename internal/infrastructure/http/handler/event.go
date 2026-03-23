@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"errors"
+
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
+	"github.com/cunex-club/quickattend-backend/internal/service"
 	"github.com/gofiber/fiber/v2"
 
 	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
-	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
-	"github.com/cunex-club/quickattend-backend/internal/service"
+	"gorm.io/gorm"
 )
 
 type EventHandler interface {
@@ -15,6 +18,8 @@ type EventHandler interface {
 	PostParticipantHandler(c *fiber.Ctx) error
 	GetOneEventHandler(*fiber.Ctx) error
 	GetEvents(*fiber.Ctx) error
+	CreateEvent(c *fiber.Ctx) error
+	UpdateEvent(c *fiber.Ctx) error
 }
 
 func (h *Handler) Delete(c *fiber.Ctx) error {
@@ -89,7 +94,9 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 		return response.SendError(c, 500, response.ErrInternalError, "Failed to assert user_id as a string")
 	}
 
-	validated, validateErr := h.Service.Event.GetEventsValidateArgs(userIDStr, params)
+	ctx := c.UserContext()
+
+	validated, validateErr := h.Service.Event.GetEventsValidateArgs(userIDStr, params, ctx)
 	if validateErr != nil {
 		return response.SendError(c, validateErr.Status, validateErr.Code, validateErr.Message)
 	}
@@ -101,7 +108,7 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 			Page:     validated.Page,
 			PageSize: validated.PageSize,
 			Search:   validated.Search,
-			Ctx:      c.UserContext(),
+			Ctx:      ctx,
 		}
 
 		res, pag, err := h.Service.Event.GetDiscoveryEventsService(&args)
@@ -116,7 +123,7 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 			Page:     validated.Page,
 			PageSize: validated.PageSize,
 			Search:   validated.Search,
-			Ctx:      c.UserContext(),
+			Ctx:      ctx,
 		}
 
 		res, pag, err := h.Service.Event.GetPastEventsService(&args)
@@ -136,4 +143,48 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 		// Should not happen
 		return response.SendError(c, 500, response.ErrInternalError, "Unknown GetEventsMode from Event service")
 	}
+}
+
+func (h *Handler) CreateEvent(c *fiber.Ctx) error {
+	var req dtoReq.CreateEventReq
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	if err := h.Validator.Struct(req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	res, err := h.Service.Event.CreateEvent(c.Context(), req)
+	if err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
+	}
+
+	return response.Created(c, res)
+}
+
+func (h *Handler) UpdateEvent(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userIdStr, ok := c.Locals("user_id").(string)
+	if !ok {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "expect string user_id in JWT")
+	}
+
+	var req dtoReq.UpdateEventReq
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	if err := h.Validator.Struct(req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	res, err := h.Service.Event.UpdateEvent(c.Context(), id, userIdStr, req)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.SendError(c, fiber.StatusNotFound, response.ErrNotFound, "not found")
+		}
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
+	}
+	return response.OK(c, res)
 }

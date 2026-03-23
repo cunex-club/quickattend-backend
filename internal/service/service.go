@@ -1,15 +1,18 @@
 package service
 
 import (
+	"net/http"
+
 	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/repository"
 	"github.com/rs/zerolog"
 )
 
 type service struct {
-	repo   repository.AllRepo
-	cfg    *config.Config
-	logger *zerolog.Logger
+	repo       repository.AllRepo
+	cfg        *config.Config
+	logger     *zerolog.Logger
+	httpClient *http.Client
 }
 
 type AllOfService struct {
@@ -18,11 +21,12 @@ type AllOfService struct {
 	Event       EventService
 }
 
-func NewService(repo repository.AllRepo, cfg *config.Config, logger *zerolog.Logger) AllOfService {
+func NewService(repo repository.AllRepo, cfg *config.Config, logger *zerolog.Logger, httpClient *http.Client) AllOfService {
 	srv := &service{
-		repo:   repo,
-		cfg:    cfg,
-		logger: logger,
+		repo:       repo,
+		cfg:        cfg,
+		logger:     logger,
+		httpClient: httpClient,
 	}
 
 	return AllOfService{

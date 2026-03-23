@@ -9,6 +9,8 @@ import (
 func SetupRoutes(app *fiber.App, h *handler.AllOfHandler, mw *middleware.Middleware) {
 	api := app.Group("/api")
 
+	AuthRoutes(api, h, mw)
+	EventRoutes(api, h, mw)
 	HealthCheckRoutes(api, h)
 	AuthRoutes(api, h, mw)
 	EventRoutes(api, h, mw)
