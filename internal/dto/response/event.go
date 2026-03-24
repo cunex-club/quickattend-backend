@@ -55,6 +55,8 @@ type GetOneEventRes struct {
 	StartTime       time.Time           `json:"start_time"`
 	EndTime         time.Time           `json:"end_time"`
 	Location        string              `json:"location"`
+	LocationLat     float64             `json:"location_lat"`
+	LocationLong    float64             `json:"location_long"`
 	TotalRegistered uint16              `json:"total_registered"`
 	EvaluationForm  *string             `json:"evaluation_form"`
 	AllowAllToScan  bool                `json:"allow_all_to_scan"`

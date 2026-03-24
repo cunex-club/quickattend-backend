@@ -781,6 +781,8 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		StartTime:       result.StartTime.UTC(),
 		EndTime:         result.EndTime.UTC(),
 		Location:        result.Location,
+		LocationLat:     result.LocationPoint.Y,
+		LocationLong:    result.LocationPoint.X,
 		TotalRegistered: result.TotalRegistered,
 		EvaluationForm:  result.EvaluationForm,
 		AllowAllToScan:  result.AllowAllToScan,
