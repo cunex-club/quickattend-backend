@@ -1,0 +1,30 @@
+type RegistrationSummary {
+  totalEligible: Int!
+  totalStudent: Int!
+  totalStaff: Int!
+  totalAll: Int!
+}
+
+type FacultyStat {
+  organization: String!
+  studentCount: Int!
+  staffCount: Int!
+  totalCount: Int!
+}
+
+type TimeStat {
+  timeBucket: String!
+  studentCount: Int!
+  staffCount: Int!
+  totalCount: Int!
+}
+
+type DashboardReadyData {
+  summary: RegistrationSummary!
+  facultyStats: [FacultyStat!]!
+  timeSeriesStats: [TimeStat!]!
+}
+
+type Query {
+  eventDashboardData(eventId: ID!): DashboardReadyData!
+}
