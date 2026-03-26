@@ -10,48 +10,26 @@ import (
 	"fmt"
 
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/handler/graphql/model"
+	"github.com/google/uuid"
 )
 
-// EventDashboardData is the resolver for the eventDashboardData field.
-func (r *queryResolver) EventDashboardData(ctx context.Context, eventID string) (*model.DashboardReadyData, error) {
-	if r.DashboardReader == nil {
-		return nil, fmt.Errorf("dashboard reader is not configured")
+// RegistrationSummary is the resolver for the registrationSummary field.
+func (r *queryResolver) RegistrationSummary(ctx context.Context, eventID string) (*model.RegistrationSummary, error) {
+	parsedEventID, err := uuid.Parse(eventID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid event id: %w", err)
 	}
 
-	data, err := r.DashboardReader.GetEventDashboardData(ctx, eventID)
+	data, err := r.Service.Dashboard.GetRegistrationSummary(ctx, parsedEventID)
 	if err != nil {
 		return nil, err
 	}
 
-	facultyStats := make([]*model.FacultyStat, 0, len(data.FacultyStats))
-	for _, item := range data.FacultyStats {
-		facultyStats = append(facultyStats, &model.FacultyStat{
-			Organization: item.Organization,
-			StudentCount: item.StudentCount,
-			StaffCount:   item.StaffCount,
-			TotalCount:   item.TotalCount,
-		})
-	}
-
-	timeSeriesStats := make([]*model.TimeStat, 0, len(data.TimeSeriesStats))
-	for _, item := range data.TimeSeriesStats {
-		timeSeriesStats = append(timeSeriesStats, &model.TimeStat{
-			TimeBucket:   item.TimeBucket,
-			StudentCount: item.StudentCount,
-			StaffCount:   item.StaffCount,
-			TotalCount:   item.TotalCount,
-		})
-	}
-
-	return &model.DashboardReadyData{
-		Summary: &model.RegistrationSummary{
-			TotalEligible: data.Summary.TotalEligible,
-			TotalStudent:  data.Summary.TotalStudent,
-			TotalStaff:    data.Summary.TotalStaff,
-			TotalAll:      data.Summary.TotalAll,
-		},
-		FacultyStats:    facultyStats,
-		TimeSeriesStats: timeSeriesStats,
+	return &model.RegistrationSummary{
+		TotalEligible: data.TotalEligible,
+		TotalStudent:  data.TotalStudent,
+		TotalStaff:    data.TotalStaff,
+		TotalAll:      data.TotalAll,
 	}, nil
 }
 

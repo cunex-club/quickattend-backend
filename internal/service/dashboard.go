@@ -3,37 +3,19 @@ package service
 import (
 	"context"
 
-	gql "github.com/cunex-club/quickattend-backend/internal/infrastructure/http/handler/graphql"
+	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
+	"github.com/google/uuid"
 )
 
 type DashboardService interface {
-	GetEventDashboardData(eventID string, ctx context.Context) (*gql.DashboardReadyDataDTO, error)
+	GetRegistrationSummary(ctx context.Context, eventID uuid.UUID) (*dtoRes.RegistrationSummary, error)
 }
 
-func (s *service) GetEventDashboardData(eventID string, ctx context.Context) (*gql.DashboardReadyDataDTO, error) {
-	// Fetch event details
-	return &gql.DashboardReadyDataDTO{
-		Summary: gql.RegistrationSummaryDTO{
-			TotalEligible: 100,
-			TotalStudent:  70,
-			TotalStaff:    30,
-			TotalAll:      100,
-		},
-		FacultyStats: []gql.FacultyStatDTO{
-			{
-				Organization: "Engineering",
-				StudentCount: 50,
-				StaffCount:   10,
-				TotalCount:   60,
-			},
-		},
-		TimeSeriesStats: []gql.TimeStatDTO{
-			{
-				TimeBucket:   "16:00",
-				StudentCount: 20,
-				StaffCount:   5,
-				TotalCount:   25,
-			},
-		},
-	}, nil
+func (s *service) GetRegistrationSummary(ctx context.Context, eventID uuid.UUID) (*dtoRes.RegistrationSummary, error) {
+	data, err := s.repo.Dashboard.GetRegistrationSummary(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
+
