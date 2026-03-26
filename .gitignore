@@ -36,3 +36,6 @@ tmp
 .air.toml
 
 .DS_Store
+
+# Added by goreleaser init:
+dist/

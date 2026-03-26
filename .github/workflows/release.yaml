@@ -1,0 +1,41 @@
+name: Release Pipeline
+
+permissions:
+  contents: write
+  packages: write
+  issues: write
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - v*
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yaml
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
