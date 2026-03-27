@@ -38,3 +38,6 @@ tmp
 .DS_Store
 
 server
+
+# Added by goreleaser init:
+dist/

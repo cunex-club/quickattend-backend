@@ -1,0 +1,33 @@
+name: Build and Test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches-ignore: [main]
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-test:
+    concurrency:
+      group: build-test-${{ github.action_ref }}
+      cancel-in-progress: true
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+
+      - name: Install dependencies
+        run: go mod tidy
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build application
+        run: go build -o app ./cmd/server
