@@ -1,24 +1,89 @@
 package handler
 
 import (
+	"errors"
+
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
+	"github.com/cunex-club/quickattend-backend/internal/service"
 	"github.com/gofiber/fiber/v2"
+
+	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
+	"gorm.io/gorm"
 )
 
 type EventHandler interface {
+	Delete(c *fiber.Ctx) error
+	Duplicate(c *fiber.Ctx) error
+	Comment(c *fiber.Ctx) error
+	PostParticipantHandler(c *fiber.Ctx) error
 	GetOneEventHandler(*fiber.Ctx) error
 	GetEvents(*fiber.Ctx) error
+	CreateEvent(c *fiber.Ctx) error
+	UpdateEvent(c *fiber.Ctx) error
+}
+
+func (h *Handler) Delete(c *fiber.Ctx) error {
+	EventID := c.Params("id")
+	userIDStr := c.Locals("user_id").(string)
+
+	err := h.Service.Event.DeleteById(EventID, userIDStr, c.UserContext())
+	if err != nil {
+		return response.SendError(c, err.Status, err.Code, err.Message)
+	}
+	return response.Deleted(c, nil)
 }
 
 func (h *Handler) GetOneEventHandler(c *fiber.Ctx) error {
 	eventIdStr := c.Params("id")
 	userIdStr := c.Locals("user_id").(string)
-
 	res, err := h.Service.Event.GetOneEventService(eventIdStr, userIdStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
+	return response.OK(c, res)
+}
 
+func (h *Handler) Duplicate(c *fiber.Ctx) error {
+	EventID := c.Params("id")
+	userIDStr := c.Locals("user_id").(string)
+
+	res, err := h.Service.Event.DuplicateById(EventID, userIDStr, c.UserContext())
+	if err != nil {
+		return response.SendError(c, err.Status, err.Code, err.Message)
+	}
+
+	return response.Created(c, res)
+}
+
+func (h *Handler) Comment(c *fiber.Ctx) error {
+	var req dtoReq.CommentReq
+
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, 400, response.ErrBadRequest, "invalid JSON body")
+	}
+
+	err := h.Service.Event.Comment(req, c.UserContext())
+	if err != nil {
+		return response.SendError(c, err.Status, err.Code, err.Message)
+	}
+
+	return nil
+}
+
+func (h *Handler) PostParticipantHandler(c *fiber.Ctx) error {
+	code := c.Params("qrcode")
+	userId := c.Locals("user_id").(string)
+
+	var reqBody dtoReq.PostParticipantReqBody
+	parseBodyErr := c.BodyParser(&reqBody)
+	if parseBodyErr != nil {
+		return response.SendError(c, 400, response.ErrBadRequest, "Invalid request body")
+	}
+
+	res, serviceErr := h.Service.Event.PostParticipantService(code, reqBody.EventId, userId, reqBody.ScannedLocationX, reqBody.ScannedLocationY, c.UserContext())
+	if serviceErr != nil {
+		return response.SendError(c, serviceErr.Status, serviceErr.Code, serviceErr.Message)
+	}
 	return response.OK(c, res)
 }
 
@@ -29,13 +94,97 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 		return response.SendError(c, 500, response.ErrInternalError, "Failed to assert user_id as a string")
 	}
 
-	res, pagination, err := h.Service.Event.GetEventsService(userIDStr, params, c.UserContext())
-	if err != nil {
-		return response.SendError(c, err.Status, err.Code, err.Message)
+	ctx := c.UserContext()
+
+	validated, validateErr := h.Service.Event.GetEventsValidateArgs(userIDStr, params, ctx)
+	if validateErr != nil {
+		return response.SendError(c, validateErr.Status, validateErr.Code, validateErr.Message)
 	}
 
-	if pagination != nil {
-		return response.Paginated(c, res, *pagination)
+	switch validated.MyEvents {
+	case service.Discovery:
+		args := service.GetEventsWithPaginationArgs{
+			UserID:   validated.UserID,
+			Page:     validated.Page,
+			PageSize: validated.PageSize,
+			Search:   validated.Search,
+			Ctx:      ctx,
+		}
+
+		res, pag, err := h.Service.Event.GetDiscoveryEventsService(&args)
+		if err != nil {
+			return response.SendError(c, err.Status, err.Code, err.Message)
+		}
+		return response.Paginated(c, res, *pag)
+
+	case service.PastEvents:
+		args := service.GetEventsWithPaginationArgs{
+			UserID:   validated.UserID,
+			Page:     validated.Page,
+			PageSize: validated.PageSize,
+			Search:   validated.Search,
+			Ctx:      ctx,
+		}
+
+		res, pag, err := h.Service.Event.GetPastEventsService(&args)
+		if err != nil {
+			return response.SendError(c, err.Status, err.Code, err.Message)
+		}
+		return response.Paginated(c, res, *pag)
+
+	case service.MyEvents:
+		res, err := h.Service.Event.GetMyEventsService(validated.UserID, validated.Search, c.UserContext())
+		if err != nil {
+			return response.SendError(c, err.Status, err.Code, err.Message)
+		}
+		return response.OK(c, res)
+
+	default:
+		// Should not happen
+		return response.SendError(c, 500, response.ErrInternalError, "Unknown GetEventsMode from Event service")
+	}
+}
+
+func (h *Handler) CreateEvent(c *fiber.Ctx) error {
+	var req dtoReq.CreateEventReq
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	if err := h.Validator.Struct(req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	res, err := h.Service.Event.CreateEvent(c.Context(), req)
+	if err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
+	}
+
+	return response.Created(c, res)
+}
+
+func (h *Handler) UpdateEvent(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userIdStr, ok := c.Locals("user_id").(string)
+	if !ok {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "expect string user_id in JWT")
+	}
+
+	var req dtoReq.UpdateEventReq
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	if err := h.Validator.Struct(req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
+	}
+
+	res, err := h.Service.Event.UpdateEvent(c.Context(), id, userIdStr, req)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.SendError(c, fiber.StatusNotFound, response.ErrNotFound, "not found")
+		}
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
 	}
 	return response.OK(c, res)
 }

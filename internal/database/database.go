@@ -3,11 +3,12 @@ package database
 import (
 	"fmt"
 
-	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+
+	"github.com/cunex-club/quickattend-backend/internal/config"
 )
 
 var logger = log.With().Str("module", "database").Logger()
@@ -24,6 +25,12 @@ func Connect(config config.DatabaseConfig) (*gorm.DB, error) {
 	})
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to connect to database")
+		return nil, err
+	}
+
+	err = db.Exec("CREATE EXTENSION IF NOT EXISTS \"pg_trgm\";").Error
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to create pg_trgm extension")
 		return nil, err
 	}
 

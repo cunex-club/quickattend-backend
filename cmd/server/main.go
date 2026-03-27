@@ -1,6 +1,9 @@
 package main
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/cunex-club/quickattend-backend/internal/config"
 	"github.com/cunex-club/quickattend-backend/internal/database"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/handler"
@@ -9,6 +12,7 @@ import (
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/logger"
 	"github.com/cunex-club/quickattend-backend/internal/repository"
 	"github.com/cunex-club/quickattend-backend/internal/service"
+	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/joho/godotenv"
@@ -29,8 +33,8 @@ func main() {
 	log.Info().Msg("Successfully connected to the database")
 
 	repos := repository.NewRepository(db)
-	services := service.NewService(repos, cfg, &log.Logger)
-	handlers := handler.NewHandler(&services, &log.Logger)
+	services := service.NewService(repos, cfg, &log.Logger, &http.Client{Timeout: 10 * time.Second})
+	handlers := handler.NewHandler(&services, &log.Logger, validator.New())
 
 	app := fiber.New()
 

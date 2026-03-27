@@ -2,12 +2,14 @@ package handler
 
 import (
 	"github.com/cunex-club/quickattend-backend/internal/service"
+	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog"
 )
 
 type Handler struct {
-	Service *service.AllOfService
-	Logger  *zerolog.Logger
+	Service   *service.AllOfService
+	Logger    *zerolog.Logger
+	Validator *validator.Validate
 }
 
 type AllOfHandler struct {
@@ -16,10 +18,11 @@ type AllOfHandler struct {
 	EventHandler       EventHandler
 }
 
-func NewHandler(srv *service.AllOfService, logger *zerolog.Logger) *AllOfHandler {
+func NewHandler(srv *service.AllOfService, logger *zerolog.Logger, validator *validator.Validate) *AllOfHandler {
 	h := &Handler{
-		Service: srv,
-		Logger:  logger,
+		Service:   srv,
+		Logger:    logger,
+		Validator: validator,
 	}
 	return &AllOfHandler{
 		HealthCheckHandler: h,

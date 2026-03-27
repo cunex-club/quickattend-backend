@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cunex-club/quickattend-backend/internal/entity"
-	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
+	"github.com/cunex-club/quickattend-backend/internal/entity"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 )
 
 type AuthService interface {
@@ -69,47 +69,28 @@ func (s *service) GetUserService(userIDStr string, ctx context.Context) (*dtoRes
 }
 
 func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) (*entity.User, *response.APIError) {
-	foundUser, findErr := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
-	if findErr == nil {
-		return &foundUser, nil
+	existing, err := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
+	if err == nil {
+		return &existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		s.logger.Error().Err(err).Uint64("user_ref_id", user.RefID).Str("action", "query_user").Msg("query_user failed")
+		return nil, &response.APIError{Code: response.ErrInternalError, Message: "internal db error", Status: 500}
 	}
 
-	if !errors.Is(findErr, gorm.ErrRecordNotFound) {
-		s.logger.Error().
-			Err(findErr).
-			Uint64("user_ref_id", user.RefID).
-			Str("action", "query_user").
-			Msg("service failed to query user by ref_id")
-
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "internal db error",
-			Status:  500,
-		}
-	}
-
-	createdUser, createErr := s.repo.Auth.CreateUser(user, ctx)
+	created, createErr := s.repo.Auth.CreateUser(user, ctx)
 	if createErr != nil {
 		if errors.Is(createErr, gorm.ErrDuplicatedKey) {
-			existingUser, _ := s.repo.Auth.GetUserById(user.ID, ctx)
-			return &existingUser, nil
+			ex, _ := s.repo.Auth.GetUserByRefId(user.RefID, ctx)
+			return &ex, nil
 		}
-
-		s.logger.Error().
-			Err(createErr).
-			Uint64("user_ref_id", user.RefID).
-			Str("action", "create_user").
-			Msg("service failed to create user")
-
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "failed to create user",
-			Status:  500,
-		}
+		s.logger.Error().Err(createErr).Uint64("user_ref_id", user.RefID).Str("action", "create_user").Msg("create_user failed")
+		return nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to create user", Status: 500}
 	}
 
-	return createdUser, nil
+	return created, nil
 }
+
 
 func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.VerifyTokenRes, *response.APIError) {
 	if strings.TrimSpace(token) == "" {
@@ -120,9 +101,8 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	tokenValidationUrl := ""
+	tokenValidationUrl := "https://culab-svc.azurewebsites.net/Service.svc/profile"
 
-	client := &http.Client{}
 	req, err := http.NewRequest("GET", tokenValidationUrl, nil)
 	if err != nil {
 		return nil, &response.APIError{
@@ -158,7 +138,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	q.Add("token", token)
 	req.URL.RawQuery = q.Encode()
 
-	resp, err := client.Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
@@ -168,15 +148,15 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusExpectationFailed {
+	if resp.StatusCode == http.StatusNoContent {
 		return nil, &response.APIError{
 			Code:    response.ErrUnauthorized,
 			Message: "invalid token",
-			Status:  resp.StatusCode,
+			Status:  http.StatusUnauthorized,
 		}
 	}
 
-	var UserData entity.CUNEXUserResponse
+	var UserData entity.CUNEXProfileResponse
 	if err := json.NewDecoder(resp.Body).Decode(&UserData); err != nil {
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
@@ -199,13 +179,13 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		RefID:       convRefId,
 		FirstnameTH: UserData.FirstNameTH,
 		SurnameTH:   UserData.LastNameTH,
-		TitleTH:     "",
-		FirstnameEN: UserData.FirstnameEN,
+		FirstnameEN: UserData.FirstNameEN,
 		SurnameEN:   UserData.LastNameEN,
-		TitleEN:     "",
+		TitleTH:     UserData.TitleNameTH,
+		TitleEN:     UserData.TitleNameEN,
 	}
 
-	// ### MOCK USER DATA ###
+	// // ### MOCK USER DATA ###
 	// User := entity.User{
 	// 	RefID:       987654321,
 	// 	FirstnameTH: "AB",
@@ -223,6 +203,14 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 			Message: createdUserErr.Message,
 			Status:  createdUserErr.Status,
 		}
+	}
+
+	if err := s.repo.Auth.SyncWhitelistPendingToWhitelist(ctx, createdUser.RefID); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", createdUser.RefID).
+			Str("action", "sync_whitelist_pending").
+			Msg("failed to sync whitelist pending to whitelist")
 	}
 
 	var (
