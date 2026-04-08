@@ -17,8 +17,8 @@ func Connect(config config.DatabaseConfig) (*gorm.DB, error) {
 
 	// TODO: Change GORM to preferred library
 	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=Asia/Bangkok",
-		config.Host, config.User, config.Password, config.Name, config.Port)
+		"host=%s user=%s password=%s dbname=%s port=%d sslmode=%s TimeZone=Asia/Bangkok",
+		config.Host, config.User, config.Password, config.Name, config.Port, config.SSLMode)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{TablePrefix: config.Schema + "."},
