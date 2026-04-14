@@ -47,7 +47,7 @@ func main() {
 		mw.RequestLogger(),
 	)
 
-	gqlResolver := &gql.Resolver{}
+	gqlResolver := &gql.Resolver{Service: &services}
 
 	router.SetupRoutes(app, handlers, mw, gqlResolver)
 	log.Info().Msg("Starting server on :8000")
