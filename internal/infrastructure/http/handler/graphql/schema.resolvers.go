@@ -13,23 +13,47 @@ import (
 	"github.com/google/uuid"
 )
 
-// RegistrationSummary is the resolver for the registrationSummary field.
-func (r *queryResolver) RegistrationSummary(ctx context.Context, eventID string) (*model.RegistrationSummary, error) {
+// EventDashboardData is the resolver for the eventDashboardData field.
+func (r *queryResolver) EventDashboardData(ctx context.Context, eventID string) (*model.DashboardReadyData, error) {
 	parsedEventID, err := uuid.Parse(eventID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid event id: %w", err)
 	}
 
-	data, err := r.Service.Dashboard.GetRegistrationSummary(ctx, parsedEventID)
+	data, err := r.Service.Dashboard.GetEventDashboardData(ctx, parsedEventID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &model.RegistrationSummary{
-		TotalEligible: data.TotalEligible,
-		TotalStudent:  data.TotalStudent,
-		TotalStaff:    data.TotalStaff,
-		TotalAll:      data.TotalAll,
+	facultyStats := make([]*model.FacultyStat, 0, len(data.FacultyStats))
+	for _, item := range data.FacultyStats {
+		facultyStats = append(facultyStats, &model.FacultyStat{
+			Organization: item.Organization,
+			StudentCount: item.StudentCount,
+			StaffCount:   item.StaffCount,
+			TotalCount:   item.TotalCount,
+		})
+	}
+
+	timeSeriesStats := make([]*model.TimeStat, 0, len(data.TimeSeriesStats))
+	for _, item := range data.TimeSeriesStats {
+		timeSeriesStats = append(timeSeriesStats, &model.TimeStat{
+			TimeBucket:   item.TimeBucket,
+			StudentCount: item.StudentCount,
+			StaffCount:   item.StaffCount,
+			TotalCount:   item.TotalCount,
+		})
+	}
+
+	return &model.DashboardReadyData{
+		Summary: &model.RegistrationSummary{
+			TotalEligible: data.Summary.TotalEligible,
+			TotalStudent:  data.Summary.TotalStudent,
+			TotalStaff:    data.Summary.TotalStaff,
+			TotalAll:      data.Summary.TotalAll,
+		},
+		FacultyStats:    facultyStats,
+		TimeSeriesStats: timeSeriesStats,
 	}, nil
 }
 

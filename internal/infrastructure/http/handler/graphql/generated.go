@@ -35,8 +35,21 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	DashboardReadyData struct {
+		FacultyStats    func(childComplexity int) int
+		Summary         func(childComplexity int) int
+		TimeSeriesStats func(childComplexity int) int
+	}
+
+	FacultyStat struct {
+		Organization func(childComplexity int) int
+		StaffCount   func(childComplexity int) int
+		StudentCount func(childComplexity int) int
+		TotalCount   func(childComplexity int) int
+	}
+
 	Query struct {
-		RegistrationSummary func(childComplexity int, eventID string) int
+		EventDashboardData func(childComplexity int, eventID string) int
 	}
 
 	RegistrationSummary struct {
@@ -45,10 +58,17 @@ type ComplexityRoot struct {
 		TotalStaff    func(childComplexity int) int
 		TotalStudent  func(childComplexity int) int
 	}
+
+	TimeStat struct {
+		StaffCount   func(childComplexity int) int
+		StudentCount func(childComplexity int) int
+		TimeBucket   func(childComplexity int) int
+		TotalCount   func(childComplexity int) int
+	}
 }
 
 type QueryResolver interface {
-	RegistrationSummary(ctx context.Context, eventID string) (*model.RegistrationSummary, error)
+	EventDashboardData(ctx context.Context, eventID string) (*model.DashboardReadyData, error)
 }
 
 type executableSchema graphql.ExecutableSchemaState[ResolverRoot, DirectiveRoot, ComplexityRoot]
@@ -65,17 +85,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	_ = ec
 	switch typeName + "." + field {
 
-	case "Query.registrationSummary":
-		if e.ComplexityRoot.Query.RegistrationSummary == nil {
+	case "DashboardReadyData.facultyStats":
+		if e.ComplexityRoot.DashboardReadyData.FacultyStats == nil {
 			break
 		}
 
-		args, err := ec.field_Query_registrationSummary_args(ctx, rawArgs)
+		return e.ComplexityRoot.DashboardReadyData.FacultyStats(childComplexity), true
+	case "DashboardReadyData.summary":
+		if e.ComplexityRoot.DashboardReadyData.Summary == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DashboardReadyData.Summary(childComplexity), true
+	case "DashboardReadyData.timeSeriesStats":
+		if e.ComplexityRoot.DashboardReadyData.TimeSeriesStats == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DashboardReadyData.TimeSeriesStats(childComplexity), true
+
+	case "FacultyStat.organization":
+		if e.ComplexityRoot.FacultyStat.Organization == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FacultyStat.Organization(childComplexity), true
+	case "FacultyStat.staffCount":
+		if e.ComplexityRoot.FacultyStat.StaffCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FacultyStat.StaffCount(childComplexity), true
+	case "FacultyStat.studentCount":
+		if e.ComplexityRoot.FacultyStat.StudentCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FacultyStat.StudentCount(childComplexity), true
+	case "FacultyStat.totalCount":
+		if e.ComplexityRoot.FacultyStat.TotalCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FacultyStat.TotalCount(childComplexity), true
+
+	case "Query.eventDashboardData":
+		if e.ComplexityRoot.Query.EventDashboardData == nil {
+			break
+		}
+
+		args, err := ec.field_Query_eventDashboardData_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.RegistrationSummary(childComplexity, args["eventID"].(string)), true
+		return e.ComplexityRoot.Query.EventDashboardData(childComplexity, args["eventID"].(string)), true
 
 	case "RegistrationSummary.totalAll":
 		if e.ComplexityRoot.RegistrationSummary.TotalAll == nil {
@@ -101,6 +165,31 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.RegistrationSummary.TotalStudent(childComplexity), true
+
+	case "TimeStat.staffCount":
+		if e.ComplexityRoot.TimeStat.StaffCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeStat.StaffCount(childComplexity), true
+	case "TimeStat.studentCount":
+		if e.ComplexityRoot.TimeStat.StudentCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeStat.StudentCount(childComplexity), true
+	case "TimeStat.timeBucket":
+		if e.ComplexityRoot.TimeStat.TimeBucket == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeStat.TimeBucket(childComplexity), true
+	case "TimeStat.totalCount":
+		if e.ComplexityRoot.TimeStat.TotalCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeStat.TotalCount(childComplexity), true
 
 	}
 	return 0, false
@@ -199,10 +288,10 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_registrationSummary_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Query_eventDashboardData_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "eventID", ec.unmarshalNString2string)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "eventID", ec.unmarshalNID2string)
 	if err != nil {
 		return nil, err
 	}
@@ -262,15 +351,14 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
-func (ec *executionContext) _Query_registrationSummary(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _DashboardReadyData_summary(ctx context.Context, field graphql.CollectedField, obj *model.DashboardReadyData) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_Query_registrationSummary,
+		ec.fieldContext_DashboardReadyData_summary,
 		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().RegistrationSummary(ctx, fc.Args["eventID"].(string))
+			return obj.Summary, nil
 		},
 		nil,
 		ec.marshalNRegistrationSummary2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationSummary,
@@ -279,12 +367,12 @@ func (ec *executionContext) _Query_registrationSummary(ctx context.Context, fiel
 	)
 }
 
-func (ec *executionContext) fieldContext_Query_registrationSummary(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_DashboardReadyData_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "Query",
+		Object:     "DashboardReadyData",
 		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "totalEligible":
@@ -299,6 +387,238 @@ func (ec *executionContext) fieldContext_Query_registrationSummary(ctx context.C
 			return nil, fmt.Errorf("no field named %q was found under type RegistrationSummary", field.Name)
 		},
 	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DashboardReadyData_facultyStats(ctx context.Context, field graphql.CollectedField, obj *model.DashboardReadyData) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DashboardReadyData_facultyStats,
+		func(ctx context.Context) (any, error) {
+			return obj.FacultyStats, nil
+		},
+		nil,
+		ec.marshalNFacultyStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStatᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DashboardReadyData_facultyStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DashboardReadyData",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "organization":
+				return ec.fieldContext_FacultyStat_organization(ctx, field)
+			case "studentCount":
+				return ec.fieldContext_FacultyStat_studentCount(ctx, field)
+			case "staffCount":
+				return ec.fieldContext_FacultyStat_staffCount(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_FacultyStat_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FacultyStat", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DashboardReadyData_timeSeriesStats(ctx context.Context, field graphql.CollectedField, obj *model.DashboardReadyData) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_DashboardReadyData_timeSeriesStats,
+		func(ctx context.Context) (any, error) {
+			return obj.TimeSeriesStats, nil
+		},
+		nil,
+		ec.marshalNTimeStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeStatᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_DashboardReadyData_timeSeriesStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DashboardReadyData",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "timeBucket":
+				return ec.fieldContext_TimeStat_timeBucket(ctx, field)
+			case "studentCount":
+				return ec.fieldContext_TimeStat_studentCount(ctx, field)
+			case "staffCount":
+				return ec.fieldContext_TimeStat_staffCount(ctx, field)
+			case "totalCount":
+				return ec.fieldContext_TimeStat_totalCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeStat", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FacultyStat_organization(ctx context.Context, field graphql.CollectedField, obj *model.FacultyStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FacultyStat_organization,
+		func(ctx context.Context) (any, error) {
+			return obj.Organization, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FacultyStat_organization(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FacultyStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FacultyStat_studentCount(ctx context.Context, field graphql.CollectedField, obj *model.FacultyStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FacultyStat_studentCount,
+		func(ctx context.Context) (any, error) {
+			return obj.StudentCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FacultyStat_studentCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FacultyStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FacultyStat_staffCount(ctx context.Context, field graphql.CollectedField, obj *model.FacultyStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FacultyStat_staffCount,
+		func(ctx context.Context) (any, error) {
+			return obj.StaffCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FacultyStat_staffCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FacultyStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FacultyStat_totalCount(ctx context.Context, field graphql.CollectedField, obj *model.FacultyStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FacultyStat_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FacultyStat_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FacultyStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_eventDashboardData(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_eventDashboardData,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().EventDashboardData(ctx, fc.Args["eventID"].(string))
+		},
+		nil,
+		ec.marshalNDashboardReadyData2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐDashboardReadyData,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_eventDashboardData(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "summary":
+				return ec.fieldContext_DashboardReadyData_summary(ctx, field)
+			case "facultyStats":
+				return ec.fieldContext_DashboardReadyData_facultyStats(ctx, field)
+			case "timeSeriesStats":
+				return ec.fieldContext_DashboardReadyData_timeSeriesStats(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DashboardReadyData", field.Name)
+		},
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			err = ec.Recover(ctx, r)
@@ -306,7 +626,7 @@ func (ec *executionContext) fieldContext_Query_registrationSummary(ctx context.C
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_registrationSummary_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Query_eventDashboardData_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -431,9 +751,9 @@ func (ec *executionContext) _RegistrationSummary_totalEligible(ctx context.Conte
 			return obj.TotalEligible, nil
 		},
 		nil,
-		ec.marshalNInt2int,
+		ec.marshalOInt2ᚖint,
 		true,
-		true,
+		false,
 	)
 }
 
@@ -527,6 +847,122 @@ func (ec *executionContext) _RegistrationSummary_totalAll(ctx context.Context, f
 func (ec *executionContext) fieldContext_RegistrationSummary_totalAll(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "RegistrationSummary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeStat_timeBucket(ctx context.Context, field graphql.CollectedField, obj *model.TimeStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeStat_timeBucket,
+		func(ctx context.Context) (any, error) {
+			return obj.TimeBucket, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeStat_timeBucket(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeStat_studentCount(ctx context.Context, field graphql.CollectedField, obj *model.TimeStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeStat_studentCount,
+		func(ctx context.Context) (any, error) {
+			return obj.StudentCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeStat_studentCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeStat_staffCount(ctx context.Context, field graphql.CollectedField, obj *model.TimeStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeStat_staffCount,
+		func(ctx context.Context) (any, error) {
+			return obj.StaffCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeStat_staffCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeStat_totalCount(ctx context.Context, field graphql.CollectedField, obj *model.TimeStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeStat_totalCount,
+		func(ctx context.Context) (any, error) {
+			return obj.TotalCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeStat_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeStat",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1991,6 +2427,109 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** object.gotpl ****************************
 
+var dashboardReadyDataImplementors = []string{"DashboardReadyData"}
+
+func (ec *executionContext) _DashboardReadyData(ctx context.Context, sel ast.SelectionSet, obj *model.DashboardReadyData) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, dashboardReadyDataImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DashboardReadyData")
+		case "summary":
+			out.Values[i] = ec._DashboardReadyData_summary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "facultyStats":
+			out.Values[i] = ec._DashboardReadyData_facultyStats(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "timeSeriesStats":
+			out.Values[i] = ec._DashboardReadyData_timeSeriesStats(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var facultyStatImplementors = []string{"FacultyStat"}
+
+func (ec *executionContext) _FacultyStat(ctx context.Context, sel ast.SelectionSet, obj *model.FacultyStat) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, facultyStatImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FacultyStat")
+		case "organization":
+			out.Values[i] = ec._FacultyStat_organization(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "studentCount":
+			out.Values[i] = ec._FacultyStat_studentCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "staffCount":
+			out.Values[i] = ec._FacultyStat_staffCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._FacultyStat_totalCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -2010,7 +2549,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
-		case "registrationSummary":
+		case "eventDashboardData":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -2019,7 +2558,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_registrationSummary(ctx, field)
+				res = ec._Query_eventDashboardData(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -2076,9 +2615,6 @@ func (ec *executionContext) _RegistrationSummary(ctx context.Context, sel ast.Se
 			out.Values[i] = graphql.MarshalString("RegistrationSummary")
 		case "totalEligible":
 			out.Values[i] = ec._RegistrationSummary_totalEligible(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
 		case "totalStudent":
 			out.Values[i] = ec._RegistrationSummary_totalStudent(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -2091,6 +2627,60 @@ func (ec *executionContext) _RegistrationSummary(ctx context.Context, sel ast.Se
 			}
 		case "totalAll":
 			out.Values[i] = ec._RegistrationSummary_totalAll(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var timeStatImplementors = []string{"TimeStat"}
+
+func (ec *executionContext) _TimeStat(ctx context.Context, sel ast.SelectionSet, obj *model.TimeStat) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, timeStatImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TimeStat")
+		case "timeBucket":
+			out.Values[i] = ec._TimeStat_timeBucket(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "studentCount":
+			out.Values[i] = ec._TimeStat_studentCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "staffCount":
+			out.Values[i] = ec._TimeStat_staffCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "totalCount":
+			out.Values[i] = ec._TimeStat_totalCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -2468,6 +3058,62 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) marshalNDashboardReadyData2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐDashboardReadyData(ctx context.Context, sel ast.SelectionSet, v model.DashboardReadyData) graphql.Marshaler {
+	return ec._DashboardReadyData(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDashboardReadyData2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐDashboardReadyData(ctx context.Context, sel ast.SelectionSet, v *model.DashboardReadyData) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DashboardReadyData(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNFacultyStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStatᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FacultyStat) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNFacultyStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStat(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNFacultyStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStat(ctx context.Context, sel ast.SelectionSet, v *model.FacultyStat) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FacultyStat(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
+	res, err := graphql.UnmarshalID(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalID(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
 	res, err := graphql.UnmarshalInt(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -2482,10 +3128,6 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 		}
 	}
 	return res
-}
-
-func (ec *executionContext) marshalNRegistrationSummary2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationSummary(ctx context.Context, sel ast.SelectionSet, v model.RegistrationSummary) graphql.Marshaler {
-	return ec._RegistrationSummary(ctx, sel, &v)
 }
 
 func (ec *executionContext) marshalNRegistrationSummary2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationSummary(ctx context.Context, sel ast.SelectionSet, v *model.RegistrationSummary) graphql.Marshaler {
@@ -2512,6 +3154,32 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNTimeStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeStatᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.TimeStat) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNTimeStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeStat(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTimeStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeStat(ctx context.Context, sel ast.SelectionSet, v *model.TimeStat) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TimeStat(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
@@ -2682,6 +3350,24 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	_ = sel
 	_ = ctx
 	res := graphql.MarshalBoolean(*v)
+	return res
+}
+
+func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalInt(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalInt(*v)
 	return res
 }
 

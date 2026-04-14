@@ -8,14 +8,14 @@ import (
 )
 
 type DashboardService interface {
-	GetRegistrationSummary(ctx context.Context, eventID uuid.UUID) (*dtoRes.RegistrationSummary, error)
+	GetEventDashboardData(ctx context.Context, eventID uuid.UUID) (*dtoRes.DashboardReadyData, error)
 }
 
-func (s *service) GetRegistrationSummary(ctx context.Context, eventID uuid.UUID) (*dtoRes.RegistrationSummary, error) {
-	data, err := s.repo.Dashboard.GetRegistrationSummary(ctx, eventID)
+func (s *service) GetEventDashboardData(ctx context.Context, eventID uuid.UUID) (*dtoRes.DashboardReadyData, error) {
+	data, err := s.repo.Dashboard.GetEventDashboardData(ctx, eventID)
 	if err != nil {
 		return nil, err
 	}
+
 	return data, nil
 }
-

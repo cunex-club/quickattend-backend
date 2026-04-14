@@ -2,12 +2,32 @@
 
 package model
 
+type DashboardReadyData struct {
+	Summary         *RegistrationSummary `json:"summary"`
+	FacultyStats    []*FacultyStat       `json:"facultyStats"`
+	TimeSeriesStats []*TimeStat          `json:"timeSeriesStats"`
+}
+
+type FacultyStat struct {
+	Organization string `json:"organization"`
+	StudentCount int    `json:"studentCount"`
+	StaffCount   int    `json:"staffCount"`
+	TotalCount   int    `json:"totalCount"`
+}
+
 type Query struct {
 }
 
 type RegistrationSummary struct {
-	TotalEligible int `json:"totalEligible"`
-	TotalStudent  int `json:"totalStudent"`
-	TotalStaff    int `json:"totalStaff"`
-	TotalAll      int `json:"totalAll"`
+	TotalEligible *int `json:"totalEligible,omitempty"`
+	TotalStudent  int  `json:"totalStudent"`
+	TotalStaff    int  `json:"totalStaff"`
+	TotalAll      int  `json:"totalAll"`
+}
+
+type TimeStat struct {
+	TimeBucket   string `json:"timeBucket"`
+	StudentCount int    `json:"studentCount"`
+	StaffCount   int    `json:"staffCount"`
+	TotalCount   int    `json:"totalCount"`
 }
