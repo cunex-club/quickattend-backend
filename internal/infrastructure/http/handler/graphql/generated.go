@@ -35,13 +35,13 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
-	DashboardReadyData struct {
-		FacultyStats    func(childComplexity int) int
-		Summary         func(childComplexity int) int
-		TimeSeriesStats func(childComplexity int) int
+	EventDashboard struct {
+		OrganizationStats func(childComplexity int) int
+		Summary           func(childComplexity int) int
+		TimeSeriesStats   func(childComplexity int) int
 	}
 
-	FacultyStat struct {
+	OrganizationStat struct {
 		Organization func(childComplexity int) int
 		StaffCount   func(childComplexity int) int
 		StudentCount func(childComplexity int) int
@@ -68,7 +68,7 @@ type ComplexityRoot struct {
 }
 
 type QueryResolver interface {
-	EventDashboardData(ctx context.Context, eventID string) (*model.DashboardReadyData, error)
+	EventDashboardData(ctx context.Context, eventID string) (*model.EventDashboard, error)
 }
 
 type executableSchema graphql.ExecutableSchemaState[ResolverRoot, DirectiveRoot, ComplexityRoot]
@@ -85,49 +85,49 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	_ = ec
 	switch typeName + "." + field {
 
-	case "DashboardReadyData.facultyStats":
-		if e.ComplexityRoot.DashboardReadyData.FacultyStats == nil {
+	case "EventDashboard.organizationStats":
+		if e.ComplexityRoot.EventDashboard.OrganizationStats == nil {
 			break
 		}
 
-		return e.ComplexityRoot.DashboardReadyData.FacultyStats(childComplexity), true
-	case "DashboardReadyData.summary":
-		if e.ComplexityRoot.DashboardReadyData.Summary == nil {
+		return e.ComplexityRoot.EventDashboard.OrganizationStats(childComplexity), true
+	case "EventDashboard.summary":
+		if e.ComplexityRoot.EventDashboard.Summary == nil {
 			break
 		}
 
-		return e.ComplexityRoot.DashboardReadyData.Summary(childComplexity), true
-	case "DashboardReadyData.timeSeriesStats":
-		if e.ComplexityRoot.DashboardReadyData.TimeSeriesStats == nil {
+		return e.ComplexityRoot.EventDashboard.Summary(childComplexity), true
+	case "EventDashboard.timeSeriesStats":
+		if e.ComplexityRoot.EventDashboard.TimeSeriesStats == nil {
 			break
 		}
 
-		return e.ComplexityRoot.DashboardReadyData.TimeSeriesStats(childComplexity), true
+		return e.ComplexityRoot.EventDashboard.TimeSeriesStats(childComplexity), true
 
-	case "FacultyStat.organization":
-		if e.ComplexityRoot.FacultyStat.Organization == nil {
+	case "OrganizationStat.organization":
+		if e.ComplexityRoot.OrganizationStat.Organization == nil {
 			break
 		}
 
-		return e.ComplexityRoot.FacultyStat.Organization(childComplexity), true
-	case "FacultyStat.staffCount":
-		if e.ComplexityRoot.FacultyStat.StaffCount == nil {
+		return e.ComplexityRoot.OrganizationStat.Organization(childComplexity), true
+	case "OrganizationStat.staffCount":
+		if e.ComplexityRoot.OrganizationStat.StaffCount == nil {
 			break
 		}
 
-		return e.ComplexityRoot.FacultyStat.StaffCount(childComplexity), true
-	case "FacultyStat.studentCount":
-		if e.ComplexityRoot.FacultyStat.StudentCount == nil {
+		return e.ComplexityRoot.OrganizationStat.StaffCount(childComplexity), true
+	case "OrganizationStat.studentCount":
+		if e.ComplexityRoot.OrganizationStat.StudentCount == nil {
 			break
 		}
 
-		return e.ComplexityRoot.FacultyStat.StudentCount(childComplexity), true
-	case "FacultyStat.totalCount":
-		if e.ComplexityRoot.FacultyStat.TotalCount == nil {
+		return e.ComplexityRoot.OrganizationStat.StudentCount(childComplexity), true
+	case "OrganizationStat.totalCount":
+		if e.ComplexityRoot.OrganizationStat.TotalCount == nil {
 			break
 		}
 
-		return e.ComplexityRoot.FacultyStat.TotalCount(childComplexity), true
+		return e.ComplexityRoot.OrganizationStat.TotalCount(childComplexity), true
 
 	case "Query.eventDashboardData":
 		if e.ComplexityRoot.Query.EventDashboardData == nil {
@@ -351,12 +351,12 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
-func (ec *executionContext) _DashboardReadyData_summary(ctx context.Context, field graphql.CollectedField, obj *model.DashboardReadyData) (ret graphql.Marshaler) {
+func (ec *executionContext) _EventDashboard_summary(ctx context.Context, field graphql.CollectedField, obj *model.EventDashboard) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_DashboardReadyData_summary,
+		ec.fieldContext_EventDashboard_summary,
 		func(ctx context.Context) (any, error) {
 			return obj.Summary, nil
 		},
@@ -367,9 +367,9 @@ func (ec *executionContext) _DashboardReadyData_summary(ctx context.Context, fie
 	)
 }
 
-func (ec *executionContext) fieldContext_DashboardReadyData_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_EventDashboard_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "DashboardReadyData",
+		Object:     "EventDashboard",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -390,51 +390,51 @@ func (ec *executionContext) fieldContext_DashboardReadyData_summary(_ context.Co
 	return fc, nil
 }
 
-func (ec *executionContext) _DashboardReadyData_facultyStats(ctx context.Context, field graphql.CollectedField, obj *model.DashboardReadyData) (ret graphql.Marshaler) {
+func (ec *executionContext) _EventDashboard_organizationStats(ctx context.Context, field graphql.CollectedField, obj *model.EventDashboard) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_DashboardReadyData_facultyStats,
+		ec.fieldContext_EventDashboard_organizationStats,
 		func(ctx context.Context) (any, error) {
-			return obj.FacultyStats, nil
+			return obj.OrganizationStats, nil
 		},
 		nil,
-		ec.marshalNFacultyStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStatᚄ,
+		ec.marshalNOrganizationStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐOrganizationStatᚄ,
 		true,
 		true,
 	)
 }
 
-func (ec *executionContext) fieldContext_DashboardReadyData_facultyStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_EventDashboard_organizationStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "DashboardReadyData",
+		Object:     "EventDashboard",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "organization":
-				return ec.fieldContext_FacultyStat_organization(ctx, field)
+				return ec.fieldContext_OrganizationStat_organization(ctx, field)
 			case "studentCount":
-				return ec.fieldContext_FacultyStat_studentCount(ctx, field)
+				return ec.fieldContext_OrganizationStat_studentCount(ctx, field)
 			case "staffCount":
-				return ec.fieldContext_FacultyStat_staffCount(ctx, field)
+				return ec.fieldContext_OrganizationStat_staffCount(ctx, field)
 			case "totalCount":
-				return ec.fieldContext_FacultyStat_totalCount(ctx, field)
+				return ec.fieldContext_OrganizationStat_totalCount(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type FacultyStat", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type OrganizationStat", field.Name)
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _DashboardReadyData_timeSeriesStats(ctx context.Context, field graphql.CollectedField, obj *model.DashboardReadyData) (ret graphql.Marshaler) {
+func (ec *executionContext) _EventDashboard_timeSeriesStats(ctx context.Context, field graphql.CollectedField, obj *model.EventDashboard) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_DashboardReadyData_timeSeriesStats,
+		ec.fieldContext_EventDashboard_timeSeriesStats,
 		func(ctx context.Context) (any, error) {
 			return obj.TimeSeriesStats, nil
 		},
@@ -445,9 +445,9 @@ func (ec *executionContext) _DashboardReadyData_timeSeriesStats(ctx context.Cont
 	)
 }
 
-func (ec *executionContext) fieldContext_DashboardReadyData_timeSeriesStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_EventDashboard_timeSeriesStats(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "DashboardReadyData",
+		Object:     "EventDashboard",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -468,12 +468,12 @@ func (ec *executionContext) fieldContext_DashboardReadyData_timeSeriesStats(_ co
 	return fc, nil
 }
 
-func (ec *executionContext) _FacultyStat_organization(ctx context.Context, field graphql.CollectedField, obj *model.FacultyStat) (ret graphql.Marshaler) {
+func (ec *executionContext) _OrganizationStat_organization(ctx context.Context, field graphql.CollectedField, obj *model.OrganizationStat) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_FacultyStat_organization,
+		ec.fieldContext_OrganizationStat_organization,
 		func(ctx context.Context) (any, error) {
 			return obj.Organization, nil
 		},
@@ -484,9 +484,9 @@ func (ec *executionContext) _FacultyStat_organization(ctx context.Context, field
 	)
 }
 
-func (ec *executionContext) fieldContext_FacultyStat_organization(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_OrganizationStat_organization(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "FacultyStat",
+		Object:     "OrganizationStat",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -497,12 +497,12 @@ func (ec *executionContext) fieldContext_FacultyStat_organization(_ context.Cont
 	return fc, nil
 }
 
-func (ec *executionContext) _FacultyStat_studentCount(ctx context.Context, field graphql.CollectedField, obj *model.FacultyStat) (ret graphql.Marshaler) {
+func (ec *executionContext) _OrganizationStat_studentCount(ctx context.Context, field graphql.CollectedField, obj *model.OrganizationStat) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_FacultyStat_studentCount,
+		ec.fieldContext_OrganizationStat_studentCount,
 		func(ctx context.Context) (any, error) {
 			return obj.StudentCount, nil
 		},
@@ -513,9 +513,9 @@ func (ec *executionContext) _FacultyStat_studentCount(ctx context.Context, field
 	)
 }
 
-func (ec *executionContext) fieldContext_FacultyStat_studentCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_OrganizationStat_studentCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "FacultyStat",
+		Object:     "OrganizationStat",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -526,12 +526,12 @@ func (ec *executionContext) fieldContext_FacultyStat_studentCount(_ context.Cont
 	return fc, nil
 }
 
-func (ec *executionContext) _FacultyStat_staffCount(ctx context.Context, field graphql.CollectedField, obj *model.FacultyStat) (ret graphql.Marshaler) {
+func (ec *executionContext) _OrganizationStat_staffCount(ctx context.Context, field graphql.CollectedField, obj *model.OrganizationStat) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_FacultyStat_staffCount,
+		ec.fieldContext_OrganizationStat_staffCount,
 		func(ctx context.Context) (any, error) {
 			return obj.StaffCount, nil
 		},
@@ -542,9 +542,9 @@ func (ec *executionContext) _FacultyStat_staffCount(ctx context.Context, field g
 	)
 }
 
-func (ec *executionContext) fieldContext_FacultyStat_staffCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_OrganizationStat_staffCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "FacultyStat",
+		Object:     "OrganizationStat",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -555,12 +555,12 @@ func (ec *executionContext) fieldContext_FacultyStat_staffCount(_ context.Contex
 	return fc, nil
 }
 
-func (ec *executionContext) _FacultyStat_totalCount(ctx context.Context, field graphql.CollectedField, obj *model.FacultyStat) (ret graphql.Marshaler) {
+func (ec *executionContext) _OrganizationStat_totalCount(ctx context.Context, field graphql.CollectedField, obj *model.OrganizationStat) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
 		ec.OperationContext,
 		field,
-		ec.fieldContext_FacultyStat_totalCount,
+		ec.fieldContext_OrganizationStat_totalCount,
 		func(ctx context.Context) (any, error) {
 			return obj.TotalCount, nil
 		},
@@ -571,9 +571,9 @@ func (ec *executionContext) _FacultyStat_totalCount(ctx context.Context, field g
 	)
 }
 
-func (ec *executionContext) fieldContext_FacultyStat_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_OrganizationStat_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "FacultyStat",
+		Object:     "OrganizationStat",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -595,7 +595,7 @@ func (ec *executionContext) _Query_eventDashboardData(ctx context.Context, field
 			return ec.Resolvers.Query().EventDashboardData(ctx, fc.Args["eventID"].(string))
 		},
 		nil,
-		ec.marshalNDashboardReadyData2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐDashboardReadyData,
+		ec.marshalNEventDashboard2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐEventDashboard,
 		true,
 		true,
 	)
@@ -610,13 +610,13 @@ func (ec *executionContext) fieldContext_Query_eventDashboardData(ctx context.Co
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "summary":
-				return ec.fieldContext_DashboardReadyData_summary(ctx, field)
-			case "facultyStats":
-				return ec.fieldContext_DashboardReadyData_facultyStats(ctx, field)
+				return ec.fieldContext_EventDashboard_summary(ctx, field)
+			case "organizationStats":
+				return ec.fieldContext_EventDashboard_organizationStats(ctx, field)
 			case "timeSeriesStats":
-				return ec.fieldContext_DashboardReadyData_timeSeriesStats(ctx, field)
+				return ec.fieldContext_EventDashboard_timeSeriesStats(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type DashboardReadyData", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type EventDashboard", field.Name)
 		},
 	}
 	defer func() {
@@ -2427,29 +2427,29 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** object.gotpl ****************************
 
-var dashboardReadyDataImplementors = []string{"DashboardReadyData"}
+var eventDashboardImplementors = []string{"EventDashboard"}
 
-func (ec *executionContext) _DashboardReadyData(ctx context.Context, sel ast.SelectionSet, obj *model.DashboardReadyData) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, dashboardReadyDataImplementors)
+func (ec *executionContext) _EventDashboard(ctx context.Context, sel ast.SelectionSet, obj *model.EventDashboard) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, eventDashboardImplementors)
 
 	out := graphql.NewFieldSet(fields)
 	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("DashboardReadyData")
+			out.Values[i] = graphql.MarshalString("EventDashboard")
 		case "summary":
-			out.Values[i] = ec._DashboardReadyData_summary(ctx, field, obj)
+			out.Values[i] = ec._EventDashboard_summary(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "facultyStats":
-			out.Values[i] = ec._DashboardReadyData_facultyStats(ctx, field, obj)
+		case "organizationStats":
+			out.Values[i] = ec._EventDashboard_organizationStats(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "timeSeriesStats":
-			out.Values[i] = ec._DashboardReadyData_timeSeriesStats(ctx, field, obj)
+			out.Values[i] = ec._EventDashboard_timeSeriesStats(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -2476,34 +2476,34 @@ func (ec *executionContext) _DashboardReadyData(ctx context.Context, sel ast.Sel
 	return out
 }
 
-var facultyStatImplementors = []string{"FacultyStat"}
+var organizationStatImplementors = []string{"OrganizationStat"}
 
-func (ec *executionContext) _FacultyStat(ctx context.Context, sel ast.SelectionSet, obj *model.FacultyStat) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, facultyStatImplementors)
+func (ec *executionContext) _OrganizationStat(ctx context.Context, sel ast.SelectionSet, obj *model.OrganizationStat) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, organizationStatImplementors)
 
 	out := graphql.NewFieldSet(fields)
 	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("FacultyStat")
+			out.Values[i] = graphql.MarshalString("OrganizationStat")
 		case "organization":
-			out.Values[i] = ec._FacultyStat_organization(ctx, field, obj)
+			out.Values[i] = ec._OrganizationStat_organization(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "studentCount":
-			out.Values[i] = ec._FacultyStat_studentCount(ctx, field, obj)
+			out.Values[i] = ec._OrganizationStat_studentCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "staffCount":
-			out.Values[i] = ec._FacultyStat_staffCount(ctx, field, obj)
+			out.Values[i] = ec._OrganizationStat_staffCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		case "totalCount":
-			out.Values[i] = ec._FacultyStat_totalCount(ctx, field, obj)
+			out.Values[i] = ec._OrganizationStat_totalCount(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -3058,44 +3058,18 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) marshalNDashboardReadyData2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐDashboardReadyData(ctx context.Context, sel ast.SelectionSet, v model.DashboardReadyData) graphql.Marshaler {
-	return ec._DashboardReadyData(ctx, sel, &v)
+func (ec *executionContext) marshalNEventDashboard2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐEventDashboard(ctx context.Context, sel ast.SelectionSet, v model.EventDashboard) graphql.Marshaler {
+	return ec._EventDashboard(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNDashboardReadyData2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐDashboardReadyData(ctx context.Context, sel ast.SelectionSet, v *model.DashboardReadyData) graphql.Marshaler {
+func (ec *executionContext) marshalNEventDashboard2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐEventDashboard(ctx context.Context, sel ast.SelectionSet, v *model.EventDashboard) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
-	return ec._DashboardReadyData(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNFacultyStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStatᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FacultyStat) graphql.Marshaler {
-	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
-		fc := graphql.GetFieldContext(ctx)
-		fc.Result = &v[i]
-		return ec.marshalNFacultyStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStat(ctx, sel, v[i])
-	})
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
-func (ec *executionContext) marshalNFacultyStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStat(ctx context.Context, sel ast.SelectionSet, v *model.FacultyStat) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._FacultyStat(ctx, sel, v)
+	return ec._EventDashboard(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
@@ -3128,6 +3102,32 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNOrganizationStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐOrganizationStatᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.OrganizationStat) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNOrganizationStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐOrganizationStat(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNOrganizationStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐOrganizationStat(ctx context.Context, sel ast.SelectionSet, v *model.OrganizationStat) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._OrganizationStat(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNRegistrationSummary2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationSummary(ctx context.Context, sel ast.SelectionSet, v *model.RegistrationSummary) graphql.Marshaler {

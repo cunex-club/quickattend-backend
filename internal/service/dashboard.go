@@ -8,10 +8,10 @@ import (
 )
 
 type DashboardService interface {
-	GetEventDashboardData(ctx context.Context, eventID uuid.UUID) (*dtoRes.DashboardReadyData, error)
+	GetEventDashboardData(ctx context.Context, eventID uuid.UUID) (*dtoRes.EventDashboard, error)
 }
 
-func (s *service) GetEventDashboardData(ctx context.Context, eventID uuid.UUID) (*dtoRes.DashboardReadyData, error) {
+func (s *service) GetEventDashboardData(ctx context.Context, eventID uuid.UUID) (*dtoRes.EventDashboard, error) {
 	data, err := s.repo.Dashboard.GetEventDashboardData(ctx, eventID)
 	if err != nil {
 		return nil, err

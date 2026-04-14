@@ -14,7 +14,7 @@ import (
 )
 
 // EventDashboardData is the resolver for the eventDashboardData field.
-func (r *queryResolver) EventDashboardData(ctx context.Context, eventID string) (*model.DashboardReadyData, error) {
+func (r *queryResolver) EventDashboardData(ctx context.Context, eventID string) (*model.EventDashboard, error) {
 	parsedEventID, err := uuid.Parse(eventID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid event id: %w", err)
@@ -25,9 +25,9 @@ func (r *queryResolver) EventDashboardData(ctx context.Context, eventID string) 
 		return nil, err
 	}
 
-	facultyStats := make([]*model.FacultyStat, 0, len(data.FacultyStats))
-	for _, item := range data.FacultyStats {
-		facultyStats = append(facultyStats, &model.FacultyStat{
+	orgStats := make([]*model.OrganizationStat, 0, len(data.OrganizationStats))
+	for _, item := range data.OrganizationStats {
+		orgStats = append(orgStats, &model.OrganizationStat{
 			Organization: item.Organization,
 			StudentCount: item.StudentCount,
 			StaffCount:   item.StaffCount,
@@ -45,15 +45,15 @@ func (r *queryResolver) EventDashboardData(ctx context.Context, eventID string) 
 		})
 	}
 
-	return &model.DashboardReadyData{
+	return &model.EventDashboard{
 		Summary: &model.RegistrationSummary{
 			TotalEligible: data.Summary.TotalEligible,
 			TotalStudent:  data.Summary.TotalStudent,
 			TotalStaff:    data.Summary.TotalStaff,
 			TotalAll:      data.Summary.TotalAll,
 		},
-		FacultyStats:    facultyStats,
-		TimeSeriesStats: timeSeriesStats,
+		OrganizationStats: orgStats,
+		TimeSeriesStats:   timeSeriesStats,
 	}, nil
 }
 

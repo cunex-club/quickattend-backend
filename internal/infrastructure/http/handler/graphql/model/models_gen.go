@@ -2,32 +2,87 @@
 
 package model
 
-type DashboardReadyData struct {
-	Summary         *RegistrationSummary `json:"summary"`
-	FacultyStats    []*FacultyStat       `json:"facultyStats"`
-	TimeSeriesStats []*TimeStat          `json:"timeSeriesStats"`
+// All data needed to render an event's dashboard in one round trip.
+type EventDashboard struct {
+	// Aggregate head-count figures across the whole event.
+	Summary *RegistrationSummary `json:"summary"`
+	// Per-organization breakdown of scanned-in participants, ordered by
+	// `totalCount` descending. Safe to render directly as a bar chart or table.
+	OrganizationStats []*OrganizationStat `json:"organizationStats"`
+	// Hourly time-series of scan activity over the event window. Always
+	// contiguous (zero-filled for hours with no scans) and chronologically
+	// ordered — suitable for direct use as a line/bar chart data source.
+	TimeSeriesStats []*TimeStat `json:"timeSeriesStats"`
 }
 
-type FacultyStat struct {
+// Per-organization breakdown of scanned-in participants.
+//
+// `organization` comes from `event_participants.organization`, a free-text
+// field captured at scan time. It is not necessarily a faculty — it can be
+// any organization label (department, company, external partner, etc.).
+// Rows are ordered by `totalCount` descending, then `organization` ascending.
+type OrganizationStat struct {
+	// Organization label as recorded on the participant's scan record.
 	Organization string `json:"organization"`
-	StudentCount int    `json:"studentCount"`
-	StaffCount   int    `json:"staffCount"`
-	TotalCount   int    `json:"totalCount"`
+	// Number of students (ref_id length == 10) in this organization.
+	StudentCount int `json:"studentCount"`
+	// Number of non-students (ref_id length != 10) in this organization.
+	StaffCount int `json:"staffCount"`
+	// Total participants in this organization. Equal to
+	// `studentCount + staffCount`.
+	TotalCount int `json:"totalCount"`
 }
 
 type Query struct {
 }
 
+// Aggregate head-count figures for a single event.
+//
+// In all count fields below, a user is considered a *student* iff their ref_id
+// has exactly 10 digits. Any non-student participant is counted as *staff*
+// (e.g. faculty members, external partners, organizers with short ref_ids).
 type RegistrationSummary struct {
+	// Total number of attendees eligible to attend the event.
+	//
+	// - For `WHITELIST` events this is the distinct union of:
+	//     (a) confirmed whitelist rows,
+	//     (b) pending whitelist rows (whitelisted ref_ids whose user account
+	//         has not yet been created), and
+	//     (c) anyone who has already been scanned in (covers the case where an
+	//         organizer removes a user from the whitelist after they have
+	//         attended — the attendee still counts as "eligible").
+	//   The invariant `totalAll <= totalEligible` therefore always holds for
+	//   whitelist events.
+	//
+	// - For any other `attendence_type` (ALL, FACULTIES) eligibility is
+	//   unbounded / not meaningful, so this field is `null`. Frontends should
+	//   hide any denominator UI when the value is null.
 	TotalEligible *int `json:"totalEligible,omitempty"`
-	TotalStudent  int  `json:"totalStudent"`
-	TotalStaff    int  `json:"totalStaff"`
-	TotalAll      int  `json:"totalAll"`
+	// Number of students (ref_id length == 10) who have been scanned in.
+	TotalStudent int `json:"totalStudent"`
+	// Number of non-students (ref_id length != 10) who have been scanned in.
+	TotalStaff int `json:"totalStaff"`
+	// Total number of scanned-in participants for the event. Equal to
+	// `totalStudent + totalStaff`.
+	TotalAll int `json:"totalAll"`
 }
 
+// Participant count for a single one-hour bucket of the event timeline.
+//
+// The response always contains a contiguous row per hour covering the event
+// window — from `DATE_TRUNC('hour', start_time)` up to whichever comes first
+// of `end_time` or `NOW()`. Hours with zero scans are present with all counts
+// set to 0, so the frontend can render line/bar charts without gap-filling.
+// Rows are ordered chronologically.
 type TimeStat struct {
-	TimeBucket   string `json:"timeBucket"`
-	StudentCount int    `json:"studentCount"`
-	StaffCount   int    `json:"staffCount"`
-	TotalCount   int    `json:"totalCount"`
+	// Start of the hourly bucket as an RFC 3339 / ISO 8601 UTC timestamp
+	// (e.g. `"2026-04-14T09:00:00Z"`). The frontend is responsible for
+	// converting to the viewer's local timezone and formatting.
+	TimeBucket string `json:"timeBucket"`
+	// Number of students (ref_id length == 10) scanned in during this hour.
+	StudentCount int `json:"studentCount"`
+	// Number of non-students (ref_id length != 10) scanned in during this hour.
+	StaffCount int `json:"staffCount"`
+	// Total scans in this hour. Equal to `studentCount + staffCount`.
+	TotalCount int `json:"totalCount"`
 }

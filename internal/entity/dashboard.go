@@ -6,7 +6,7 @@ type RegistrationSummary struct {
 	TotalAll     int `gorm:"column:total_all"`
 }
 
-type FacultyStat struct {
+type OrganizationStat struct {
 	Organization string `gorm:"column:organization"`
 	StudentCount int    `gorm:"column:student_count"`
 	StaffCount   int    `gorm:"column:staff_count"`

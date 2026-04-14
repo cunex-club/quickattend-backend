@@ -7,7 +7,7 @@ type RegistrationSummary struct {
 	TotalAll      int  `json:"totalAll"`
 }
 
-type FacultyStat struct {
+type OrganizationStat struct {
 	Organization string `json:"organization"`
 	StudentCount int    `json:"studentCount"`
 	StaffCount   int    `json:"staffCount"`
@@ -21,8 +21,8 @@ type TimeStat struct {
 	TotalCount   int    `json:"totalCount"`
 }
 
-type DashboardReadyData struct {
-	Summary         RegistrationSummary `json:"summary"`
-	FacultyStats    []FacultyStat       `json:"facultyStats"`
-	TimeSeriesStats []TimeStat          `json:"timeSeriesStats"`
+type EventDashboard struct {
+	Summary           RegistrationSummary `json:"summary"`
+	OrganizationStats []OrganizationStat  `json:"organizationStats"`
+	TimeSeriesStats   []TimeStat          `json:"timeSeriesStats"`
 }
