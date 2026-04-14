@@ -474,6 +474,393 @@ SELECT
   '55555555-5555-5555-5555-555555555555'::uuid
 FROM user_111_events_with_rn WHERE rn IN (12, 13, 14);
 
+-- =========================
+-- DASHBOARD VALIDATION DATA (NEW EVENT)
+-- Event ID for GraphQL testing: eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee
+-- =========================
+
+INSERT INTO users (id, ref_id, firstname_th, surname_th, title_th, firstname_en, surname_en, title_en)
+VALUES
+  ('66666666-6666-6666-6666-666666666666', 7000000001, 'ปริญญา', 'อธิศักดิ์', 'นาย', 'Parinya', 'Atisak', 'Mr.'),
+  ('77777777-7777-7777-7777-777777777777', 7000000002, 'พิมพ์ชนก', 'สุวรรณ', 'นางสาว', 'Pimchanok', 'Suwan', 'Ms.'),
+  ('88888888-8888-8888-8888-888888888888', 7000000003, 'สิรภพ', 'ชาญชัย', 'นาย', 'Siraphop', 'Chanchai', 'Mr.'),
+  ('99999999-9999-9999-9999-999999999999', 7000000004, 'กัญญ์วรา', 'ศรีสุข', 'นางสาว', 'Kanwara', 'Srisuk', 'Ms.'),
+  ('abababab-abab-abab-abab-abababababab', 7000000005, 'ธีรภัทร', 'วงศ์ศรี', 'นาย', 'Theerapat', 'Wongsri', 'Mr.'),
+  ('bcbcbcbc-bcbc-bcbc-bcbc-bcbcbcbcbcbc', 40001, 'ภาสกร', 'ใจมั่น', 'นาย', 'Phatsakorn', 'Jaiman', 'Mr.'),
+  ('cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd', 40002, 'ชญานี', 'กุลดี', 'นางสาว', 'Chayanee', 'Kuldee', 'Ms.'),
+  ('dededede-dede-dede-dede-dededededede', 40003, 'ณัฐพล', 'ทรัพย์เพิ่ม', 'นาย', 'Nattaphon', 'Sapphoem', 'Mr.'),
+  ('efefefef-efef-efef-efef-efefefefefef', 40004, 'อชิรญา', 'พลอยงาม', 'นางสาว', 'Achiraya', 'Ployngam', 'Ms.')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO events (
+  id, name, organizer, description,
+  start_time, end_time, location, location_point,
+  attendence_type, allow_all_to_scan,
+  evaluation_form, revealed_fields
+)
+VALUES (
+  'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+  'GraphQL Dashboard Validation Event',
+  'QA Automation Team',
+  'Dataset-heavy event for validating dashboard-ready GraphQL response',
+  DATE_TRUNC('hour', NOW()) - INTERVAL '6 hours',
+  DATE_TRUNC('hour', NOW()) + INTERVAL '2 hours',
+  'Data Lab Hall',
+  POINT(100.5200, 13.7400),
+  'ALL',
+  true,
+  'https://forms.example.com/graphql-dashboard-validation',
+  ARRAY['NAME', 'ORGANIZATION', 'REFID']::participant_data[]
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO event_users (role, user_id, event_id)
+VALUES
+  ('OWNER', '11111111-1111-1111-1111-111111111111', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'),
+  ('MANAGER', '55555555-5555-5555-5555-555555555555', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'),
+  ('STAFF', '66666666-6666-6666-6666-666666666666', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee')
+ON CONFLICT (user_id, event_id) DO NOTHING;
+
+INSERT INTO event_agendas (event_id, activity_name, start_time, end_time)
+VALUES  
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    'Check-in Wave 1',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '4 hours',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '3 hours'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    'Check-in Wave 2',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '3 hours',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '2 hours'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    'Check-in Wave 3',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '2 hours',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '1 hour'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    'Final Check-in',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '1 hour',
+    DATE_TRUNC('hour', NOW())
+  )
+ON CONFLICT (event_id, start_time, end_time) DO NOTHING;
+
+INSERT INTO event_participants (
+  event_id,
+  scanned_timestamp,
+  comment_timestamp,
+  comment,
+  participant_id,
+  organization,
+  scanned_location,
+  scanner_id
+)
+VALUES
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '4 hours' + INTERVAL '5 minutes',
+    NULL,
+    NULL,
+    '66666666-6666-6666-6666-666666666666',
+    'Engineering Operations',
+    POINT(100.5201, 13.7401),
+    '11111111-1111-1111-1111-111111111111'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '4 hours' + INTERVAL '22 minutes',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '4 hours' + INTERVAL '25 minutes',
+    'Joined from pre-registered queue',
+    '77777777-7777-7777-7777-777777777777',
+    'Engineering Operations',
+    POINT(100.5202, 13.7401),
+    '11111111-1111-1111-1111-111111111111'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '3 hours' + INTERVAL '7 minutes',
+    NULL,
+    NULL,
+    '88888888-8888-8888-8888-888888888888',
+    'Student Council',
+    POINT(100.5203, 13.7402),
+    '55555555-5555-5555-5555-555555555555'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '3 hours' + INTERVAL '28 minutes',
+    NULL,
+    NULL,
+    '99999999-9999-9999-9999-999999999999',
+    'Student Council',
+    POINT(100.5204, 13.7402),
+    '55555555-5555-5555-5555-555555555555'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '2 hours' + INTERVAL '4 minutes',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '2 hours' + INTERVAL '6 minutes',
+    'Arrived with team',
+    'abababab-abab-abab-abab-abababababab',
+    'Research Hub',
+    POINT(100.5205, 13.7403),
+    '66666666-6666-6666-6666-666666666666'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '2 hours' + INTERVAL '16 minutes',
+    NULL,
+    NULL,
+    'bcbcbcbc-bcbc-bcbc-bcbc-bcbcbcbcbcbc',
+    'Research Hub',
+    POINT(100.5206, 13.7403),
+    '66666666-6666-6666-6666-666666666666'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '1 hour' + INTERVAL '3 minutes',
+    NULL,
+    NULL,
+    'cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd',
+    'Research Hub',
+    POINT(100.5207, 13.7404),
+    '11111111-1111-1111-1111-111111111111'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '1 hour' + INTERVAL '19 minutes',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '1 hour' + INTERVAL '23 minutes',
+    'Checked in after traffic delay',
+    'dededede-dede-dede-dede-dededededede',
+    'External Partner',
+    POINT(100.5208, 13.7404),
+    '11111111-1111-1111-1111-111111111111'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '1 hour' + INTERVAL '44 minutes',
+    NULL,
+    NULL,
+    'efefefef-efef-efef-efef-efefefefefef',
+    'External Partner',
+    POINT(100.5209, 13.7405),
+    '55555555-5555-5555-5555-555555555555'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) + INTERVAL '6 minutes',
+    NULL,
+    NULL,
+    '22222222-2222-2222-2222-222222222222',
+    'Student Council',
+    POINT(100.5210, 13.7405),
+    '66666666-6666-6666-6666-666666666666'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) + INTERVAL '12 minutes',
+    NULL,
+    NULL,
+    '33333333-3333-3333-3333-333333333333',
+    'Engineering Operations',
+    POINT(100.5211, 13.7406),
+    '66666666-6666-6666-6666-666666666666'
+  ),
+  (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+    DATE_TRUNC('hour', NOW()) + INTERVAL '18 minutes',
+    NULL,
+    NULL,
+    '44444444-4444-4444-4444-444444444444',
+    'External Partner',
+    POINT(100.5212, 13.7406),
+    '66666666-6666-6666-6666-666666666666'
+  )
+ON CONFLICT (event_id, participant_id) DO NOTHING;
+
+-- Expected summary for eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee (ALL-type event)
+-- totalEligible = NULL (not a WHITELIST event)
+-- totalStudent  = 5  (10-digit ref_id)
+-- totalStaff    = 7  (<10-digit ref_id)
+-- totalAll      = 12
+
+-- =========================
+-- DASHBOARD VALIDATION DATA (WHITELIST EVENT)
+-- Exercises GraphQL eventDashboardData.summary.totalEligible
+-- for a WHITELIST-type event: UNION of event_whitelists,
+-- event_whitelist_pendings, and already-scanned participants.
+-- Event ID: ffffffff-ffff-ffff-ffff-ffffffffffff
+-- =========================
+
+-- Extra users for the whitelist dashboard scenario.
+-- Students = 10-digit ref_id, Staff = <10-digit ref_id.
+INSERT INTO users (id, ref_id, firstname_th, surname_th, title_th, firstname_en, surname_en, title_en)
+VALUES
+  ('f1f1f1f1-f1f1-f1f1-f1f1-f1f1f1f1f1f1', 6610000001, 'วรัญญา', 'ศิริ', 'นางสาว', 'Waranya', 'Siri', 'Ms.'),
+  ('f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2', 6610000002, 'กฤติน', 'ทองดี', 'นาย', 'Kritin', 'Thongdee', 'Mr.'),
+  ('f3f3f3f3-f3f3-f3f3-f3f3-f3f3f3f3f3f3', 6610000003, 'ปุญญิศา', 'มีสุข', 'นางสาว', 'Punyisa', 'Meesuk', 'Ms.'),
+  ('f4f4f4f4-f4f4-f4f4-f4f4-f4f4f4f4f4f4', 50001,      'ชนินทร์', 'พัฒนา', 'นาย', 'Chanin', 'Pattana', 'Mr.'),
+  ('f5f5f5f5-f5f5-f5f5-f5f5-f5f5f5f5f5f5', 50002,      'อาริยา', 'บุญมี', 'นางสาว', 'Ariya', 'Boonmee', 'Ms.')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO events (
+  id, name, organizer, description,
+  start_time, end_time, location, location_point,
+  attendence_type, allow_all_to_scan,
+  evaluation_form, revealed_fields
+)
+VALUES (
+  'ffffffff-ffff-ffff-ffff-ffffffffffff',
+  'Whitelist Dashboard Validation Event',
+  'QA Automation Team',
+  'Dataset for validating totalEligible on WHITELIST events',
+  DATE_TRUNC('hour', NOW()) - INTERVAL '3 hours',
+  DATE_TRUNC('hour', NOW()) + INTERVAL '1 hour',
+  'Secure Briefing Room',
+  POINT(100.5300, 13.7500),
+  'WHITELIST',
+  false,
+  NULL,
+  ARRAY['NAME', 'REFID']::participant_data[]
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO event_users (role, user_id, event_id)
+VALUES
+  ('OWNER',   '11111111-1111-1111-1111-111111111111', 'ffffffff-ffff-ffff-ffff-ffffffffffff'),
+  ('MANAGER', '33333333-3333-3333-3333-333333333333', 'ffffffff-ffff-ffff-ffff-ffffffffffff')
+ON CONFLICT (user_id, event_id) DO NOTHING;
+
+-- Whitelist rows (confirmed): 4 entries
+--   students: 6610000001, 6610000002   (2)
+--   staff:    50001,      50002        (2)
+-- Note: user 22222222 (ref_id 10002, staff) will appear as a scanned
+-- participant below but is *not* on the whitelist — this simulates the
+-- "post-hoc whitelist edit" case that Option B's UNION covers, and proves
+-- the scanned branch contributes to totalEligible.
+INSERT INTO event_whitelists (event_id, attendee_ref_id)
+VALUES
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', 6610000001),
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', 6610000002),
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', 50001),
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', 50002)
+ON CONFLICT (event_id, attendee_ref_id) DO NOTHING;
+
+-- Pending whitelist rows (user accounts not yet created): 2 entries
+--   one student-shaped ref_id (10 digits), one staff-shaped (<10)
+INSERT INTO event_whitelist_pendings (event_id, attendee_ref_id)
+VALUES
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', 6699999999),
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff', 59999)
+ON CONFLICT (event_id, attendee_ref_id) DO NOTHING;
+
+INSERT INTO event_agendas (event_id, activity_name, start_time, end_time)
+VALUES
+  (
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'Briefing Check-in',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '3 hours',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '2 hours'
+  ),
+  (
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    'Closed Session',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '2 hours',
+    DATE_TRUNC('hour', NOW())
+  )
+ON CONFLICT (event_id, start_time, end_time) DO NOTHING;
+
+-- Scanned participants:
+--   - 3 whitelisted users actually showed up
+--       * f1f1 (student 6610000001)  — Engineering Faculty, -3h bucket
+--       * f2f2 (student 6610000002)  — Engineering Faculty, -2h bucket
+--       * f4f4 (staff  50001)        — Board Office,        -2h bucket
+--   - 1 non-whitelisted user got scanned in (simulates a whitelist row
+--     that was later removed): 22222222 (staff 10002), -1h bucket.
+--     This user must still count toward totalEligible via the UNION.
+INSERT INTO event_participants (
+  event_id,
+  scanned_timestamp,
+  comment_timestamp,
+  comment,
+  participant_id,
+  organization,
+  scanned_location,
+  scanner_id
+)
+VALUES
+  (
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '3 hours' + INTERVAL '8 minutes',
+    NULL,
+    NULL,
+    'f1f1f1f1-f1f1-f1f1-f1f1-f1f1f1f1f1f1',
+    'Engineering Faculty',
+    POINT(100.5301, 13.7501),
+    '11111111-1111-1111-1111-111111111111'
+  ),
+  (
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '2 hours' + INTERVAL '12 minutes',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '2 hours' + INTERVAL '14 minutes',
+    'Checked in with team',
+    'f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2',
+    'Engineering Faculty',
+    POINT(100.5302, 13.7501),
+    '11111111-1111-1111-1111-111111111111'
+  ),
+  (
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '2 hours' + INTERVAL '35 minutes',
+    NULL,
+    NULL,
+    'f4f4f4f4-f4f4-f4f4-f4f4-f4f4f4f4f4f4',
+    'Board Office',
+    POINT(100.5303, 13.7502),
+    '33333333-3333-3333-3333-333333333333'
+  ),
+  (
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    DATE_TRUNC('hour', NOW()) - INTERVAL '1 hour' + INTERVAL '4 minutes',
+    NULL,
+    NULL,
+    '22222222-2222-2222-2222-222222222222',
+    'Board Office',
+    POINT(100.5304, 13.7502),
+    '33333333-3333-3333-3333-333333333333'
+  )
+ON CONFLICT (event_id, participant_id) DO NOTHING;
+
+-- Expected summary for ffffffff-ffff-ffff-ffff-ffffffffffff (WHITELIST event)
+--
+-- totalEligible is built from the UNION of distinct attendee_ref_id across
+-- event_whitelists, event_whitelist_pendings, and users who were scanned in:
+--   whitelists:  {6610000001, 6610000002, 50001, 50002}
+--   pendings:    {6699999999, 59999}
+--   scanned:     {6610000001, 6610000002, 50001, 10002}
+--   UNION:       {6610000001, 6610000002, 50001, 50002,
+--                 6699999999, 59999, 10002}
+-- totalEligible = 7
+--
+-- totalStudent  = 2  (f1f1 = 6610000001, f2f2 = 6610000002)
+-- totalStaff    = 2  (f4f4 = 50001, 22222222 = 10002)
+-- totalAll      = 4
+--
+-- Invariant check: totalAll (4) <= totalEligible (7)  ✔
+--
+-- facultyStats (by organization):
+--   'Engineering Faculty'  studentCount=2 staffCount=0 totalCount=2
+--   'Board Office'         studentCount=0 staffCount=2 totalCount=2
+--
+-- timeSeriesStats buckets (Asia/Bangkok, 1h granularity):
+--   NOW-3h bucket: 1 student, 0 staff, 1 total
+--   NOW-2h bucket: 1 student, 1 staff, 2 total
+--   NOW-1h bucket: 0 student, 1 staff, 1 total
+
 COMMIT;
 
 
