@@ -110,6 +110,17 @@ CREATE TABLE "event_whitelist_pendings" (
         REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
 
+CREATE TABLE "event_user_pendings" (
+    "id" uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    "role" role NOT NULL,
+    "user_id" uuid NOT NULL,
+    "event_id" uuid NOT NULL,
+
+    CONSTRAINT "unique_user_and_event_pendings" UNIQUE ("user_id", "event_id"),
+    CONSTRAINT "fk_event_user_pendings_event" FOREIGN KEY ("event_id") 
+        REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
+);
+
 CREATE INDEX idx_events_end_time ON events (end_time);
 CREATE INDEX idx_events_name_trgm ON events USING GIN (name gin_trgm_ops);
 CREATE INDEX idx_events_organizer_trgm ON events USING GIN (organizer gin_trgm_ops);

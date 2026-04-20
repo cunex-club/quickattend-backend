@@ -76,6 +76,15 @@ type EventUser struct {
 	User  User  `gorm:"foreignKey:UserID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
 
+type EventUserPending struct {
+	ID      datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Role    role           `gorm:"type:role;not null" json:"role"`
+	UserID  datatypes.UUID `gorm:"type:uuid;not null;index:unique_user_and_event_pendings,unique" json:"user_id"`
+	EventID datatypes.UUID `gorm:"type:uuid;not null;index:unique_user_and_event_pendings,unique" json:"event_id"`
+
+	Event Event `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+}
+
 type EventUserInput struct {
 	RefID uint64
 	Role  role
