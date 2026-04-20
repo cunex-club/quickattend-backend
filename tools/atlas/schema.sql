@@ -10,9 +10,12 @@ CREATE TABLE "users" (
     "firstname_th" text NOT NULL,
     "surname_th" text NOT NULL,
     "title_th" text NOT NULL,
+    "faculty_name_th" text NOT NULL,
     "firstname_en" text NOT NULL,
     "surname_en" text NOT NULL,
-    "title_en" text NOT NULL
+    "title_en" text NOT NULL,
+    "faculty_name_en" text NOT NULL,
+    "profile_image_url" text NOT NULL
 );
 
 CREATE TABLE "events" (
