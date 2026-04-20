@@ -55,14 +55,17 @@ func (s *service) GetUserService(userIDStr string, ctx context.Context) (*dtoRes
 	}
 
 	userDTO := dtoRes.GetAuthUserRes{
-		ID:          user.ID.String(),
-		RefID:       s.FormatRefIdToStr(user.RefID),
-		FirstnameTH: user.FirstnameTH,
-		SurnameTH:   user.SurnameTH,
-		TitleTH:     user.TitleTH,
-		FirstnameEN: user.FirstnameEN,
-		SurnameEN:   user.SurnameEN,
-		TitleEN:     user.TitleEN,
+		ID:              user.ID.String(),
+		RefID:           s.FormatRefIdToStr(user.RefID),
+		FirstnameTH:     user.FirstnameTH,
+		SurnameTH:       user.SurnameTH,
+		TitleTH:         user.TitleTH,
+		FacultyNameTH:   user.FacultyNameTH,
+		FirstnameEN:     user.FirstnameEN,
+		SurnameEN:       user.SurnameEN,
+		TitleEN:         user.TitleEN,
+		FacultyNameEN:   user.FacultyNameEN,
+		ProfileImageURL: user.ProfileImageURL,
 	}
 
 	return &userDTO, nil
@@ -90,7 +93,6 @@ func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) 
 
 	return created, nil
 }
-
 
 func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.VerifyTokenRes, *response.APIError) {
 	if strings.TrimSpace(token) == "" {
