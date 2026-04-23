@@ -178,39 +178,50 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	}
 
 	User := entity.User{
-		RefID:       convRefId,
-		FirstnameTH: UserData.FirstNameTH,
-		SurnameTH:   UserData.LastNameTH,
-		FirstnameEN: UserData.FirstNameEN,
-		SurnameEN:   UserData.LastNameEN,
-		TitleTH:     UserData.TitleNameTH,
-		TitleEN:     UserData.TitleNameEN,
+		RefID:         convRefId,
+		FirstnameTH:   UserData.FirstNameTH,
+		SurnameTH:     UserData.LastNameTH,
+		FirstnameEN:   UserData.FirstNameEN,
+		SurnameEN:     UserData.LastNameEN,
+		TitleTH:       UserData.TitleNameTH,
+		TitleEN:       UserData.TitleNameEN,
+		FacultyNameTH: UserData.FacultyNameTH,
+		FacultyNameEN: UserData.FacultyNameEN,
 	}
 
 	// // ### MOCK USER DATA ###
 	// User := entity.User{
-	// 	RefID:       987654321,
-	// 	FirstnameTH: "AB",
-	// 	SurnameTH:   "CD",
-	// 	TitleTH:     "EEEE",
-	// 	FirstnameEN: "FG",
-	// 	SurnameEN:   "HI",
-	// 	TitleEN:     "JJJJ",
+	// 	RefID:         987654321,
+	// 	FirstnameTH:   "AB",
+	// 	SurnameTH:     "CD",
+	// 	TitleTH:       "EEEE",
+	// 	FirstnameEN:   "FG",
+	// 	SurnameEN:     "HI",
+	// 	TitleEN:       "JJJJ",
+	// 	FacultyNameTH: "KK",
+	// 	FacultyNameEN: "LL",
 	// }
 
-	createdUser, createdUserErr := s.CreateUserIfNotExists(&User, ctx)
-	if createdUserErr != nil {
+	notToUpdate := []string{"profile_image_url"}
+	upsertUser, upsertErr := s.repo.Auth.UpsertUserByRefId(&User, &notToUpdate, ctx)
+	if upsertErr != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", upsertUser.RefID).
+			Str("action", "upsert_user_by_ref_id").
+			Msg("failed to upsert user by ref id")
+
 		return nil, &response.APIError{
-			Code:    createdUserErr.Code,
-			Message: createdUserErr.Message,
-			Status:  createdUserErr.Status,
+			Code:    response.ErrInternalError,
+			Message: "Failed to upsert user by ref id",
+			Status:  500,
 		}
 	}
 
-	if err := s.repo.Auth.SyncWhitelistPendingToWhitelist(ctx, createdUser.RefID); err != nil {
+	if err := s.repo.Auth.SyncWhitelistPendingToWhitelist(ctx, upsertUser.RefID); err != nil {
 		s.logger.Error().
 			Err(err).
-			Uint64("user_ref_id", createdUser.RefID).
+			Uint64("user_ref_id", upsertUser.RefID).
 			Str("action", "sync_whitelist_pending").
 			Msg("failed to sync whitelist pending to whitelist")
 	}
@@ -222,7 +233,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"user_id": createdUser.ID.String(),
+			"user_id": upsertUser.ID.String(),
 		})
 
 	JWTSecret := s.cfg.JWTSecret
