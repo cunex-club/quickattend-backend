@@ -226,6 +226,14 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 			Msg("failed to sync whitelist pending to whitelist")
 	}
 
+	if err := s.repo.Auth.SyncEventUserPendingToEventUser(ctx, upsertUser.ID, upsertUser.RefID); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", upsertUser.RefID).
+			Str("action", "sync_event_user_pending").
+			Msg("failed to sync event user pending to event user")
+	}
+
 	var (
 		key []byte
 		t   *jwt.Token
