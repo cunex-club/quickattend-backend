@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
@@ -14,6 +15,10 @@ type AuthRepository interface {
 	GetUserById(datatypes.UUID, context.Context) (entity.User, error)
 	GetUserByRefId(uint64, context.Context) (entity.User, error)
 	CreateUser(*entity.User, context.Context) (*entity.User, error)
+
+	// If user with given `ref_id` doesn't exist, create. Otherwise update all fields, excluding ones specified in `fieldsToOmit`.
+	// If `fieldsToOmit` is nil, all fields of the user are updated expect ID.
+	UpsertUserByRefId(user *entity.User, fieldsToOmit *[]string, ctx context.Context) (*entity.User, error)
 
 	FindWhitelistPendingByRefID(ctx context.Context, refID uint64) ([]entity.EventWhitelistPending, error)
 	DeleteWhitelistPendingByRefID(ctx context.Context, refID uint64) error
@@ -38,6 +43,48 @@ func (r *repository) CreateUser(user *entity.User, ctx context.Context) (*entity
 		return nil, err
 	}
 	return user, err
+}
+
+func (r *repository) UpsertUserByRefId(user *entity.User, fieldsToOmit *[]string, ctx context.Context) (*entity.User, error) {
+	db := r.db.WithContext(ctx)
+
+	var exist bool
+	err := db.Raw(`SELECT EXISTS 
+		(SELECT 1 FROM users WHERE ref_id = ?) 
+		AS subQuery`, user.RefID).
+		Scan(&exist).
+		Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return user, err
+	}
+
+	if !exist {
+		return user, db.Model(&entity.User{}).Create(user).Error
+	}
+
+	// Update
+	userMap := map[string]any{
+		"ref_id":            user.RefID,
+		"firstname_th":      user.FirstnameTH,
+		"surname_th":        user.SurnameTH,
+		"title_th":          user.TitleTH,
+		"faculty_name_th":   user.FacultyNameTH,
+		"firstname_en":      user.FirstnameEN,
+		"surname_en":        user.SurnameEN,
+		"title_en":          user.TitleEN,
+		"faculty_name_en":   user.FacultyNameEN,
+		"profile_image_url": user.ProfileImageURL,
+	}
+	if fieldsToOmit != nil {
+		for _, field := range *fieldsToOmit {
+			delete(userMap, field)
+		}
+	}
+
+	update := db.Model(&entity.User{}).
+		Where("ref_id = ?", user.RefID).
+		Updates(userMap)
+	return user, update.Error
 }
 
 func (r *repository) FindWhitelistPendingByRefID(ctx context.Context, refID uint64) ([]entity.EventWhitelistPending, error) {
