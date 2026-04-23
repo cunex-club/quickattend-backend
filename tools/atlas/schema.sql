@@ -113,10 +113,10 @@ CREATE TABLE "event_whitelist_pendings" (
 CREATE TABLE "event_user_pendings" (
     "id" uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     "role" role NOT NULL,
-    "user_id" uuid NOT NULL,
+    "user_ref_id" bigint NOT NULL,
     "event_id" uuid NOT NULL,
 
-    CONSTRAINT "unique_user_and_event_pendings" UNIQUE ("user_id", "event_id"),
+    CONSTRAINT "unique_user_and_event_pendings" UNIQUE ("user_ref_id", "event_id"),
     CONSTRAINT "fk_event_user_pendings_event" FOREIGN KEY ("event_id") 
         REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
