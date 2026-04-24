@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/cunex-club/quickattend-backend/internal/entity"
@@ -16,9 +15,10 @@ type AuthRepository interface {
 	GetUserByRefId(uint64, context.Context) (entity.User, error)
 	CreateUser(*entity.User, context.Context) (*entity.User, error)
 
-	// If user with given `ref_id` doesn't exist, create. Otherwise update all fields, excluding ones specified in `fieldsToOmit`.
-	// If `fieldsToOmit` is nil, all fields of the user are updated expect ID.
-	// This function also fills in the ID field of user struct after create/update.
+	// If user with given `ref_id` doesn't exist, create and fill in the ID field.
+	// Otherwise update all fields, excluding ID and those specified in `fieldsToOmit`, and return the updated entity.
+	//
+	// If `fieldsToOmit` is nil, all fields except ID are updated.
 	UpsertUserByRefId(user *entity.User, fieldsToOmit *[]string, ctx context.Context) (*entity.User, error)
 
 	FindWhitelistPendingByRefID(ctx context.Context, refID uint64) ([]entity.EventWhitelistPending, error)
@@ -49,24 +49,6 @@ func (r *repository) CreateUser(user *entity.User, ctx context.Context) (*entity
 }
 
 func (r *repository) UpsertUserByRefId(user *entity.User, fieldsToOmit *[]string, ctx context.Context) (*entity.User, error) {
-	db := r.db.WithContext(ctx)
-
-	var rowID string
-	err := db.Model(&entity.User{}).Select("id").
-		Where("ref_id = ?", user.RefID).
-		Scan(&rowID).
-		Error
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return user, err
-	}
-
-	// User not found, create
-	if rowID == "" {
-		createErr := db.Model(&entity.User{}).Create(user).Error
-		return user, createErr
-	}
-
-	// Update
 	userMap := map[string]any{
 		"ref_id":            user.RefID,
 		"firstname_th":      user.FirstnameTH,
@@ -85,15 +67,14 @@ func (r *repository) UpsertUserByRefId(user *entity.User, fieldsToOmit *[]string
 		}
 	}
 
-	update := db.Model(&entity.User{}).
-		Where("ref_id = ?", user.RefID).
-		Updates(userMap)
-
-	// populate ID with the one from DB if original user entity doesn't have it
-	if user.ID.IsEmpty() {
-		user.ID = datatypes.UUID(datatypes.BinUUIDFromString(rowID))
-	}
-	return user, update.Error
+	err := r.db.WithContext(ctx).Clauses(
+		clause.Returning{},
+		clause.OnConflict{
+			Columns:   []clause.Column{{Name: "ref_id"}},
+			DoUpdates: clause.Assignments(userMap),
+		},
+	).Create(&user).Error
+	return user, err
 }
 
 func (r *repository) FindWhitelistPendingByRefID(ctx context.Context, refID uint64) ([]entity.EventWhitelistPending, error) {
