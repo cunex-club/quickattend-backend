@@ -16,7 +16,7 @@ const (
 	FAIL      status = "fail"
 )
 
-type GetParticipantRes struct {
+type PostParticipantRes struct {
 	FirstnameTH     *string   `json:"firstname_th"`
 	SurnameTH       *string   `json:"surname_th"`
 	TitleTH         *string   `json:"title_th"`

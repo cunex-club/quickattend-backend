@@ -29,7 +29,7 @@ type EventService interface {
 	DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError
 	DuplicateById(EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
 	Comment(checkInReq dtoReq.CommentReq, ctx context.Context) *response.APIError
-	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
+	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.PostParticipantRes, *response.APIError)
 
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
 
@@ -330,7 +330,7 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 	}, nil
 }
 
-func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
+func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.PostParticipantRes, *response.APIError) {
 	if code == "" {
 		return nil, &response.APIError{
 			Code:    "INVALID_QR",
@@ -621,7 +621,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	checkInCode := base64.StdEncoding.EncodeToString(raw)
 
 	// Finally, format response according to revealed_fields of this event
-	responseBody := dtoRes.GetParticipantRes{
+	responseBody := dtoRes.PostParticipantRes{
 		FirstnameTH:     nil,
 		SurnameTH:       nil,
 		TitleTH:         nil,
