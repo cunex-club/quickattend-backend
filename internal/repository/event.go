@@ -398,10 +398,18 @@ func (r *repository) CheckEventAccess(ctx context.Context, orgCode uint8, refID 
 		return found, nil
 
 	case string(entity.AttendanceWhitelist):
-		checkErr := withCtx.Raw(`SELECT EXISTS (
-			SELECT 1 FROM event_whitelists
-			WHERE event_id = ? AND attendee_ref_id = ?
-		) AS subQuery`, eventId, refID).Scan(&found).Error
+		checkErr := withCtx.Raw(`SELECT (
+            SELECT (
+                EXISTS (
+                    SELECT 1 FROM event_whitelists 
+                    WHERE event_id = ? AND attendee_ref_id = ?
+                )
+                OR EXISTS (
+                    SELECT 1 FROM event_whitelist_pendings
+                    WHERE event_id = ? AND attendee_ref_id = ?
+                )
+            ) AS innerSubQuery
+        ) AS subQuery`, eventId, refID, eventId, refID).Scan(&found).Error
 		if checkErr != nil {
 			return false, checkErr
 		}
