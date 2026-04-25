@@ -131,7 +131,7 @@ func (r *repository) DeleteById(id uuid.UUID, userIdStr string, ctx context.Cont
 }
 
 func (r *repository) GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (*entity.GetOneEventQuery, error) {
-	withCtx := r.db.Debug().WithContext(ctx)
+	withCtx := r.db.WithContext(ctx)
 
 	var event entity.Event
 	errEvent := withCtx.
