@@ -750,6 +750,38 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
+	// Format each attribute
+
+	usersDTO := make([]dtoRes.GetOneEventUser, 0, len(result.EventUser))
+	if len(result.EventUser) > 0 {
+		for _, user := range result.EventUser {
+			u := user.User
+			usersDTO = append(usersDTO, dtoRes.GetOneEventUser{
+				RefID:           s.FormatRefIdToStr(u.RefID),
+				FirstnameTH:     u.FirstnameTH,
+				SurnameTH:       u.SurnameTH,
+				TitleTH:         u.TitleTH,
+				FacultyNameTH:   u.FacultyNameTH,
+				FirstnameEN:     u.FirstnameEN,
+				SurnameEN:       u.SurnameEN,
+				TitleEN:         u.TitleEN,
+				FacultyNameEN:   u.FacultyNameEN,
+				ProfileImageURL: u.ProfileImageURL,
+				Role:            string(user.Role),
+			})
+		}
+	}
+
+	usersPendingDTO := make([]dtoRes.GetOneEventUserPending, 0, len(result.EventUserPending))
+	if len(result.EventUserPending) > 0 {
+		for _, user := range result.EventUserPending {
+			usersPendingDTO = append(usersPendingDTO, dtoRes.GetOneEventUserPending{
+				RefID: s.FormatRefIdToStr(user.UserRefID),
+				Role:  string(user.Role),
+			})
+		}
+	}
+
 	agendaDTO := make([]dtoRes.GetOneEventAgenda, 0, len(result.EventAgenda))
 	if len(result.EventAgenda) > 0 {
 		for _, slot := range result.EventAgenda {
@@ -761,18 +793,39 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
-	usersDTO := make([]dtoRes.GetOneEventUser, 0, len(result.EventUser))
-	if len(result.EventUser) > 0 {
-		for _, user := range result.EventUser {
-			u := user.User
-			usersDTO = append(usersDTO, dtoRes.GetOneEventUser{
-				FirstnameTH: u.FirstnameTH,
-				SurnameTH:   u.SurnameTH,
-				TitleTH:     u.TitleTH,
-				FirstnameEN: u.FirstnameEN,
-				SurnameEN:   u.SurnameEN,
-				TitleEN:     u.TitleEN,
-				Role:        string(user.Role),
+	allowedFacDTO := make([]dtoRes.GetOneEventAllowedFaculties, 0, len(result.EventAllowedFaculties))
+	if len(result.EventAllowedFaculties) > 0 {
+		for _, faculty := range result.EventAllowedFaculties {
+			allowedFacDTO = append(allowedFacDTO, dtoRes.GetOneEventAllowedFaculties{
+				FacultyNO: faculty.FacultyNO,
+			})
+		}
+	}
+
+	whitelistDTO := make([]dtoRes.GetOneEventWhitelist, 0, len(result.EventWhitelist))
+	if len(result.EventWhitelist) > 0 {
+		for _, wl := range result.EventWhitelist {
+			wlUser := wl.User
+			whitelistDTO = append(whitelistDTO, dtoRes.GetOneEventWhitelist{
+				RefID:           s.FormatRefIdToStr(wlUser.RefID),
+				FirstnameTH:     wlUser.FirstnameTH,
+				SurnameTH:       wlUser.SurnameTH,
+				TitleTH:         wlUser.TitleTH,
+				FacultyNameTH:   wlUser.FacultyNameTH,
+				FirstnameEN:     wlUser.FirstnameEN,
+				SurnameEN:       wlUser.SurnameEN,
+				TitleEN:         wlUser.TitleEN,
+				FacultyNameEN:   wlUser.FacultyNameEN,
+				ProfileImageURL: wlUser.ProfileImageURL,
+			})
+		}
+	}
+
+	whitelistPendingDTO := make([]dtoRes.GetOneEventWhitelistPending, 0, len(result.EventWhitelistPending))
+	if len(result.EventWhitelistPending) > 0 {
+		for _, wl := range result.EventWhitelistPending {
+			whitelistPendingDTO = append(whitelistPendingDTO, dtoRes.GetOneEventWhitelistPending{
+				RefID: s.FormatRefIdToStr(wl.AttendeeRefID),
 			})
 		}
 	}
@@ -784,21 +837,26 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 	finalRes := dtoRes.GetOneEventRes{
-		Name:            result.Name,
-		Organizer:       result.Organizer,
-		Description:     result.Description,
-		StartTime:       result.StartTime.UTC(),
-		EndTime:         result.EndTime.UTC(),
-		Location:        result.Location,
-		LocationLat:     result.LocationPoint.Y,
-		LocationLong:    result.LocationPoint.X,
-		TotalRegistered: result.TotalRegistered,
-		EvaluationForm:  result.EvaluationForm,
-		AllowAllToScan:  result.AllowAllToScan,
-		RevealedFields:  revealedFields,
-		Role:            result.Role,
-		Agenda:          agendaDTO,
-		User:            usersDTO,
+		Name:             result.Name,
+		Organizer:        result.Organizer,
+		Description:      result.Description,
+		StartTime:        result.StartTime.UTC(),
+		EndTime:          result.EndTime.UTC(),
+		Location:         result.Location,
+		LocationLat:      result.LocationPoint.Y,
+		LocationLong:     result.LocationPoint.X,
+		TotalRegistered:  result.TotalRegistered,
+		EvaluationForm:   result.EvaluationForm,
+		AllowAllToScan:   result.AllowAllToScan,
+		RevealedFields:   revealedFields,
+		AttendanceType:   result.AttendenceType,
+		Role:             result.Role,
+		Agenda:           agendaDTO,
+		User:             usersDTO,
+		UserPending:      usersPendingDTO,
+		AllowedFaculties: allowedFacDTO,
+		WhiteList:        whitelistDTO,
+		WhiteListPending: whitelistPendingDTO,
 	}
 
 	return &finalRes, nil
