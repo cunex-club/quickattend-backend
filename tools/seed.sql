@@ -577,7 +577,7 @@ INSERT INTO event_users (event_id, user_id, role)
 VALUES
   ('5d7fbc22-ac19-4c70-95ab-6f7cf1056867'::uuid, '44444444-4444-4444-4444-444444444444'::uuid, 'OWNER'),
   ('40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, 'OWNER'),
-  ('40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid, '44444444-4444-4444-4444-444444444444'::uuid, 'OWNER');
+  ('40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid, '44444444-4444-4444-4444-444444444444'::uuid, 'MANAGER');
 
 -- Event staff without account
 INSERT INTO event_user_pendings (event_id, user_ref_id, role)
