@@ -1187,6 +1187,7 @@ func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput,
 
 	out := make([]entity.EventUserInput, 0, len(in))
 	seenRole := make(map[uint64]string, len(in)) // ref_id -> role string
+	ownerCount := 0
 
 	for _, m := range in {
 		r, err := entity.ParseRole(m.Role)
@@ -1203,10 +1204,18 @@ func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput,
 		}
 
 		seenRole[m.RefID] = rs
+		if r == entity.OWNER {
+			ownerCount += 1
+		}
+
 		out = append(out, entity.EventUserInput{
 			RefID: m.RefID,
 			Role:  r,
 		})
+	}
+
+	if ownerCount != 1 {
+		return nil, fmt.Errorf("require exactly one owner in manager_and_staff")
 	}
 
 	return out, nil

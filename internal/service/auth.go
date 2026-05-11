@@ -91,7 +91,6 @@ func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) 
 	return created, nil
 }
 
-
 func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.VerifyTokenRes, *response.APIError) {
 	if strings.TrimSpace(token) == "" {
 		return nil, &response.APIError{
