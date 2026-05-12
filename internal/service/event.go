@@ -33,7 +33,7 @@ type EventService interface {
 
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
 
-	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error)
+	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq, userId string) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, userId string, updates dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error)
 
 	GetEventsValidateArgs(userIDStr string, queryParams map[string]string, ctx context.Context) (validated *GetEventsValidateArgsReturn, err *response.APIError)
@@ -1059,7 +1059,22 @@ func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetDiscoveryEv
 	}
 }
 
-func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error) {
+func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq, userId string) (*dtoRes.CreateEventRes, error) {
+	userIdUUID, err := uuid.Parse(userId)
+	if err != nil {
+		return nil, errors.New("Invalid user id")
+	}
+
+	// Validate that the requester is listed as the event owner in the managers_and_staff payload.
+	// Check separately here instead of modifying buildCreateOrUpdatePayload() for minimal change.
+	isOwner, err := s.createEventCheckOwnerIsRequester(req.ManagersAndStaff, userIdUUID, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !isOwner {
+		return nil, errors.New("User must list themselves as the event's owner in managers_and_staff")
+	}
+
 	payload, err := buildCreateOrUpdatePayload(req)
 	if err != nil {
 		return nil, err
@@ -1367,4 +1382,20 @@ func anyToUint8(v any) (uint8, error) {
 		return 0, fmt.Errorf("out of range")
 	}
 	return uint8(u), nil
+}
+
+// POST /events helper function.
+// Check if the requester is listed as the owner of event
+func (s *service) createEventCheckOwnerIsRequester(req []dtoReq.ManagerStaffReq, userId uuid.UUID, ctx context.Context) (bool, error) {
+	user, err := s.repo.Auth.GetUserById(datatypes.UUID(userId), ctx)
+	if err != nil {
+		return false, err
+	}
+
+	for _, person := range req {
+		if person.Role == string(entity.OWNER) && user.RefID != person.RefID {
+			return false, nil
+		}
+	}
+	return true, nil
 }
