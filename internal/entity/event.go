@@ -333,3 +333,18 @@ type GetDiscoveryEvents struct {
 	EvaluationForm *string        `gorm:"column:evaluation_form"`
 	LocationPoint  Point          `gorm:"column:location_point"`
 }
+
+type EventPersonExportRow struct {
+	RefID        *uint64
+	TitleTH      *string
+	FirstnameTH  *string
+	SurnameTH    *string
+	TitleEN      *string
+	FirstnameEN  *string
+	SurnameEN    *string
+	Organization *string
+	EventRole    *string // OWNER | MANAGER | STAFF | nil
+	OnWhitelist  bool
+	CheckedInAt  *time.Time
+	Comment      *string
+}

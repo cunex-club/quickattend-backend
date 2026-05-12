@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
+	errorx "github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response/error"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -40,6 +42,8 @@ type EventRepository interface {
 
 	CreateEvent(ctx context.Context, payload entity.CreateEventPayload) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, payload entity.CreateEventPayload) (*dtoRes.UpdateEventRes, error)
+
+	GetEventUserExport(ctx context.Context, eventID datatypes.UUID) (eventName string, rows []entity.EventPersonExportRow, err error)
 }
 
 type GetEventsArguments struct {
@@ -52,7 +56,7 @@ type GetEventsArguments struct {
 
 func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
 	if checkInRowId == uuid.Nil {
-		return entity.ErrNilUUID
+		return errorx.ErrNilUUID
 	}
 
 	result := r.db.WithContext(ctx).
@@ -81,10 +85,10 @@ func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, commen
 		}
 
 		if !exists {
-			return entity.ErrCheckInTargetNotFound
+			return errorx.ErrCheckInTargetNotFound
 		}
 
-		return entity.ErrAlreadyCommented
+		return errorx.ErrAlreadyCommented
 	}
 
 	return nil
@@ -123,7 +127,7 @@ func (r *repository) DeleteById(id uuid.UUID, userIdStr string, ctx context.Cont
 		}
 
 		if isOwner == 0 {
-			return entity.ErrInsufficientPermissions
+			return errorx.ErrInsufficientPermissions
 		}
 
 		return tx.Delete(&event).Error
@@ -718,4 +722,228 @@ func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatype
 	}
 
 	return out, nil
+}
+
+type personRecord struct {
+	refID        uint64
+	titleTH      *string
+	firstnameTH  *string
+	surnameTH    *string
+	titleEN      *string
+	firstnameEN  *string
+	surnameEN    *string
+	organization *string
+	eventRole    *string
+	onWhitelist  bool
+	checkedInAt  *time.Time
+	comment      *string
+}
+
+func (p *personRecord) mergeUserFields(titleTH, firstTH, surTH, titleEN, firstEN, surEN *string) {
+	if p.titleTH == nil {
+		p.titleTH = titleTH
+	}
+	if p.firstnameTH == nil {
+		p.firstnameTH = firstTH
+	}
+	if p.surnameTH == nil {
+		p.surnameTH = surTH
+	}
+	if p.titleEN == nil {
+		p.titleEN = titleEN
+	}
+	if p.firstnameEN == nil {
+		p.firstnameEN = firstEN
+	}
+	if p.surnameEN == nil {
+		p.surnameEN = surEN
+	}
+}
+
+func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.UUID) (string, []entity.EventPersonExportRow, error) {
+	db := r.db.WithContext(ctx)
+
+	// ---- 1. Verify event & get name ----
+	var event entity.Event
+	if err := db.Select("name").
+		First(&event, "id = ?", eventID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", nil, errorx.ErrEventNotFound
+		}
+		return "", nil, err
+	}
+
+	people := make(map[uint64]*personRecord)
+	getOrCreate := func(refID uint64) *personRecord {
+		if p, ok := people[refID]; ok {
+			return p
+		}
+		p := &personRecord{refID: refID}
+		people[refID] = p
+		return p
+	}
+
+	// ---- 2. Event users (OWNER / MANAGER / STAFF) ----
+	type euRow struct {
+		RefID       uint64  `gorm:"column:ref_id"`
+		TitleTH     *string `gorm:"column:title_th"`
+		FirstnameTH *string `gorm:"column:firstname_th"`
+		SurnameTH   *string `gorm:"column:surname_th"`
+		TitleEN     *string `gorm:"column:title_en"`
+		FirstnameEN *string `gorm:"column:firstname_en"`
+		SurnameEN   *string `gorm:"column:surname_en"`
+		Role        string  `gorm:"column:role"`
+	}
+	var eus []euRow
+	if err := db.Table("event_users AS eu").
+		Select(`u.ref_id,
+                u.title_th, u.firstname_th, u.surname_th,
+                u.title_en, u.firstname_en, u.surname_en,
+                eu.role::text AS role`).
+		Joins("JOIN users u ON u.id = eu.user_id").
+		Where("eu.event_id = ?", eventID).
+		Scan(&eus).Error; err != nil {
+		return "", nil, err
+	}
+	for _, x := range eus {
+		p := getOrCreate(x.RefID)
+		p.mergeUserFields(x.TitleTH, x.FirstnameTH, x.SurnameTH,
+			x.TitleEN, x.FirstnameEN, x.SurnameEN)
+		role := x.Role
+		p.eventRole = &role
+	}
+
+	// ---- 3. Participants (people who got scanned) ----
+	type pRow struct {
+		RefID            uint64    `gorm:"column:ref_id"`
+		TitleTH          *string   `gorm:"column:title_th"`
+		FirstnameTH      *string   `gorm:"column:firstname_th"`
+		SurnameTH        *string   `gorm:"column:surname_th"`
+		TitleEN          *string   `gorm:"column:title_en"`
+		FirstnameEN      *string   `gorm:"column:firstname_en"`
+		SurnameEN        *string   `gorm:"column:surname_en"`
+		Organization     string    `gorm:"column:organization"`
+		ScannedTimestamp time.Time `gorm:"column:scanned_timestamp"`
+		Comment          *string   `gorm:"column:comment"`
+	}
+	var parts []pRow
+	if err := db.Table("event_participants AS ep").
+		Select(`u.ref_id,
+                u.title_th, u.firstname_th, u.surname_th,
+                u.title_en, u.firstname_en, u.surname_en,
+                ep.organization, ep.scanned_timestamp, ep.comment`).
+		Joins("JOIN users u ON u.id = ep.participant_id").
+		Where("ep.event_id = ?", eventID).
+		// Earliest scan first so MIN-like behavior on first hit
+		Order("ep.scanned_timestamp ASC").
+		Scan(&parts).Error; err != nil {
+		return "", nil, err
+	}
+	for _, x := range parts {
+		p := getOrCreate(x.RefID)
+		p.mergeUserFields(x.TitleTH, x.FirstnameTH, x.SurnameTH,
+			x.TitleEN, x.FirstnameEN, x.SurnameEN)
+
+		if x.Organization != "" {
+			org := x.Organization
+			p.organization = &org
+		}
+		// Keep earliest scan
+		if p.checkedInAt == nil || x.ScannedTimestamp.Before(*p.checkedInAt) {
+			ts := x.ScannedTimestamp
+			p.checkedInAt = &ts
+		}
+		// Keep first non-empty comment
+		if p.comment == nil && x.Comment != nil && *x.Comment != "" {
+			c := *x.Comment
+			p.comment = &c
+		}
+	}
+
+	// ---- 4. Whitelist (may have nil user row for pending) ----
+	type wRow struct {
+		RefID       uint64  `gorm:"column:ref_id"`
+		TitleTH     *string `gorm:"column:title_th"`
+		FirstnameTH *string `gorm:"column:firstname_th"`
+		SurnameTH   *string `gorm:"column:surname_th"`
+		TitleEN     *string `gorm:"column:title_en"`
+		FirstnameEN *string `gorm:"column:firstname_en"`
+		SurnameEN   *string `gorm:"column:surname_en"`
+	}
+	var wls []wRow
+	if err := db.Table("event_whitelists AS ew").
+		Select(`ew.attendee_ref_id AS ref_id,
+                u.title_th, u.firstname_th, u.surname_th,
+                u.title_en, u.firstname_en, u.surname_en`).
+		Joins("LEFT JOIN users u ON u.ref_id = ew.attendee_ref_id").
+		Where("ew.event_id = ?", eventID).
+		Scan(&wls).Error; err != nil {
+		return "", nil, err
+	}
+	for _, x := range wls {
+		p := getOrCreate(x.RefID)
+		p.onWhitelist = true
+		p.mergeUserFields(x.TitleTH, x.FirstnameTH, x.SurnameTH,
+			x.TitleEN, x.FirstnameEN, x.SurnameEN)
+	}
+	
+	type wPendRow struct {
+		RefID uint64 `gorm:"column:attendee_ref_id"`
+	}
+	var wlPendings []wPendRow
+	if err := db.Table("event_whitelist_pendings").
+		Select("attendee_ref_id").
+		Where("event_id = ?", eventID).
+		Scan(&wlPendings).Error; err != nil {
+		return "", nil, err
+	}
+	for _, x := range wlPendings {
+		p := getOrCreate(x.RefID)
+		p.onWhitelist = true
+		// name fields ยังเป็น nil อยู่ — ยังไม่มี user row จริง ๆ
+	}
+
+	// ---- 5. Flatten + sort ----
+	rows := make([]entity.EventPersonExportRow, 0, len(people))
+	for _, p := range people {
+		refID := p.refID
+		rows = append(rows, entity.EventPersonExportRow{
+			RefID:        &refID,
+			TitleTH:      p.titleTH,
+			FirstnameTH:  p.firstnameTH,
+			SurnameTH:    p.surnameTH,
+			TitleEN:      p.titleEN,
+			FirstnameEN:  p.firstnameEN,
+			SurnameEN:    p.surnameEN,
+			Organization: p.organization,
+			EventRole:    p.eventRole,
+			OnWhitelist:  p.onWhitelist,
+			CheckedInAt:  p.checkedInAt,
+			Comment:      p.comment,
+		})
+	}
+
+	sort.SliceStable(rows, func(i, j int) bool {
+		a, b := rows[i], rows[j]
+		ai := derefOr(a.FirstnameTH, derefOr(a.FirstnameEN, ""))
+		bi := derefOr(b.FirstnameTH, derefOr(b.FirstnameEN, ""))
+		if ai != bi {
+			return ai < bi
+		}
+		as := derefOr(a.SurnameTH, derefOr(a.SurnameEN, ""))
+		bs := derefOr(b.SurnameTH, derefOr(b.SurnameEN, ""))
+		if as != bs {
+			return as < bs
+		}
+		return *a.RefID < *b.RefID
+	})
+
+	return event.Name, rows, nil
+}
+
+func derefOr(s *string, fallback string) string {
+	if s == nil {
+		return fallback
+	}
+	return *s
 }

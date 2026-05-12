@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	dtoReq "github.com/cunex-club/quickattend-backend/internal/dto/request"
+	errorx "github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response/error"
 	"gorm.io/gorm"
 )
 
@@ -20,6 +21,7 @@ type EventHandler interface {
 	GetEvents(*fiber.Ctx) error
 	CreateEvent(c *fiber.Ctx) error
 	UpdateEvent(c *fiber.Ctx) error
+	ExportEventUserExcel(c *fiber.Ctx) error
 }
 
 func (h *Handler) Delete(c *fiber.Ctx) error {
@@ -187,4 +189,21 @@ func (h *Handler) UpdateEvent(c *fiber.Ctx) error {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
 	}
 	return response.OK(c, res)
+}
+
+func (h *Handler) ExportEventUserExcel(c *fiber.Ctx) error {
+	eventID := c.Params("id")
+
+	userIDStr, ok := c.Locals("user_id").(string)
+	if !ok {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "expect string user_id in JWT")
+	}
+
+	filename, content, err := h.Service.Event.ExportEventUserExcel(c.UserContext(), eventID, userIDStr)
+	if err != nil {
+		status, code, msg := errorx.EventError(err)
+		return response.SendError(c, status, code, msg)
+	}
+
+	return response.Excel(c, filename, content)
 }

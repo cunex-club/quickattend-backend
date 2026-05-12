@@ -1,18 +1,21 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/xuri/excelize/v2"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
@@ -20,6 +23,7 @@ import (
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
+	errorx "github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response/error"
 	"github.com/cunex-club/quickattend-backend/internal/repository"
 )
 
@@ -40,6 +44,8 @@ type EventService interface {
 	GetMyEventsService(userID datatypes.UUID, search string, ctx context.Context) (res *[]dtoRes.GetEventsRes, err *response.APIError)
 	GetDiscoveryEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetDiscoveryEventsRes, pagination *response.Pagination, err *response.APIError)
 	GetPastEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetEventsRes, pagination *response.Pagination, err *response.APIError)
+
+	ExportEventUserExcel(ctx context.Context, eventIdStr string, userIdStr string) (string, []byte, error)
 }
 
 type GetEventsValidateArgsReturn struct {
@@ -120,7 +126,7 @@ func (s *service) Comment(commentReq dtoReq.CommentReq, ctx context.Context) *re
 		ctx,
 	); err != nil {
 
-		if errors.Is(err, entity.ErrAlreadyCommented) {
+		if errors.Is(err, errorx.ErrAlreadyCommented) {
 			return &response.APIError{
 				Code:    response.ErrConflict,
 				Message: err.Error(),
@@ -128,7 +134,7 @@ func (s *service) Comment(commentReq dtoReq.CommentReq, ctx context.Context) *re
 			}
 		}
 
-		if errors.Is(err, entity.ErrCheckInTargetNotFound) {
+		if errors.Is(err, errorx.ErrCheckInTargetNotFound) {
 			return &response.APIError{
 				Code:    response.ErrBadRequest,
 				Message: err.Error(),
@@ -190,7 +196,7 @@ func (s *service) DeleteById(eventIDStr string, userIDStr string, ctx context.Co
 			}
 		}
 
-		if errors.Is(err, entity.ErrInsufficientPermissions) {
+		if errors.Is(err, errorx.ErrInsufficientPermissions) {
 			logger.Msg("user unauthorized")
 			return &response.APIError{
 				Code:    response.ErrForbidden,
@@ -199,7 +205,7 @@ func (s *service) DeleteById(eventIDStr string, userIDStr string, ctx context.Co
 			}
 		}
 
-		if errors.Is(err, entity.ErrNilUUID) {
+		if errors.Is(err, errorx.ErrNilUUID) {
 			logger.Msg("attempt deleting nil uuid")
 			return &response.APIError{
 				Code:    response.ErrBadRequest,
@@ -1358,4 +1364,192 @@ func anyToUint8(v any) (uint8, error) {
 		return 0, fmt.Errorf("out of range")
 	}
 	return uint8(u), nil
+}
+
+func (s *service) ExportEventUserExcel(ctx context.Context, eventIdStr string, userIdStr string) (string, []byte, error) {
+	eventUUID, err := uuid.Parse(eventIdStr)
+	if err != nil {
+		return "", nil, errorx.ErrInvalidEventID
+	}
+
+	userUUID, err := uuid.Parse(userIdStr)
+	if err != nil {
+		return "", nil, errorx.ErrInvalidUserID
+	}
+
+	role, err := s.repo.Event.GetUserRoleInEvent(eventUUID, userUUID, ctx)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		s.logger.Error().Err(err).
+			Str("event_id", eventIdStr).
+			Str("user_id", userIdStr).
+			Str("function", "EventRepository.GetUserRoleInEvent").
+			Msg("failed to check export permission")
+		return "", nil, fmt.Errorf("permission check: %w", errorx.ErrInternalDB)
+	}
+	if role == nil {
+		return "", nil, errorx.ErrInsufficientPermissions
+	}
+
+	eventName, rows, err := s.repo.Event.GetEventUserExport(ctx, datatypes.UUID(datatypes.BinUUIDFromString(eventIdStr)))
+	if err != nil {
+		if errors.Is(err, errorx.ErrEventNotFound) {
+			return "", nil, errorx.ErrEventNotFound
+		}
+		s.logger.Error().Err(err).
+			Str("event_id", eventIdStr).
+			Str("function", "EventRepository.GetEventUserExport").
+			Msg("failed to get export rows")
+		return "", nil, fmt.Errorf("query export: %w", errorx.ErrInternalDB)
+	}
+
+	content, err := buildEventPeopleExcel(rows)
+	if err != nil {
+		s.logger.Error().Err(err).
+			Str("event_id", eventIdStr).
+			Msg("failed to build excel")
+		return "", nil, fmt.Errorf("build excel: %w", errorx.ErrExcelGeneration)
+	}
+
+	filename := sanitizeExcelFilename(eventName) + "_people.xlsx"
+	return filename, content, nil
+}
+
+func buildEventPeopleExcel(rows []entity.EventPersonExportRow) ([]byte, error) {
+	f := excelize.NewFile()
+	defer func() { _ = f.Close() }()
+
+	const sheet = "People"
+	f.SetSheetName(f.GetSheetName(0), sheet)
+
+	headerStyle, err := f.NewStyle(&excelize.Style{
+		Font:      &excelize.Font{Bold: true},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"#EDEDED"}, Pattern: 1},
+		Alignment: &excelize.Alignment{Vertical: "center"},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	headers := []string{
+		"No.",
+		"Ref ID",
+		"Title TH", "Firstname TH", "Surname TH",
+		"Title EN", "Firstname EN", "Surname EN",
+		"Organization",
+		"Event Role",
+		"On Whitelist",
+		"Checked In At",
+		"Comment",
+	}
+	for i, h := range headers {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		if err := f.SetCellValue(sheet, cell, h); err != nil {
+			return nil, err
+		}
+	}
+	lastCol, _ := excelize.CoordinatesToCellName(len(headers), 1)
+	if err := f.SetCellStyle(sheet, "A1", lastCol, headerStyle); err != nil {
+		return nil, err
+	}
+
+	// --- Body ---
+	for i, row := range rows {
+		r := i + 2
+		values := []any{
+			i + 1,
+			formatRefIDPtr(row.RefID),
+			valueOrEmpty(row.TitleTH),
+			valueOrEmpty(row.FirstnameTH),
+			valueOrEmpty(row.SurnameTH),
+			valueOrEmpty(row.TitleEN),
+			valueOrEmpty(row.FirstnameEN),
+			valueOrEmpty(row.SurnameEN),
+			valueOrEmpty(row.Organization),
+			valueOrDash(row.EventRole),
+			boolYesOrDash(row.OnWhitelist),
+			formatTimePtr(row.CheckedInAt),
+			valueOrEmpty(row.Comment),
+		}
+		startCell, _ := excelize.CoordinatesToCellName(1, r)
+		if err := f.SetSheetRow(sheet, startCell, &values); err != nil {
+			return nil, err
+		}
+	}
+
+	// --- Freeze header row ---
+	if err := f.SetPanes(sheet, &excelize.Panes{
+		Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft",
+	}); err != nil {
+		return nil, err
+	}
+
+	// --- Column widths ---
+	widths := []float64{6, 14, 10, 18, 18, 10, 18, 18, 28, 12, 14, 22, 40}
+	for i, w := range widths {
+		col, _ := excelize.ColumnNumberToName(i + 1)
+		if err := f.SetColWidth(sheet, col, col, w); err != nil {
+			return nil, err
+		}
+	}
+
+	// --- Enable autofilter on the header ---
+	if err := f.AutoFilter(sheet, "A1:"+lastCol, []excelize.AutoFilterOptions{}); err != nil {
+		return nil, err
+	}
+
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, err
+	}
+	return bytes.Clone(buf.Bytes()), nil
+}
+
+func valueOrDash(s *string) string {
+	if s == nil || *s == "" {
+		return "—"
+	}
+	return *s
+}
+
+func boolYesOrDash(b bool) string {
+	if b {
+		return "Yes"
+	}
+	return "—"
+}
+
+func valueOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func formatRefIDPtr(v *uint64) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%08d", *v)
+}
+
+func formatTimePtr(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
+}
+
+var invalidFilenameChars = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]+`)
+
+func sanitizeExcelFilename(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "event_people"
+	}
+	name = invalidFilenameChars.ReplaceAllString(name, "_")
+	name = strings.Trim(name, " .")
+	if name == "" {
+		return "event_people"
+	}
+	return name
 }

@@ -17,6 +17,7 @@ func EventRoutes(r fiber.Router, h *handler.AllOfHandler, mw *middleware.Middlew
 	events.Post("/", h.EventHandler.CreateEvent)
 	events.Put("/:id", h.EventHandler.UpdateEvent)
 	event.Get("/", h.EventHandler.GetEvents)
+	event.Get("/:id/export", h.EventHandler.ExportEventUserExcel)
 
 	participant := r.Group("/participant", mw.AuthRequired())
 	participant.Put("/comment", h.EventHandler.Comment)
