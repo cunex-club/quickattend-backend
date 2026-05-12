@@ -478,12 +478,17 @@ func (r *repository) CreateEvent(ctx context.Context, payload entity.CreateEvent
 			}
 		}
 
-		eventUsers, err := buildEventUsersFromInput(ctx, tx, payload.Event.ID, payload.EventUsersInput)
+		eventUsers, eventUsersPend, err := splitEventUserAndPending(ctx, tx, payload.Event.ID, payload.EventUsersInput)
 		if err != nil {
 			return err
 		}
 		if len(eventUsers) > 0 {
 			if err := tx.Create(&eventUsers).Error; err != nil {
+				return err
+			}
+		}
+		if len(eventUsersPend) > 0 {
+			if err := tx.Create(&eventUsersPend).Error; err != nil {
 				return err
 			}
 		}
@@ -541,6 +546,9 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 		if err := tx.Where("event_id = ?", existing.ID).Delete(&entity.EventUser{}).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("event_id = ?", existing.ID).Delete(&entity.EventUserPending{}).Error; err != nil {
+			return err
+		}
 
 		if len(payload.Agendas) > 0 {
 			for i := range payload.Agendas {
@@ -589,12 +597,17 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 			}
 		}
 
-		eventUsers, err := buildEventUsersFromInput(ctx, tx, existing.ID, payload.EventUsersInput)
+		eventUsers, eventUsersPend, err := splitEventUserAndPending(ctx, tx, existing.ID, payload.EventUsersInput)
 		if err != nil {
 			return err
 		}
 		if len(eventUsers) > 0 {
 			if err := tx.Create(&eventUsers).Error; err != nil {
+				return err
+			}
+		}
+		if len(eventUsersPend) > 0 {
+			if err := tx.Create(&eventUsersPend).Error; err != nil {
 				return err
 			}
 		}
@@ -668,9 +681,9 @@ func splitWhitelistAndPending(ctx context.Context, tx *gorm.DB, wl []entity.Even
 	return okOut, pendOut, nil
 }
 
-func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatypes.UUID, in []entity.EventUserInput) ([]entity.EventUser, error) {
+func splitEventUserAndPending(ctx context.Context, tx *gorm.DB, eventID datatypes.UUID, in []entity.EventUserInput) ([]entity.EventUser, []entity.EventUserPending, error) {
 	if len(in) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// dedup by ref_id (ถ้า ref_id ซ้ำแต่ role ต่างกัน -> error)
@@ -681,7 +694,7 @@ func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatype
 		rs := string(x.Role) // role underlying type = string
 		if old, ok := seenRole[x.RefID]; ok {
 			if old != rs {
-				return nil, fmt.Errorf("duplicate ref_id with different role in managers_and_staff: %d", x.RefID)
+				return nil, nil, fmt.Errorf("duplicate ref_id with different role in managers_and_staff: %d", x.RefID)
 			}
 			continue
 		}
@@ -695,27 +708,36 @@ func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatype
 	}
 
 	var users []entity.User
-	if err := tx.WithContext(ctx).Where("ref_id IN ?", refIDs).Find(&users).Error; err != nil {
-		return nil, err
+	if err := tx.WithContext(ctx).
+		Select("id", "ref_id").
+		Where("ref_id IN ?", refIDs).
+		Find(&users).Error; err != nil {
+		return nil, nil, err
 	}
 
-	userByRef := make(map[uint64]entity.User, len(users))
+	userFromDB := make(map[uint64]entity.User, len(users))
 	for _, u := range users {
-		userByRef[u.RefID] = u
+		userFromDB[u.RefID] = u
 	}
 
-	out := make([]entity.EventUser, 0, len(dedup))
+	outOK := make([]entity.EventUser, 0, len(userFromDB))
+	outPend := make([]entity.EventUserPending, 0)
 	for _, x := range dedup {
-		u, ok := userByRef[x.RefID]
+		u, ok := userFromDB[x.RefID]
 		if !ok {
-			return nil, fmt.Errorf("unknown ref_id in managers_and_staff: %d", x.RefID)
+			outPend = append(outPend, entity.EventUserPending{
+				EventID:   eventID,
+				UserRefID: x.RefID,
+				Role:      x.Role,
+			})
+			continue
 		}
-		out = append(out, entity.EventUser{
+		outOK = append(outOK, entity.EventUser{
 			EventID: eventID,
 			UserID:  u.ID,
 			Role:    x.Role, // ✅ ใช้ role value เดิมได้เลย
 		})
 	}
 
-	return out, nil
+	return outOK, outPend, nil
 }
