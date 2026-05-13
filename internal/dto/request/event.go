@@ -37,6 +37,17 @@ type CreateEventReq struct {
 
 type UpdateEventReq = CreateEventReq
 
+type DuplicateEventReq struct {
+	Location       string            `json:"location" validate:"required"`
+	LocationLat    float64           `json:"location_lat"`
+	LocationLong   float64           `json:"location_long"`
+	StartTime      string            `json:"start_time" validate:"required"` // RFC3339 UTC
+	EndTime        string            `json:"end_time" validate:"required"`   // RFC3339 UTC
+	Timezone       string            `json:"timezone" validate:"required"`   // e.g. Asia/Bangkok
+	Agenda         []CreateAgendaReq `json:"agenda" validate:"dive"`
+	EvaluationForm *string           `json:"evaluation_form"`
+}
+
 type CommentReq struct {
 	Comment            string `json:"comment"`
 	EncodedOneTimeCode string `json:"one_time_code"`
