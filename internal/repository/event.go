@@ -92,11 +92,18 @@ func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, commen
 
 func (r *repository) FindById(id uuid.UUID, ctx context.Context) (*entity.Event, error) {
 	var event entity.Event
+
+	// Only preload what's necessary for event duplication
 	err := r.db.WithContext(ctx).
-		Preload("EventWhitelist").
+		Model(&entity.Event{}).
+		Preload("EventUser.User").
+		Preload("EventUserPending").
 		Preload("EventAllowedFaculties").
-		Preload("EventAgenda").
-		First(&event, "id = ?", id).Error
+		Preload("EventWhitelist.User").
+		Preload("EventWhitelistPending").
+		Where("id = ?", id).
+		First(&event).
+		Error
 	if err != nil {
 		return nil, err
 	}
