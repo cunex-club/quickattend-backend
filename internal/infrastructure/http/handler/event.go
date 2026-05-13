@@ -47,7 +47,15 @@ func (h *Handler) Duplicate(c *fiber.Ctx) error {
 	EventID := c.Params("id")
 	userIDStr := c.Locals("user_id").(string)
 
-	res, err := h.Service.Event.DuplicateById(EventID, userIDStr, c.UserContext())
+	var reqBody dtoReq.DuplicateEventReq
+	if err := c.BodyParser(&reqBody); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "Invalid JSON body")
+	}
+	if err := h.Validator.Struct(reqBody); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "Invalid JSON body")
+	}
+
+	res, err := h.Service.Event.DuplicateById(reqBody, EventID, userIDStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
