@@ -20,7 +20,7 @@ func (s *service) GetUserByRefId(refIdStr string, ctx context.Context) (*dtoRes.
 		return nil, &response.APIError{
 			Code:    response.ErrBadRequest,
 			Status:  400,
-			Message: "Invalid ref_id format",
+			Message: "Invalid format of path parameter 'ref_id'",
 		}
 	}
 

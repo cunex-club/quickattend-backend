@@ -12,9 +12,6 @@ type UserHandler interface {
 
 func (h *Handler) GetUserByRefId(c *fiber.Ctx) error {
 	refIdStr := c.Params("ref_id")
-	if refIdStr == "" {
-		return response.SendError(c, 400, response.ErrBadRequest, "Empty path parameter 'ref_id'")
-	}
 
 	user, err := h.Service.User.GetUserByRefId(refIdStr, c.UserContext())
 	if err != nil {
