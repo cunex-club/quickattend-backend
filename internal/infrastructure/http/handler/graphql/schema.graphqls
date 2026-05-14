@@ -1,0 +1,61 @@
+"""
+Aggregate head-count figures for a single event.
+"""
+type RegistrationSummary {
+  totalEligible: Int
+
+  # Number of students (ref_id length == 10) who have been scanned in.
+  totalStudent: Int!
+
+  # Number of non-students (ref_id length != 10) who have been scanned in.
+  totalStaff: Int!
+
+  # totalStudent + totalStaff
+  totalAll: Int!
+}
+
+"""
+Per-organization breakdown of scanned-in participants.
+"""
+type OrganizationStat {
+  organization: String!
+
+  # Number of students (ref_id length == 10) in this organization.
+  studentCount: Int!
+
+  # Number of non-students (ref_id length != 10) in this organization.
+  staffCount: Int!
+
+  # studentCount + staffCount
+  totalCount: Int!
+}
+
+"""
+Participant count for a single one-hour bucket of the event timeline.
+"""
+type TimeStat {
+  """
+  Start of the hourly bucket as an RFC 3339 / ISO 8601 UTC timestamp
+  ex. 2026-04-14T09:00:00Z
+  """
+  timeBucket: String!
+
+  # Number of students (ref_id length == 10) scanned in during this hour.
+  studentCount: Int!
+
+  # Number of non-students (ref_id length != 10) scanned in during this hour.
+  staffCount: Int!
+
+  # Total scans in this hour. Equal to `studentCount + staffCount`.
+  totalCount: Int!
+}
+
+type EventDashboard {
+  summary: RegistrationSummary!
+  organizationStats: [OrganizationStat!]!
+  timeSeriesStats: [TimeStat!]!
+}
+
+type Query {
+  eventDashboardData(eventID: ID!): EventDashboard!
+}
