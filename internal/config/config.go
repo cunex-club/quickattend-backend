@@ -20,6 +20,7 @@ type DatabaseConfig struct {
 	Password string `env:"POSTGRES_PASS,required"`
 	Name     string `env:"POSTGRES_DB,required"`
 	Schema   string `env:"POSTGRES_SCHEMA" envDefault:"public"`
+	SSLMode  string `env:"POSTGRES_SSLMODE" envDefault:"disable"`
 }
 
 type LLEConfig struct {
