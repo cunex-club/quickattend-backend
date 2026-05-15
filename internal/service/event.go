@@ -29,7 +29,7 @@ type EventService interface {
 	DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError
 	DuplicateById(EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
 	Comment(checkInReq dtoReq.CommentReq, ctx context.Context) *response.APIError
-	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
+	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.PostParticipantRes, *response.APIError)
 
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
 
@@ -330,7 +330,7 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 	}, nil
 }
 
-func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
+func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.PostParticipantRes, *response.APIError) {
 	if code == "" {
 		return nil, &response.APIError{
 			Code:    "INVALID_QR",
@@ -504,18 +504,51 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	orgCode := uint8(tempCode)
 
 	// Insert participant now to allow inserting them into EventParticipants later
-	userToInsert := entity.User{
-		RefID:       refIdUInt,
-		FirstnameTH: CUNEXSuccess.FirstNameTH,
-		SurnameTH:   CUNEXSuccess.LastNameTH,
-		TitleTH:     "",
-		FirstnameEN: CUNEXSuccess.FirstNameEN,
-		SurnameEN:   CUNEXSuccess.LastNameEN,
-		TitleEN:     "",
+	var (
+		orgTH string
+		orgEN string
+	)
+	switch CUNEXSuccess.UserType {
+	case entity.STUDENTS:
+		orgTH = CUNEXSuccess.FacultyNameTH
+		orgEN = CUNEXSuccess.FacultyNameEN
+
+	case entity.STAFFS:
+		orgTH = CUNEXSuccess.DepartmentNameTH
+		orgEN = CUNEXSuccess.DepartmentNameEN
+
+	default:
+		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Invalid userType returned from CU NEX GET qrcode",
+			Status:  500,
+		}
 	}
-	user, createUserErr := s.CreateUserIfNotExists(&userToInsert, ctx)
-	if createUserErr != nil {
-		return nil, createUserErr
+
+	userToUpsert := entity.User{
+		RefID:           refIdUInt,
+		FirstnameTH:     CUNEXSuccess.FirstNameTH,
+		SurnameTH:       CUNEXSuccess.LastNameTH,
+		FirstnameEN:     CUNEXSuccess.FirstNameEN,
+		SurnameEN:       CUNEXSuccess.LastNameEN,
+		FacultyNameTH:   orgTH,
+		FacultyNameEN:   orgEN,
+		ProfileImageURL: CUNEXSuccess.ProfileImageUrl,
+	}
+	notToUpdate := []string{"title_th", "title_en"}
+	user, upsertErr := s.repo.Auth.UpsertUserByRefId(&userToUpsert, &notToUpdate, ctx)
+	if upsertErr != nil {
+		s.logger.Error().Err(upsertErr).
+			Uint64("participant_ref_id", refIdUInt).
+			Str("action", "upsert_user_by_ref_id").
+			Msg("failed to upsert user by ref id")
+
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB error",
+			Status:  500,
+		}
 	}
 
 	// Get event info for checking scanning/check in permission
@@ -550,30 +583,6 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	status, checkinTime, rowId, errCheckStatus := s.CheckCheckinStatus(ctx, eventIdUuid, user.RefID, user.ID, string(event.AttendenceType), orgCode, event.EndTime)
 	if errCheckStatus != nil {
 		return nil, errCheckStatus
-	}
-
-	// Format org before proceeding with steps according to status
-	// to make EventParticipants insertion possible
-	var (
-		orgTH string
-		orgEN string
-	)
-	switch CUNEXSuccess.UserType {
-	case entity.STUDENTS:
-		orgTH = CUNEXSuccess.FacultyNameTH
-		orgEN = CUNEXSuccess.FacultyNameEN
-
-	case entity.STAFFS:
-		orgTH = CUNEXSuccess.DepartmentNameTH
-		orgEN = CUNEXSuccess.DepartmentNameEN
-
-	default:
-		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Invalid userType returned from CU NEX GET qrcode",
-			Status:  500,
-		}
 	}
 
 	switch status {
@@ -612,7 +621,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	checkInCode := base64.StdEncoding.EncodeToString(raw)
 
 	// Finally, format response according to revealed_fields of this event
-	responseBody := dtoRes.GetParticipantRes{
+	responseBody := dtoRes.PostParticipantRes{
 		FirstnameTH:     nil,
 		SurnameTH:       nil,
 		TitleTH:         nil,
@@ -741,6 +750,38 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
+	// Format each attribute
+
+	usersDTO := make([]dtoRes.GetOneEventUser, 0, len(result.EventUser))
+	if len(result.EventUser) > 0 {
+		for _, user := range result.EventUser {
+			u := user.User
+			usersDTO = append(usersDTO, dtoRes.GetOneEventUser{
+				RefID:           s.FormatRefIdToStr(u.RefID),
+				FirstnameTH:     u.FirstnameTH,
+				SurnameTH:       u.SurnameTH,
+				TitleTH:         u.TitleTH,
+				FacultyNameTH:   u.FacultyNameTH,
+				FirstnameEN:     u.FirstnameEN,
+				SurnameEN:       u.SurnameEN,
+				TitleEN:         u.TitleEN,
+				FacultyNameEN:   u.FacultyNameEN,
+				ProfileImageURL: u.ProfileImageURL,
+				Role:            string(user.Role),
+			})
+		}
+	}
+
+	usersPendingDTO := make([]dtoRes.GetOneEventUserPending, 0, len(result.EventUserPending))
+	if len(result.EventUserPending) > 0 {
+		for _, user := range result.EventUserPending {
+			usersPendingDTO = append(usersPendingDTO, dtoRes.GetOneEventUserPending{
+				RefID: s.FormatRefIdToStr(user.UserRefID),
+				Role:  string(user.Role),
+			})
+		}
+	}
+
 	agendaDTO := make([]dtoRes.GetOneEventAgenda, 0, len(result.EventAgenda))
 	if len(result.EventAgenda) > 0 {
 		for _, slot := range result.EventAgenda {
@@ -752,18 +793,39 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
-	usersDTO := make([]dtoRes.GetOneEventUser, 0, len(result.EventUser))
-	if len(result.EventUser) > 0 {
-		for _, user := range result.EventUser {
-			u := user.User
-			usersDTO = append(usersDTO, dtoRes.GetOneEventUser{
-				FirstnameTH: u.FirstnameTH,
-				SurnameTH:   u.SurnameTH,
-				TitleTH:     u.TitleTH,
-				FirstnameEN: u.FirstnameEN,
-				SurnameEN:   u.SurnameEN,
-				TitleEN:     u.TitleEN,
-				Role:        string(user.Role),
+	allowedFacDTO := make([]dtoRes.GetOneEventAllowedFaculties, 0, len(result.EventAllowedFaculties))
+	if len(result.EventAllowedFaculties) > 0 {
+		for _, faculty := range result.EventAllowedFaculties {
+			allowedFacDTO = append(allowedFacDTO, dtoRes.GetOneEventAllowedFaculties{
+				FacultyNO: faculty.FacultyNO,
+			})
+		}
+	}
+
+	whitelistDTO := make([]dtoRes.GetOneEventWhitelist, 0, len(result.EventWhitelist))
+	if len(result.EventWhitelist) > 0 {
+		for _, wl := range result.EventWhitelist {
+			wlUser := wl.User
+			whitelistDTO = append(whitelistDTO, dtoRes.GetOneEventWhitelist{
+				RefID:           s.FormatRefIdToStr(wlUser.RefID),
+				FirstnameTH:     wlUser.FirstnameTH,
+				SurnameTH:       wlUser.SurnameTH,
+				TitleTH:         wlUser.TitleTH,
+				FacultyNameTH:   wlUser.FacultyNameTH,
+				FirstnameEN:     wlUser.FirstnameEN,
+				SurnameEN:       wlUser.SurnameEN,
+				TitleEN:         wlUser.TitleEN,
+				FacultyNameEN:   wlUser.FacultyNameEN,
+				ProfileImageURL: wlUser.ProfileImageURL,
+			})
+		}
+	}
+
+	whitelistPendingDTO := make([]dtoRes.GetOneEventWhitelistPending, 0, len(result.EventWhitelistPending))
+	if len(result.EventWhitelistPending) > 0 {
+		for _, wl := range result.EventWhitelistPending {
+			whitelistPendingDTO = append(whitelistPendingDTO, dtoRes.GetOneEventWhitelistPending{
+				RefID: s.FormatRefIdToStr(wl.AttendeeRefID),
 			})
 		}
 	}
@@ -775,21 +837,26 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 	finalRes := dtoRes.GetOneEventRes{
-		Name:            result.Name,
-		Organizer:       result.Organizer,
-		Description:     result.Description,
-		StartTime:       result.StartTime.UTC(),
-		EndTime:         result.EndTime.UTC(),
-		Location:        result.Location,
-		LocationLat:     result.LocationPoint.Y,
-		LocationLong:    result.LocationPoint.X,
-		TotalRegistered: result.TotalRegistered,
-		EvaluationForm:  result.EvaluationForm,
-		AllowAllToScan:  result.AllowAllToScan,
-		RevealedFields:  revealedFields,
-		Role:            result.Role,
-		Agenda:          agendaDTO,
-		User:            usersDTO,
+		Name:             result.Name,
+		Organizer:        result.Organizer,
+		Description:      result.Description,
+		StartTime:        result.StartTime.UTC(),
+		EndTime:          result.EndTime.UTC(),
+		Location:         result.Location,
+		LocationLat:      result.LocationPoint.Y,
+		LocationLong:     result.LocationPoint.X,
+		TotalRegistered:  result.TotalRegistered,
+		EvaluationForm:   result.EvaluationForm,
+		AllowAllToScan:   result.AllowAllToScan,
+		RevealedFields:   revealedFields,
+		AttendanceType:   result.AttendenceType,
+		Role:             result.Role,
+		Agenda:           agendaDTO,
+		User:             usersDTO,
+		UserPending:      usersPendingDTO,
+		AllowedFaculties: allowedFacDTO,
+		WhiteList:        whitelistDTO,
+		WhiteListPending: whitelistPendingDTO,
 	}
 
 	return &finalRes, nil

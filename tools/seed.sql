@@ -3,14 +3,13 @@ BEGIN;
 -- =========================
 -- USERS
 -- =========================
-INSERT INTO users (id, ref_id, firstname_th, surname_th, title_th, firstname_en, surname_en, title_en)
+INSERT INTO users (id, ref_id, firstname_th, surname_th, title_th, firstname_en, surname_en, title_en, faculty_name_th, faculty_name_en, profile_image_url)
 VALUES
-  ('11111111-1111-1111-1111-111111111111', 10001, 'สมชาย', 'ใจดี', 'นาย', 'Somchai', 'Jaidee', 'Mr.'),
-  ('22222222-2222-2222-2222-222222222222', 10002, 'สมหญิง', 'แสนดี', 'นางสาว', 'Somying', 'Saendee', 'Ms.'),
-  ('33333333-3333-3333-3333-333333333333', 10003, 'วิทยา', 'เก่งงาน', 'นาย', 'Withaya', 'Kengngan', 'Mr.'),
-  ('44444444-4444-4444-4444-444444444444', 10004, 'อรทัย', 'ตั้งใจ', 'นาง', 'Orathai', 'Tangjai', 'Mrs.'),
-  ('55555555-5555-5555-5555-555555555555', 6631321321, 'ธนกร', 'ไชยยุทธ', 'นาย', 'Thanagorn', 'Chaiyut', 'Mr.');
-
+  ('11111111-1111-1111-1111-111111111111', 10001, 'สมชาย', 'ใจดี', 'นาย', 'Somchai', 'Jaidee', 'Mr.', 'คณะ ก', 'faculty A', 'https://'),
+  ('22222222-2222-2222-2222-222222222222', 10002, 'สมหญิง', 'แสนดี', 'นางสาว', 'Somying', 'Saendee', 'Ms.', 'คณะ ข', 'faculty B', 'https://'),
+  ('33333333-3333-3333-3333-333333333333', 10003, 'วิทยา', 'เก่งงาน', 'นาย', 'Withaya', 'Kengngan', 'Mr.', 'คณะ ค', 'faculty C', 'https://'),
+  ('44444444-4444-4444-4444-444444444444', 10004, 'อรทัย', 'ตั้งใจ', 'นาง', 'Orathai', 'Tangjai', 'Mrs.', 'คณะ ง', 'faculty D', 'https://'),
+  ('55555555-5555-5555-5555-555555555555', 6631321321, 'ธนกร', 'ไชยยุทธ', 'นาย', 'Thanagorn', 'Chaiyut', 'Mr.', 'คณะวิศวกรรมศาสตร์', 'faculty of engineering', '');
 -- =========================
 -- EVENTS
 -- =========================
@@ -473,6 +472,49 @@ SELECT
   POINT(52.0, 3.33),
   '55555555-5555-5555-5555-555555555555'::uuid
 FROM user_111_events_with_rn WHERE rn IN (12, 13, 14);
+/*
+Summary of additional events for user 111
+
+***** 7 more past events: name = "Past event i of user 111"
+- Already ended
+
+For i = 1 to 4
+- users
+  - OWNER = 333 (วิทยา)
+  - MANAGER = 111 (สมชาย)
+- 2 participants
+  - 111 scanned 222, no comment
+  - 111 scanned 555, has comment
+
+For i = 5 to 7
+- users
+  - OWNER = 222 (สมหญิง)
+  - STAFF = 111 (สมชาย)
+- 1 participant
+  - 222 scanned 444, no comment
+
+
+***** 7 more discovery events: name = "Discovery event i of user 111" 
+- Ongoing
+
+For i = 1 to 4
+- users
+  - OWNER = 333 (วิทยา)
+- 3 participants
+  - 333 scanned 222, no comment
+  - 333 scanned 444, has comment
+  - 333 scanned 555, has comment
+
+For i = 5 to 7
+- users
+  - OWNER = 222 (สมหญิง)
+  - MANAGER = 444 (อรทัย)
+  - STAFF = 555 (ธนกร)
+- 1 participant
+  - 555 scanned 333, no comment
+*/
+
+
 
 -- =========================
 -- DASHBOARD VALIDATION DATA (NEW EVENT)
@@ -861,47 +903,103 @@ ON CONFLICT (event_id, participant_id) DO NOTHING;
 --   NOW-2h bucket: 1 student, 1 staff, 2 total
 --   NOW-1h bucket: 0 student, 1 staff, 1 total
 
+
+
+
+
+
+-- More events for testing whitelist pendings and event user pendings
+INSERT INTO events (
+  id, name, organizer, description,
+  start_time, end_time, location, location_point,
+  attendence_type, allow_all_to_scan,
+  evaluation_form, revealed_fields
+)
+VALUES
+  (
+    '5d7fbc22-ac19-4c70-95ab-6f7cf1056867'::uuid,
+    'Event abc with whitelist system',
+    'abc org',
+    NULL,
+    NOW() - INTERVAL '2 hours',
+    NOW() + INTERVAL '5 hours',
+    'location of abc',
+    POINT(10, 50),
+    'WHITELIST'::attendence_type,
+    FALSE,
+    NULL,
+    ARRAY['PHOTO', 'NAME', 'REFID', 'ORGANIZATION']::participant_data[]
+  ),
+  (
+    '40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid,
+    'Event jjjj with whitelist system',  
+    'jjjj',
+    'nothing',
+    NOW() - INTERVAL '1 hour',
+    NOW() + INTERVAL '4 hours',
+    'location of jjjj',
+    POINT(0, 3.33),
+    'WHITELIST'::attendence_type,
+    TRUE,
+    NULL,
+    ARRAY['NAME', 'REFID', 'ORGANIZATION']::participant_data[]
+  );
+
+-- Whitelist people with account in system
+INSERT INTO event_whitelists (event_id, attendee_ref_id)
+VALUES
+  ('5d7fbc22-ac19-4c70-95ab-6f7cf1056867'::uuid, 10001),
+  ('5d7fbc22-ac19-4c70-95ab-6f7cf1056867'::uuid, 6631321321),
+  ('40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid, 10002),
+  ('40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid, 10003);
+
+-- Whitelist people without account
+INSERT INTO event_whitelist_pendings (event_id, attendee_ref_id)
+VALUES
+  ('5d7fbc22-ac19-4c70-95ab-6f7cf1056867'::uuid, 99999),
+  ('5d7fbc22-ac19-4c70-95ab-6f7cf1056867'::uuid, 6638067221),
+  ('40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid, 888888);
+
+
+-- Event staff with account in system
+INSERT INTO event_users (event_id, user_id, role)
+VALUES
+  ('5d7fbc22-ac19-4c70-95ab-6f7cf1056867'::uuid, '44444444-4444-4444-4444-444444444444'::uuid, 'OWNER'),
+  ('40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid, '11111111-1111-1111-1111-111111111111'::uuid, 'OWNER'),
+  ('40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid, '44444444-4444-4444-4444-444444444444'::uuid, 'MANAGER');
+
+-- Event staff without account
+INSERT INTO event_user_pendings (event_id, user_ref_id, role)
+VALUES
+  ('40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid, 6638067221, 'STAFF'),
+  ('5d7fbc22-ac19-4c70-95ab-6f7cf1056867'::uuid, 222222, 'MANAGER');
+
+INSERT INTO event_agendas (event_id, activity_name, start_time, end_time)
+VALUES
+  (
+    '5d7fbc22-ac19-4c70-95ab-6f7cf1056867'::uuid, 
+    'slot1',
+    NOW() - INTERVAL '2 hours',
+    NOW() + INTERVAL '1 hour'
+  ),
+  (
+    '5d7fbc22-ac19-4c70-95ab-6f7cf1056867'::uuid, 
+    'slot2',
+    NOW() + INTERVAL '1 hour',
+    NOW() + INTERVAL '5 hours'
+  ),
+  (
+    '40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid,
+    'slot1',
+    NOW() - INTERVAL '1 hour',
+    NOW() + INTERVAL '2 hours'
+  ),
+  (
+    '40ae65ef-9b95-4031-ab00-257ab7cbdf70'::uuid,
+    'slot2',
+    NOW() + INTERVAL '2 hours',
+    NOW() + INTERVAL '4 hours'   
+  );
+
+
 COMMIT;
-
-
-/*
-Summary of additional events for user 111
-
-***** 7 more past events: name = "Past event i of user 111"
-- Already ended
-
-For i = 1 to 4
-- users
-  - OWNER = 333 (วิทยา)
-  - MANAGER = 111 (สมชาย)
-- 2 participants
-  - 111 scanned 222, no comment
-  - 111 scanned 555, has comment
-
-For i = 5 to 7
-- users
-  - OWNER = 222 (สมหญิง)
-  - STAFF = 111 (สมชาย)
-- 1 participant
-  - 222 scanned 444, no comment
-
-
-***** 7 more discovery events: name = "Discovery event i of user 111" 
-- Ongoing
-
-For i = 1 to 4
-- users
-  - OWNER = 333 (วิทยา)
-- 3 participants
-  - 333 scanned 222, no comment
-  - 333 scanned 444, has comment
-  - 333 scanned 555, has comment
-
-For i = 5 to 7
-- users
-  - OWNER = 222 (สมหญิง)
-  - MANAGER = 444 (อรทัย)
-  - STAFF = 555 (ธนกร)
-- 1 participant
-  - 555 scanned 333, no comment
-*/

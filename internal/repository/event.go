@@ -133,28 +133,59 @@ func (r *repository) DeleteById(id uuid.UUID, userIdStr string, ctx context.Cont
 func (r *repository) GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (*entity.GetOneEventQuery, error) {
 	withCtx := r.db.WithContext(ctx)
 
-	var result entity.GetOneEventQuery
-	err := withCtx.
+	var event entity.Event
+	errEvent := withCtx.
 		Model(&entity.Event{}).
-		Preload("EventUser.User").
+		Preload("EventUser.User", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("ref_id")
+		}).
+		Preload("EventUserPending", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("user_ref_id")
+		}).
 		Preload("EventAgenda", func(tx *gorm.DB) *gorm.DB {
 			return tx.Order("start_time")
 		}).
-		Select("events.*",
-			"eu.role AS role",
-			"COUNT(DISTINCT ep.participant_id) AS total_registered",
-		).
-		Joins("LEFT JOIN event_participants ep ON events.id = ep.event_id").
-		Joins("LEFT JOIN event_users eu ON events.id = eu.event_id AND eu.user_id = ?", userId).
-		Where("events.id = ?", eventId).
-		Group("events.id, eu.role").
-		First(&result).
+		Preload("EventAllowedFaculties", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("faculty_no")
+		}).
+		Preload("EventWhitelist.User", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("ref_id")
+		}).
+		Preload("EventWhitelistPending", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("attendee_ref_id")
+		}).
+		Where("id = ?", eventId).
+		First(&event).
 		Error
-
-	if err != nil {
-		return nil, err
+	if errEvent != nil {
+		return nil, errEvent
 	}
 
+	var registerCount uint16
+	errCount := withCtx.Model(&entity.EventParticipants{}).
+		Select("COUNT(DISTINCT participant_id)").
+		Where("event_id = ?", eventId).
+		Scan(&registerCount).
+		Error
+	if errCount != nil {
+		return nil, errCount
+	}
+
+	var role *string
+	errRole := withCtx.Model(&entity.EventUser{}).
+		Select("role").
+		Where("user_id = ? AND event_id = ?", userId, eventId).
+		Scan(&role).
+		Error
+	if errRole != nil {
+		return nil, errRole
+	}
+
+	result := entity.GetOneEventQuery{
+		Event:           event,
+		Role:            role,
+		TotalRegistered: registerCount,
+	}
 	return &result, nil
 }
 
@@ -367,10 +398,18 @@ func (r *repository) CheckEventAccess(ctx context.Context, orgCode uint8, refID 
 		return found, nil
 
 	case string(entity.AttendanceWhitelist):
-		checkErr := withCtx.Raw(`SELECT EXISTS (
-			SELECT 1 FROM event_whitelists
-			WHERE event_id = ? AND attendee_ref_id = ?
-		) AS subQuery`, eventId, refID).Scan(&found).Error
+		checkErr := withCtx.Raw(`SELECT (
+            SELECT (
+                EXISTS (
+                    SELECT 1 FROM event_whitelists 
+                    WHERE event_id = ? AND attendee_ref_id = ?
+                )
+                OR EXISTS (
+                    SELECT 1 FROM event_whitelist_pendings
+                    WHERE event_id = ? AND attendee_ref_id = ?
+                )
+            ) AS innerSubQuery
+        ) AS subQuery`, eventId, refID, eventId, refID).Scan(&found).Error
 		if checkErr != nil {
 			return false, checkErr
 		}
