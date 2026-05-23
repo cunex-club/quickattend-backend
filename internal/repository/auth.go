@@ -15,9 +15,17 @@ type AuthRepository interface {
 	GetUserByRefId(uint64, context.Context) (entity.User, error)
 	CreateUser(*entity.User, context.Context) (*entity.User, error)
 
+	// If user with given `ref_id` doesn't exist, create and fill in the ID field.
+	// Otherwise update all fields, excluding ID and those specified in `fieldsToOmit`, and return the updated entity.
+	//
+	// If `fieldsToOmit` is nil, all fields except ID are updated.
+	UpsertUserByRefId(user *entity.User, fieldsToOmit *[]string, ctx context.Context) (*entity.User, error)
+
 	FindWhitelistPendingByRefID(ctx context.Context, refID uint64) ([]entity.EventWhitelistPending, error)
 	DeleteWhitelistPendingByRefID(ctx context.Context, refID uint64) error
 	SyncWhitelistPendingToWhitelist(ctx context.Context, refID uint64) error
+
+	SyncEventUserPendingToEventUser(ctx context.Context, userID datatypes.UUID, refID uint64) error
 }
 
 func (r *repository) GetUserById(userID datatypes.UUID, ctx context.Context) (entity.User, error) {
@@ -37,6 +45,35 @@ func (r *repository) CreateUser(user *entity.User, ctx context.Context) (*entity
 	if err != nil {
 		return nil, err
 	}
+	return user, err
+}
+
+func (r *repository) UpsertUserByRefId(user *entity.User, fieldsToOmit *[]string, ctx context.Context) (*entity.User, error) {
+	userMap := map[string]any{
+		"ref_id":            user.RefID,
+		"firstname_th":      user.FirstnameTH,
+		"surname_th":        user.SurnameTH,
+		"title_th":          user.TitleTH,
+		"faculty_name_th":   user.FacultyNameTH,
+		"firstname_en":      user.FirstnameEN,
+		"surname_en":        user.SurnameEN,
+		"title_en":          user.TitleEN,
+		"faculty_name_en":   user.FacultyNameEN,
+		"profile_image_url": user.ProfileImageURL,
+	}
+	if fieldsToOmit != nil {
+		for _, field := range *fieldsToOmit {
+			delete(userMap, field)
+		}
+	}
+
+	err := r.db.WithContext(ctx).Clauses(
+		clause.Returning{},
+		clause.OnConflict{
+			Columns:   []clause.Column{{Name: "ref_id"}},
+			DoUpdates: clause.Assignments(userMap),
+		},
+	).Create(&user).Error
 	return user, err
 }
 
@@ -84,5 +121,44 @@ func (r *repository) SyncWhitelistPendingToWhitelist(ctx context.Context, refID 
 		}
 
 		return tx.Where("attendee_ref_id = ?", refID).Delete(&entity.EventWhitelistPending{}).Error
+	})
+}
+
+func (r *repository) SyncEventUserPendingToEventUser(ctx context.Context, userID datatypes.UUID, refID uint64) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var pending []entity.EventUserPending
+		if err := tx.Where("user_ref_id = ?", refID).Find(&pending).Error; err != nil {
+			return err
+		}
+		if len(pending) == 0 {
+			return nil
+		}
+
+		eu := make([]entity.EventUser, 0, len(pending))
+		seen := map[string]struct{}{}
+		for _, r := range pending {
+			key := fmt.Sprintf("%d:%s", r.UserRefID, r.EventID.String())
+			if _, ok := seen[key]; ok {
+				continue
+			}
+
+			seen[key] = struct{}{}
+			eu = append(eu, entity.EventUser{
+				UserID:  userID,
+				EventID: r.EventID,
+				Role:    r.Role,
+			})
+		}
+
+		if len(eu) > 0 {
+			if err := tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "user_id"}, {Name: "event_id"}},
+				DoNothing: true,
+			}).Create(&eu).Error; err != nil {
+				return err
+			}
+		}
+
+		return tx.Where("user_ref_id = ?", refID).Delete(&entity.EventUserPending{}).Error
 	})
 }

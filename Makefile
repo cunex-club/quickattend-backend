@@ -12,8 +12,9 @@ POSTGRES_DB 		?= quickattend-db
 POSTGRES_SCHEMA ?= public
 
 DB_URL := postgres://$(POSTGRES_USER):$(POSTGRES_PASS)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable&search_path=$(POSTGRES_SCHEMA)
+ATLAS_DEV_URL ?= $(DB_URL)
 
-.PHONY: run tidy migrate
+.PHONY: run tidy test compose-up compose-down migrate-up migrate-diff migrate db-clean db-seed db-reset env
 
 env:
 	echo $(DB_URL)
@@ -36,9 +37,15 @@ compose-down:
 
 migrate-up:
 	@psql "postgres://$(POSTGRES_USER):$(POSTGRES_PASS)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable" -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;" && \
-	atlas migrate apply -u "$(DB_URL)" --dir file://tools/atlas/migrations
+	if [ -d tools/atlas/migrations ]; then \
+		atlas migrate apply -u "$(DB_URL)" --dir file://tools/atlas/migrations; \
+	else \
+		echo "tools/atlas/migrations not found, applying schema from tools/atlas/schema.sql"; \
+		atlas schema apply -u "$(DB_URL)" --to file://tools/atlas/schema.sql --dev-url "$(ATLAS_DEV_URL)" --auto-approve; \
+	fi
 
 migrate-diff:
+	@mkdir -p tools/atlas/migrations
 	@read -p "Enter migration name (no spaces): " name; \
 	atlas migrate diff $$name \
 		--dir file://tools/atlas/migrations \

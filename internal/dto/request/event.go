@@ -58,3 +58,4 @@ type PostParticipantReqBody struct {
 	ScannedLocationX float64 `json:"scanned_location_long"`
 	ScannedLocationY float64 `json:"scanned_location_lat"`
 }
+
