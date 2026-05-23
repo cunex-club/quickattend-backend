@@ -27,13 +27,13 @@ var thaiLoc = time.FixedZone(entity.ThaiTZ, 7*3600)
 
 type EventService interface {
 	DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError
-	DuplicateById(EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
+	DuplicateById(Req dtoReq.DuplicateEventReq, EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
 	Comment(checkInReq dtoReq.CommentReq, ctx context.Context) *response.APIError
 	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.PostParticipantRes, *response.APIError)
 
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
 
-	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error)
+	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq, userId string) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, userId string, updates dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error)
 
 	GetEventsValidateArgs(userIDStr string, queryParams map[string]string, ctx context.Context) (validated *GetEventsValidateArgsReturn, err *response.APIError)
@@ -219,7 +219,7 @@ func (s *service) DeleteById(eventIDStr string, userIDStr string, ctx context.Co
 	return nil
 }
 
-func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError) {
+func (s *service) DuplicateById(Req dtoReq.DuplicateEventReq, eventIDStr string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError) {
 	eventID, parseErr := uuid.Parse(eventIDStr)
 	if parseErr != nil {
 		return nil, &response.APIError{
@@ -281,14 +281,102 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 		}
 	}
 
+	// validate payload
+	// timezone
+	if err := validateThaiTimezone(Req.Timezone); err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+
+	// start_time, end_time
+	startTime, err := parseTime(Req.StartTime)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+	endTime, err := parseTime(Req.EndTime)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+	if !endTime.After(startTime) {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: "end_time must be after start_time",
+		}
+	}
+	if !isSameDay(startTime, endTime) {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: fmt.Sprintf("start_time and end_time must be on the same day in timezone %s", entity.ThaiTZ),
+		}
+	}
+
+	// agenda
+	agendas, err := buildAgendas(Req.Agenda, startTime, endTime)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+
+	// build new event
 	newEvent := *originalEvent
 	newEvent.ID = datatypes.UUID(uuid.New())
 
-	// breaking the memory link from originalEvent
+	// break the memory link from originalEvent, insert new information
+	// location
+	newEvent.Location = Req.Location
+
+	// start_time
+	newEvent.StartTime = startTime
+
+	// end_time
+	newEvent.EndTime = endTime
+
+	// evaluation_form
+	newEvent.EvaluationForm = Req.EvaluationForm
+
+	// location_point
+	newEvent.LocationPoint = entity.Point{
+		X: Req.LocationLong,
+		Y: Req.LocationLat,
+	}
+
+	// agenda
+	newEvent.EventAgenda = make([]entity.EventAgenda, 0, len(agendas))
+	for _, item := range agendas {
+		newEvent.EventAgenda = append(newEvent.EventAgenda, entity.EventAgenda{
+			ActivityName: item.ActivityName,
+			StartTime:    item.StartTime,
+			EndTime:      item.EndTime,
+		})
+	}
+
+	// copy over other existing info
 	// Whitelist
 	newEvent.EventWhitelist = make([]entity.EventWhitelist, 0, len(originalEvent.EventWhitelist))
 	for _, item := range originalEvent.EventWhitelist {
 		newEvent.EventWhitelist = append(newEvent.EventWhitelist, entity.EventWhitelist{
+			AttendeeRefID: item.AttendeeRefID,
+		})
+	}
+	newEvent.EventWhitelistPending = make([]entity.EventWhitelistPending, 0, len(originalEvent.EventWhitelistPending))
+	for _, item := range originalEvent.EventWhitelistPending {
+		newEvent.EventWhitelistPending = append(newEvent.EventWhitelistPending, entity.EventWhitelistPending{
 			AttendeeRefID: item.AttendeeRefID,
 		})
 	}
@@ -301,13 +389,19 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 		})
 	}
 
-	// Agenda
-	newEvent.EventAgenda = make([]entity.EventAgenda, 0, len(originalEvent.EventAgenda))
-	for _, item := range originalEvent.EventAgenda {
-		newEvent.EventAgenda = append(newEvent.EventAgenda, entity.EventAgenda{
-			ActivityName: item.ActivityName,
-			StartTime:    item.StartTime,
-			EndTime:      item.EndTime,
+	// Users
+	newEvent.EventUser = make([]entity.EventUser, 0, len(originalEvent.EventUser))
+	for _, item := range originalEvent.EventUser {
+		newEvent.EventUser = append(newEvent.EventUser, entity.EventUser{
+			UserID: item.UserID,
+			Role:   item.Role,
+		})
+	}
+	newEvent.EventUserPending = make([]entity.EventUserPending, 0, len(originalEvent.EventUserPending))
+	for _, item := range originalEvent.EventUserPending {
+		newEvent.EventUserPending = append(newEvent.EventUserPending, entity.EventUserPending{
+			UserRefID: item.UserRefID,
+			Role:      item.Role,
 		})
 	}
 
@@ -1126,7 +1220,22 @@ func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetDiscoveryEv
 	}
 }
 
-func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error) {
+func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq, userId string) (*dtoRes.CreateEventRes, error) {
+	userIdUUID, err := uuid.Parse(userId)
+	if err != nil {
+		return nil, errors.New("Invalid user id")
+	}
+
+	// Validate that the requester is listed as the event owner in the managers_and_staff payload.
+	// Check separately here instead of modifying buildCreateOrUpdatePayload() for minimal change.
+	isOwner, err := s.createEventCheckOwnerIsRequester(req.ManagersAndStaff, userIdUUID, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !isOwner {
+		return nil, errors.New("User must list themselves as the event's owner in managers_and_staff")
+	}
+
 	payload, err := buildCreateOrUpdatePayload(req)
 	if err != nil {
 		return nil, err
@@ -1254,6 +1363,7 @@ func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput,
 
 	out := make([]entity.EventUserInput, 0, len(in))
 	seenRole := make(map[uint64]string, len(in)) // ref_id -> role string
+	ownerCount := 0
 
 	for _, m := range in {
 		r, err := entity.ParseRole(m.Role)
@@ -1270,10 +1380,18 @@ func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput,
 		}
 
 		seenRole[m.RefID] = rs
+		if r == entity.OWNER {
+			ownerCount += 1
+		}
+
 		out = append(out, entity.EventUserInput{
 			RefID: m.RefID,
 			Role:  r,
 		})
+	}
+
+	if ownerCount != 1 {
+		return nil, fmt.Errorf("require exactly one owner in manager_and_staff")
 	}
 
 	return out, nil
@@ -1425,4 +1543,20 @@ func anyToUint8(v any) (uint8, error) {
 		return 0, fmt.Errorf("out of range")
 	}
 	return uint8(u), nil
+}
+
+// POST /events helper function.
+// Check if the requester is listed as the owner of event
+func (s *service) createEventCheckOwnerIsRequester(req []dtoReq.ManagerStaffReq, userId uuid.UUID, ctx context.Context) (bool, error) {
+	user, err := s.repo.Auth.GetUserById(datatypes.UUID(userId), ctx)
+	if err != nil {
+		return false, err
+	}
+
+	for _, person := range req {
+		if person.Role == string(entity.OWNER) && user.RefID != person.RefID {
+			return false, nil
+		}
+	}
+	return true, nil
 }
