@@ -10,14 +10,13 @@ import (
 	"fmt"
 
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/handler/graphql/model"
-	"github.com/google/uuid"
 )
 
 // RegistrationSummary is the resolver for the registrationSummary field.
 func (r *queryResolver) RegistrationSummary(ctx context.Context, eventID string) (*model.RegistrationSummary, error) {
-	parsedEventID, err := uuid.Parse(eventID)
+	parsedEventID, err := parseEventID(eventID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid event id: %w", err)
+		return nil, err
 	}
 
 	data, err := r.Service.Dashboard.GetRegistrationSummary(ctx, parsedEventID)
@@ -31,6 +30,48 @@ func (r *queryResolver) RegistrationSummary(ctx context.Context, eventID string)
 		TotalStaff:    data.TotalStaff,
 		TotalAll:      data.TotalAll,
 	}, nil
+}
+
+// RegistrationAnalytics is the resolver for the registrationAnalytics field.
+func (r *queryResolver) RegistrationAnalytics(ctx context.Context, eventID string, filter *model.RegistrationAnalyticsFilterInput, focus *model.RegistrationAnalyticsFocusInput) (*model.RegistrationAnalytics, error) {
+	parsedEventID, err := parseEventID(eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceFilter := toServiceRegistrationAnalyticsFilter(filter)
+	serviceFocus := toServiceRegistrationAnalyticsFocus(focus)
+
+	data, err := r.Service.Dashboard.GetRegistrationAnalytics(ctx, parsedEventID, serviceFilter, serviceFocus)
+	if err != nil {
+		fmt.Printf("registrationAnalytics error: %+v\n", err)
+		return nil, err
+	}
+
+	return toModelRegistrationAnalytics(data), nil
+}
+
+// WhitelistParticipants is the resolver for the whitelistParticipants field.
+func (r *queryResolver) WhitelistParticipants(ctx context.Context, eventID string, filter *model.RegistrationAnalyticsFilterInput, state *model.ParticipantState) ([]*model.WhitelistParticipant, error) {
+	parsedEventID, err := parseEventID(eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceFilter := toServiceRegistrationAnalyticsFilter(filter)
+	serviceState := toServiceParticipantState(state)
+
+	data, err := r.Service.Dashboard.GetWhitelistParticipants(ctx, parsedEventID, serviceFilter, serviceState)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]*model.WhitelistParticipant, 0, len(data))
+	for _, item := range data {
+		out = append(out, toModelWhitelistParticipant(item))
+	}
+
+	return out, nil
 }
 
 // Query returns QueryResolver implementation.
