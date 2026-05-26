@@ -2,7 +2,55 @@
 
 package model
 
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
+)
+
+type Faculty struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type FacultyStat struct {
+	Faculty *Faculty `json:"faculty"`
+	Summary *Summary `json:"summary"`
+}
+
+type FacultyTimeSlotStat struct {
+	Faculty  *Faculty  `json:"faculty"`
+	TimeSlot *TimeSlot `json:"timeSlot"`
+	Summary  *Summary  `json:"summary"`
+}
+
+type Focus struct {
+	Dimension FocusDimension `json:"dimension"`
+	ID        string         `json:"id"`
+	Label     string         `json:"label"`
+}
+
 type Query struct {
+}
+
+type RegistrationAnalytics struct {
+	Mode      RegistrationMode       `json:"mode"`
+	Summary   *Summary               `json:"summary"`
+	Focus     *Focus                 `json:"focus,omitempty"`
+	Faculties []*FacultyStat         `json:"faculties"`
+	TimeSlots []*TimeSlotStat        `json:"timeSlots"`
+	Matrix    []*FacultyTimeSlotStat `json:"matrix"`
+}
+
+type RegistrationAnalyticsFilterInput struct {
+	FacultyIds  []string `json:"facultyIds,omitempty"`
+	TimeSlotIds []string `json:"timeSlotIds,omitempty"`
+}
+
+type RegistrationAnalyticsFocusInput struct {
+	Dimension FocusDimension `json:"dimension"`
+	ID        string         `json:"id"`
 }
 
 type RegistrationSummary struct {
@@ -10,4 +58,198 @@ type RegistrationSummary struct {
 	TotalStudent  int `json:"totalStudent"`
 	TotalStaff    int `json:"totalStaff"`
 	TotalAll      int `json:"totalAll"`
+}
+
+type Summary struct {
+	RegisteredCount   int  `json:"registeredCount"`
+	ExpectedCount     *int `json:"expectedCount,omitempty"`
+	UnregisteredCount *int `json:"unregisteredCount,omitempty"`
+}
+
+type TimeSlot struct {
+	ID      string `json:"id"`
+	Label   string `json:"label"`
+	StartAt string `json:"startAt"`
+	EndAt   string `json:"endAt"`
+}
+
+type TimeSlotStat struct {
+	TimeSlot *TimeSlot `json:"timeSlot"`
+	Summary  *Summary  `json:"summary"`
+}
+
+type WhitelistParticipant struct {
+	ID                 string           `json:"id"`
+	FullName           string           `json:"fullName"`
+	Faculty            *Faculty         `json:"faculty"`
+	State              ParticipantState `json:"state"`
+	RegisteredAt       *string          `json:"registeredAt,omitempty"`
+	RegisteredTimeSlot *TimeSlot        `json:"registeredTimeSlot,omitempty"`
+}
+
+type FocusDimension string
+
+const (
+	FocusDimensionFaculty  FocusDimension = "FACULTY"
+	FocusDimensionTimeSlot FocusDimension = "TIME_SLOT"
+)
+
+var AllFocusDimension = []FocusDimension{
+	FocusDimensionFaculty,
+	FocusDimensionTimeSlot,
+}
+
+func (e FocusDimension) IsValid() bool {
+	switch e {
+	case FocusDimensionFaculty, FocusDimensionTimeSlot:
+		return true
+	}
+	return false
+}
+
+func (e FocusDimension) String() string {
+	return string(e)
+}
+
+func (e *FocusDimension) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FocusDimension(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FocusDimension", str)
+	}
+	return nil
+}
+
+func (e FocusDimension) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *FocusDimension) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e FocusDimension) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ParticipantState string
+
+const (
+	ParticipantStateRegistered    ParticipantState = "REGISTERED"
+	ParticipantStateNotRegistered ParticipantState = "NOT_REGISTERED"
+)
+
+var AllParticipantState = []ParticipantState{
+	ParticipantStateRegistered,
+	ParticipantStateNotRegistered,
+}
+
+func (e ParticipantState) IsValid() bool {
+	switch e {
+	case ParticipantStateRegistered, ParticipantStateNotRegistered:
+		return true
+	}
+	return false
+}
+
+func (e ParticipantState) String() string {
+	return string(e)
+}
+
+func (e *ParticipantState) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ParticipantState(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ParticipantState", str)
+	}
+	return nil
+}
+
+func (e ParticipantState) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ParticipantState) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ParticipantState) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type RegistrationMode string
+
+const (
+	RegistrationModeOpen      RegistrationMode = "OPEN"
+	RegistrationModeWhitelist RegistrationMode = "WHITELIST"
+	RegistrationModeFaculties RegistrationMode = "FACULTIES"
+)
+
+var AllRegistrationMode = []RegistrationMode{
+	RegistrationModeOpen,
+	RegistrationModeWhitelist,
+	RegistrationModeFaculties,
+}
+
+func (e RegistrationMode) IsValid() bool {
+	switch e {
+	case RegistrationModeOpen, RegistrationModeWhitelist, RegistrationModeFaculties:
+		return true
+	}
+	return false
+}
+
+func (e RegistrationMode) String() string {
+	return string(e)
+}
+
+func (e *RegistrationMode) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RegistrationMode(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RegistrationMode", str)
+	}
+	return nil
+}
+
+func (e RegistrationMode) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *RegistrationMode) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e RegistrationMode) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

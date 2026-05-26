@@ -1,3 +1,47 @@
+scalar DateTime
+
+enum RegistrationMode {
+  OPEN
+  WHITELIST
+  FACULTIES
+}
+
+enum FocusDimension {
+  FACULTY
+  TIME_SLOT
+}
+
+enum ParticipantState {
+  REGISTERED
+  NOT_REGISTERED
+}
+
+input RegistrationAnalyticsFilterInput {
+  facultyIds: [ID!]
+  timeSlotIds: [ID!]
+}
+
+input RegistrationAnalyticsFocusInput {
+  dimension: FocusDimension!
+  id: ID!
+}
+
+type Query {
+  registrationSummary(eventId: ID!): RegistrationSummary!
+
+  registrationAnalytics(
+    eventId: ID!
+    filter: RegistrationAnalyticsFilterInput
+    focus: RegistrationAnalyticsFocusInput
+  ): RegistrationAnalytics!
+
+  whitelistParticipants(
+    eventId: ID!
+    filter: RegistrationAnalyticsFilterInput
+    state: ParticipantState
+  ): [WhitelistParticipant!]!
+}
+
 type RegistrationSummary {
   totalEligible: Int!
   totalStudent: Int!
@@ -5,6 +49,60 @@ type RegistrationSummary {
   totalAll: Int!
 }
 
-type Query {
-  registrationSummary(eventID: String!): RegistrationSummary!
+type RegistrationAnalytics {
+  mode: RegistrationMode!
+  summary: Summary!
+  focus: Focus
+  faculties: [FacultyStat!]!
+  timeSlots: [TimeSlotStat!]!
+  matrix: [FacultyTimeSlotStat!]!
+}
+
+type Summary {
+  registeredCount: Int!
+  expectedCount: Int
+  unregisteredCount: Int
+}
+
+type Focus {
+  dimension: FocusDimension!
+  id: ID!
+  label: String!
+}
+
+type Faculty {
+  id: ID!
+  name: String!
+}
+
+type TimeSlot {
+  id: ID!
+  label: String!
+  startAt: DateTime!
+  endAt: DateTime!
+}
+
+type FacultyStat {
+  faculty: Faculty!
+  summary: Summary!
+}
+
+type TimeSlotStat {
+  timeSlot: TimeSlot!
+  summary: Summary!
+}
+
+type FacultyTimeSlotStat {
+  faculty: Faculty!
+  timeSlot: TimeSlot!
+  summary: Summary!
+}
+
+type WhitelistParticipant {
+  id: ID!
+  fullName: String!
+  faculty: Faculty!
+  state: ParticipantState!
+  registeredAt: DateTime
+  registeredTimeSlot: TimeSlot
 }

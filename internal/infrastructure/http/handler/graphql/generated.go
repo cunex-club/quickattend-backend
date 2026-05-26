@@ -35,8 +35,41 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	Faculty struct {
+		ID   func(childComplexity int) int
+		Name func(childComplexity int) int
+	}
+
+	FacultyStat struct {
+		Faculty func(childComplexity int) int
+		Summary func(childComplexity int) int
+	}
+
+	FacultyTimeSlotStat struct {
+		Faculty  func(childComplexity int) int
+		Summary  func(childComplexity int) int
+		TimeSlot func(childComplexity int) int
+	}
+
+	Focus struct {
+		Dimension func(childComplexity int) int
+		ID        func(childComplexity int) int
+		Label     func(childComplexity int) int
+	}
+
 	Query struct {
-		RegistrationSummary func(childComplexity int, eventID string) int
+		RegistrationAnalytics func(childComplexity int, eventID string, filter *model.RegistrationAnalyticsFilterInput, focus *model.RegistrationAnalyticsFocusInput) int
+		RegistrationSummary   func(childComplexity int, eventID string) int
+		WhitelistParticipants func(childComplexity int, eventID string, filter *model.RegistrationAnalyticsFilterInput, state *model.ParticipantState) int
+	}
+
+	RegistrationAnalytics struct {
+		Faculties func(childComplexity int) int
+		Focus     func(childComplexity int) int
+		Matrix    func(childComplexity int) int
+		Mode      func(childComplexity int) int
+		Summary   func(childComplexity int) int
+		TimeSlots func(childComplexity int) int
 	}
 
 	RegistrationSummary struct {
@@ -45,10 +78,39 @@ type ComplexityRoot struct {
 		TotalStaff    func(childComplexity int) int
 		TotalStudent  func(childComplexity int) int
 	}
+
+	Summary struct {
+		ExpectedCount     func(childComplexity int) int
+		RegisteredCount   func(childComplexity int) int
+		UnregisteredCount func(childComplexity int) int
+	}
+
+	TimeSlot struct {
+		EndAt   func(childComplexity int) int
+		ID      func(childComplexity int) int
+		Label   func(childComplexity int) int
+		StartAt func(childComplexity int) int
+	}
+
+	TimeSlotStat struct {
+		Summary  func(childComplexity int) int
+		TimeSlot func(childComplexity int) int
+	}
+
+	WhitelistParticipant struct {
+		Faculty            func(childComplexity int) int
+		FullName           func(childComplexity int) int
+		ID                 func(childComplexity int) int
+		RegisteredAt       func(childComplexity int) int
+		RegisteredTimeSlot func(childComplexity int) int
+		State              func(childComplexity int) int
+	}
 }
 
 type QueryResolver interface {
 	RegistrationSummary(ctx context.Context, eventID string) (*model.RegistrationSummary, error)
+	RegistrationAnalytics(ctx context.Context, eventID string, filter *model.RegistrationAnalyticsFilterInput, focus *model.RegistrationAnalyticsFocusInput) (*model.RegistrationAnalytics, error)
+	WhitelistParticipants(ctx context.Context, eventID string, filter *model.RegistrationAnalyticsFilterInput, state *model.ParticipantState) ([]*model.WhitelistParticipant, error)
 }
 
 type executableSchema graphql.ExecutableSchemaState[ResolverRoot, DirectiveRoot, ComplexityRoot]
@@ -65,6 +127,81 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	_ = ec
 	switch typeName + "." + field {
 
+	case "Faculty.id":
+		if e.ComplexityRoot.Faculty.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Faculty.ID(childComplexity), true
+	case "Faculty.name":
+		if e.ComplexityRoot.Faculty.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Faculty.Name(childComplexity), true
+
+	case "FacultyStat.faculty":
+		if e.ComplexityRoot.FacultyStat.Faculty == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FacultyStat.Faculty(childComplexity), true
+	case "FacultyStat.summary":
+		if e.ComplexityRoot.FacultyStat.Summary == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FacultyStat.Summary(childComplexity), true
+
+	case "FacultyTimeSlotStat.faculty":
+		if e.ComplexityRoot.FacultyTimeSlotStat.Faculty == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FacultyTimeSlotStat.Faculty(childComplexity), true
+	case "FacultyTimeSlotStat.summary":
+		if e.ComplexityRoot.FacultyTimeSlotStat.Summary == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FacultyTimeSlotStat.Summary(childComplexity), true
+	case "FacultyTimeSlotStat.timeSlot":
+		if e.ComplexityRoot.FacultyTimeSlotStat.TimeSlot == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FacultyTimeSlotStat.TimeSlot(childComplexity), true
+
+	case "Focus.dimension":
+		if e.ComplexityRoot.Focus.Dimension == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Focus.Dimension(childComplexity), true
+	case "Focus.id":
+		if e.ComplexityRoot.Focus.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Focus.ID(childComplexity), true
+	case "Focus.label":
+		if e.ComplexityRoot.Focus.Label == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Focus.Label(childComplexity), true
+
+	case "Query.registrationAnalytics":
+		if e.ComplexityRoot.Query.RegistrationAnalytics == nil {
+			break
+		}
+
+		args, err := ec.field_Query_registrationAnalytics_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.RegistrationAnalytics(childComplexity, args["eventId"].(string), args["filter"].(*model.RegistrationAnalyticsFilterInput), args["focus"].(*model.RegistrationAnalyticsFocusInput)), true
 	case "Query.registrationSummary":
 		if e.ComplexityRoot.Query.RegistrationSummary == nil {
 			break
@@ -75,7 +212,55 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.RegistrationSummary(childComplexity, args["eventID"].(string)), true
+		return e.ComplexityRoot.Query.RegistrationSummary(childComplexity, args["eventId"].(string)), true
+	case "Query.whitelistParticipants":
+		if e.ComplexityRoot.Query.WhitelistParticipants == nil {
+			break
+		}
+
+		args, err := ec.field_Query_whitelistParticipants_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.WhitelistParticipants(childComplexity, args["eventId"].(string), args["filter"].(*model.RegistrationAnalyticsFilterInput), args["state"].(*model.ParticipantState)), true
+
+	case "RegistrationAnalytics.faculties":
+		if e.ComplexityRoot.RegistrationAnalytics.Faculties == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RegistrationAnalytics.Faculties(childComplexity), true
+	case "RegistrationAnalytics.focus":
+		if e.ComplexityRoot.RegistrationAnalytics.Focus == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RegistrationAnalytics.Focus(childComplexity), true
+	case "RegistrationAnalytics.matrix":
+		if e.ComplexityRoot.RegistrationAnalytics.Matrix == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RegistrationAnalytics.Matrix(childComplexity), true
+	case "RegistrationAnalytics.mode":
+		if e.ComplexityRoot.RegistrationAnalytics.Mode == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RegistrationAnalytics.Mode(childComplexity), true
+	case "RegistrationAnalytics.summary":
+		if e.ComplexityRoot.RegistrationAnalytics.Summary == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RegistrationAnalytics.Summary(childComplexity), true
+	case "RegistrationAnalytics.timeSlots":
+		if e.ComplexityRoot.RegistrationAnalytics.TimeSlots == nil {
+			break
+		}
+
+		return e.ComplexityRoot.RegistrationAnalytics.TimeSlots(childComplexity), true
 
 	case "RegistrationSummary.totalAll":
 		if e.ComplexityRoot.RegistrationSummary.TotalAll == nil {
@@ -102,6 +287,100 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.RegistrationSummary.TotalStudent(childComplexity), true
 
+	case "Summary.expectedCount":
+		if e.ComplexityRoot.Summary.ExpectedCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Summary.ExpectedCount(childComplexity), true
+	case "Summary.registeredCount":
+		if e.ComplexityRoot.Summary.RegisteredCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Summary.RegisteredCount(childComplexity), true
+	case "Summary.unregisteredCount":
+		if e.ComplexityRoot.Summary.UnregisteredCount == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Summary.UnregisteredCount(childComplexity), true
+
+	case "TimeSlot.endAt":
+		if e.ComplexityRoot.TimeSlot.EndAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeSlot.EndAt(childComplexity), true
+	case "TimeSlot.id":
+		if e.ComplexityRoot.TimeSlot.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeSlot.ID(childComplexity), true
+	case "TimeSlot.label":
+		if e.ComplexityRoot.TimeSlot.Label == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeSlot.Label(childComplexity), true
+	case "TimeSlot.startAt":
+		if e.ComplexityRoot.TimeSlot.StartAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeSlot.StartAt(childComplexity), true
+
+	case "TimeSlotStat.summary":
+		if e.ComplexityRoot.TimeSlotStat.Summary == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeSlotStat.Summary(childComplexity), true
+	case "TimeSlotStat.timeSlot":
+		if e.ComplexityRoot.TimeSlotStat.TimeSlot == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TimeSlotStat.TimeSlot(childComplexity), true
+
+	case "WhitelistParticipant.faculty":
+		if e.ComplexityRoot.WhitelistParticipant.Faculty == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WhitelistParticipant.Faculty(childComplexity), true
+	case "WhitelistParticipant.fullName":
+		if e.ComplexityRoot.WhitelistParticipant.FullName == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WhitelistParticipant.FullName(childComplexity), true
+	case "WhitelistParticipant.id":
+		if e.ComplexityRoot.WhitelistParticipant.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WhitelistParticipant.ID(childComplexity), true
+	case "WhitelistParticipant.registeredAt":
+		if e.ComplexityRoot.WhitelistParticipant.RegisteredAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WhitelistParticipant.RegisteredAt(childComplexity), true
+	case "WhitelistParticipant.registeredTimeSlot":
+		if e.ComplexityRoot.WhitelistParticipant.RegisteredTimeSlot == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WhitelistParticipant.RegisteredTimeSlot(childComplexity), true
+	case "WhitelistParticipant.state":
+		if e.ComplexityRoot.WhitelistParticipant.State == nil {
+			break
+		}
+
+		return e.ComplexityRoot.WhitelistParticipant.State(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -109,7 +388,10 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
-	inputUnmarshalMap := graphql.BuildUnmarshalerMap()
+	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputRegistrationAnalyticsFilterInput,
+		ec.unmarshalInputRegistrationAnalyticsFocusInput,
+	)
 	first := true
 
 	switch opCtx.Operation.Operation {
@@ -199,14 +481,56 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_registrationSummary_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Query_registrationAnalytics_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "eventID", ec.unmarshalNString2string)
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "eventId", ec.unmarshalNID2string)
 	if err != nil {
 		return nil, err
 	}
-	args["eventID"] = arg0
+	args["eventId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "filter", ec.unmarshalORegistrationAnalyticsFilterInput2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationAnalyticsFilterInput)
+	if err != nil {
+		return nil, err
+	}
+	args["filter"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "focus", ec.unmarshalORegistrationAnalyticsFocusInput2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationAnalyticsFocusInput)
+	if err != nil {
+		return nil, err
+	}
+	args["focus"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_registrationSummary_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "eventId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["eventId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_whitelistParticipants_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "eventId", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["eventId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "filter", ec.unmarshalORegistrationAnalyticsFilterInput2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationAnalyticsFilterInput)
+	if err != nil {
+		return nil, err
+	}
+	args["filter"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "state", ec.unmarshalOParticipantState2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐParticipantState)
+	if err != nil {
+		return nil, err
+	}
+	args["state"] = arg2
 	return args, nil
 }
 
@@ -262,6 +586,334 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
+func (ec *executionContext) _Faculty_id(ctx context.Context, field graphql.CollectedField, obj *model.Faculty) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Faculty_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Faculty_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Faculty",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Faculty_name(ctx context.Context, field graphql.CollectedField, obj *model.Faculty) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Faculty_name,
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Faculty_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Faculty",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FacultyStat_faculty(ctx context.Context, field graphql.CollectedField, obj *model.FacultyStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FacultyStat_faculty,
+		func(ctx context.Context) (any, error) {
+			return obj.Faculty, nil
+		},
+		nil,
+		ec.marshalNFaculty2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFaculty,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FacultyStat_faculty(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FacultyStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Faculty_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Faculty_name(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Faculty", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FacultyStat_summary(ctx context.Context, field graphql.CollectedField, obj *model.FacultyStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FacultyStat_summary,
+		func(ctx context.Context) (any, error) {
+			return obj.Summary, nil
+		},
+		nil,
+		ec.marshalNSummary2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐSummary,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FacultyStat_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FacultyStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "registeredCount":
+				return ec.fieldContext_Summary_registeredCount(ctx, field)
+			case "expectedCount":
+				return ec.fieldContext_Summary_expectedCount(ctx, field)
+			case "unregisteredCount":
+				return ec.fieldContext_Summary_unregisteredCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Summary", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FacultyTimeSlotStat_faculty(ctx context.Context, field graphql.CollectedField, obj *model.FacultyTimeSlotStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FacultyTimeSlotStat_faculty,
+		func(ctx context.Context) (any, error) {
+			return obj.Faculty, nil
+		},
+		nil,
+		ec.marshalNFaculty2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFaculty,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FacultyTimeSlotStat_faculty(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FacultyTimeSlotStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Faculty_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Faculty_name(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Faculty", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FacultyTimeSlotStat_timeSlot(ctx context.Context, field graphql.CollectedField, obj *model.FacultyTimeSlotStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FacultyTimeSlotStat_timeSlot,
+		func(ctx context.Context) (any, error) {
+			return obj.TimeSlot, nil
+		},
+		nil,
+		ec.marshalNTimeSlot2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeSlot,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FacultyTimeSlotStat_timeSlot(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FacultyTimeSlotStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TimeSlot_id(ctx, field)
+			case "label":
+				return ec.fieldContext_TimeSlot_label(ctx, field)
+			case "startAt":
+				return ec.fieldContext_TimeSlot_startAt(ctx, field)
+			case "endAt":
+				return ec.fieldContext_TimeSlot_endAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSlot", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FacultyTimeSlotStat_summary(ctx context.Context, field graphql.CollectedField, obj *model.FacultyTimeSlotStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_FacultyTimeSlotStat_summary,
+		func(ctx context.Context) (any, error) {
+			return obj.Summary, nil
+		},
+		nil,
+		ec.marshalNSummary2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐSummary,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_FacultyTimeSlotStat_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FacultyTimeSlotStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "registeredCount":
+				return ec.fieldContext_Summary_registeredCount(ctx, field)
+			case "expectedCount":
+				return ec.fieldContext_Summary_expectedCount(ctx, field)
+			case "unregisteredCount":
+				return ec.fieldContext_Summary_unregisteredCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Summary", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Focus_dimension(ctx context.Context, field graphql.CollectedField, obj *model.Focus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Focus_dimension,
+		func(ctx context.Context) (any, error) {
+			return obj.Dimension, nil
+		},
+		nil,
+		ec.marshalNFocusDimension2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFocusDimension,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Focus_dimension(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Focus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type FocusDimension does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Focus_id(ctx context.Context, field graphql.CollectedField, obj *model.Focus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Focus_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Focus_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Focus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Focus_label(ctx context.Context, field graphql.CollectedField, obj *model.Focus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Focus_label,
+		func(ctx context.Context) (any, error) {
+			return obj.Label, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Focus_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Focus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_registrationSummary(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -270,7 +922,7 @@ func (ec *executionContext) _Query_registrationSummary(ctx context.Context, fiel
 		ec.fieldContext_Query_registrationSummary,
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().RegistrationSummary(ctx, fc.Args["eventID"].(string))
+			return ec.Resolvers.Query().RegistrationSummary(ctx, fc.Args["eventId"].(string))
 		},
 		nil,
 		ec.marshalNRegistrationSummary2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationSummary,
@@ -307,6 +959,116 @@ func (ec *executionContext) fieldContext_Query_registrationSummary(ctx context.C
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_registrationSummary_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_registrationAnalytics(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_registrationAnalytics,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().RegistrationAnalytics(ctx, fc.Args["eventId"].(string), fc.Args["filter"].(*model.RegistrationAnalyticsFilterInput), fc.Args["focus"].(*model.RegistrationAnalyticsFocusInput))
+		},
+		nil,
+		ec.marshalNRegistrationAnalytics2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationAnalytics,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_registrationAnalytics(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mode":
+				return ec.fieldContext_RegistrationAnalytics_mode(ctx, field)
+			case "summary":
+				return ec.fieldContext_RegistrationAnalytics_summary(ctx, field)
+			case "focus":
+				return ec.fieldContext_RegistrationAnalytics_focus(ctx, field)
+			case "faculties":
+				return ec.fieldContext_RegistrationAnalytics_faculties(ctx, field)
+			case "timeSlots":
+				return ec.fieldContext_RegistrationAnalytics_timeSlots(ctx, field)
+			case "matrix":
+				return ec.fieldContext_RegistrationAnalytics_matrix(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RegistrationAnalytics", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_registrationAnalytics_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_whitelistParticipants(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_whitelistParticipants,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().WhitelistParticipants(ctx, fc.Args["eventId"].(string), fc.Args["filter"].(*model.RegistrationAnalyticsFilterInput), fc.Args["state"].(*model.ParticipantState))
+		},
+		nil,
+		ec.marshalNWhitelistParticipant2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐWhitelistParticipantᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_whitelistParticipants(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_WhitelistParticipant_id(ctx, field)
+			case "fullName":
+				return ec.fieldContext_WhitelistParticipant_fullName(ctx, field)
+			case "faculty":
+				return ec.fieldContext_WhitelistParticipant_faculty(ctx, field)
+			case "state":
+				return ec.fieldContext_WhitelistParticipant_state(ctx, field)
+			case "registeredAt":
+				return ec.fieldContext_WhitelistParticipant_registeredAt(ctx, field)
+			case "registeredTimeSlot":
+				return ec.fieldContext_WhitelistParticipant_registeredTimeSlot(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type WhitelistParticipant", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_whitelistParticipants_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -416,6 +1178,216 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 				return ec.fieldContext___Schema_directives(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RegistrationAnalytics_mode(ctx context.Context, field graphql.CollectedField, obj *model.RegistrationAnalytics) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RegistrationAnalytics_mode,
+		func(ctx context.Context) (any, error) {
+			return obj.Mode, nil
+		},
+		nil,
+		ec.marshalNRegistrationMode2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationMode,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RegistrationAnalytics_mode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RegistrationAnalytics",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type RegistrationMode does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RegistrationAnalytics_summary(ctx context.Context, field graphql.CollectedField, obj *model.RegistrationAnalytics) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RegistrationAnalytics_summary,
+		func(ctx context.Context) (any, error) {
+			return obj.Summary, nil
+		},
+		nil,
+		ec.marshalNSummary2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐSummary,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RegistrationAnalytics_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RegistrationAnalytics",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "registeredCount":
+				return ec.fieldContext_Summary_registeredCount(ctx, field)
+			case "expectedCount":
+				return ec.fieldContext_Summary_expectedCount(ctx, field)
+			case "unregisteredCount":
+				return ec.fieldContext_Summary_unregisteredCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Summary", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RegistrationAnalytics_focus(ctx context.Context, field graphql.CollectedField, obj *model.RegistrationAnalytics) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RegistrationAnalytics_focus,
+		func(ctx context.Context) (any, error) {
+			return obj.Focus, nil
+		},
+		nil,
+		ec.marshalOFocus2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFocus,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_RegistrationAnalytics_focus(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RegistrationAnalytics",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "dimension":
+				return ec.fieldContext_Focus_dimension(ctx, field)
+			case "id":
+				return ec.fieldContext_Focus_id(ctx, field)
+			case "label":
+				return ec.fieldContext_Focus_label(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Focus", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RegistrationAnalytics_faculties(ctx context.Context, field graphql.CollectedField, obj *model.RegistrationAnalytics) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RegistrationAnalytics_faculties,
+		func(ctx context.Context) (any, error) {
+			return obj.Faculties, nil
+		},
+		nil,
+		ec.marshalNFacultyStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStatᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RegistrationAnalytics_faculties(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RegistrationAnalytics",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "faculty":
+				return ec.fieldContext_FacultyStat_faculty(ctx, field)
+			case "summary":
+				return ec.fieldContext_FacultyStat_summary(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FacultyStat", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RegistrationAnalytics_timeSlots(ctx context.Context, field graphql.CollectedField, obj *model.RegistrationAnalytics) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RegistrationAnalytics_timeSlots,
+		func(ctx context.Context) (any, error) {
+			return obj.TimeSlots, nil
+		},
+		nil,
+		ec.marshalNTimeSlotStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeSlotStatᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RegistrationAnalytics_timeSlots(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RegistrationAnalytics",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "timeSlot":
+				return ec.fieldContext_TimeSlotStat_timeSlot(ctx, field)
+			case "summary":
+				return ec.fieldContext_TimeSlotStat_summary(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSlotStat", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RegistrationAnalytics_matrix(ctx context.Context, field graphql.CollectedField, obj *model.RegistrationAnalytics) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_RegistrationAnalytics_matrix,
+		func(ctx context.Context) (any, error) {
+			return obj.Matrix, nil
+		},
+		nil,
+		ec.marshalNFacultyTimeSlotStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyTimeSlotStatᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_RegistrationAnalytics_matrix(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RegistrationAnalytics",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "faculty":
+				return ec.fieldContext_FacultyTimeSlotStat_faculty(ctx, field)
+			case "timeSlot":
+				return ec.fieldContext_FacultyTimeSlotStat_timeSlot(ctx, field)
+			case "summary":
+				return ec.fieldContext_FacultyTimeSlotStat_summary(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FacultyTimeSlotStat", field.Name)
 		},
 	}
 	return fc, nil
@@ -532,6 +1504,475 @@ func (ec *executionContext) fieldContext_RegistrationSummary_totalAll(_ context.
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Summary_registeredCount(ctx context.Context, field graphql.CollectedField, obj *model.Summary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Summary_registeredCount,
+		func(ctx context.Context) (any, error) {
+			return obj.RegisteredCount, nil
+		},
+		nil,
+		ec.marshalNInt2int,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Summary_registeredCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Summary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Summary_expectedCount(ctx context.Context, field graphql.CollectedField, obj *model.Summary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Summary_expectedCount,
+		func(ctx context.Context) (any, error) {
+			return obj.ExpectedCount, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Summary_expectedCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Summary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Summary_unregisteredCount(ctx context.Context, field graphql.CollectedField, obj *model.Summary) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Summary_unregisteredCount,
+		func(ctx context.Context) (any, error) {
+			return obj.UnregisteredCount, nil
+		},
+		nil,
+		ec.marshalOInt2ᚖint,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_Summary_unregisteredCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Summary",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSlot_id(ctx context.Context, field graphql.CollectedField, obj *model.TimeSlot) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeSlot_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeSlot_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSlot",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSlot_label(ctx context.Context, field graphql.CollectedField, obj *model.TimeSlot) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeSlot_label,
+		func(ctx context.Context) (any, error) {
+			return obj.Label, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeSlot_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSlot",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSlot_startAt(ctx context.Context, field graphql.CollectedField, obj *model.TimeSlot) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeSlot_startAt,
+		func(ctx context.Context) (any, error) {
+			return obj.StartAt, nil
+		},
+		nil,
+		ec.marshalNDateTime2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeSlot_startAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSlot",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSlot_endAt(ctx context.Context, field graphql.CollectedField, obj *model.TimeSlot) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeSlot_endAt,
+		func(ctx context.Context) (any, error) {
+			return obj.EndAt, nil
+		},
+		nil,
+		ec.marshalNDateTime2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeSlot_endAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSlot",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSlotStat_timeSlot(ctx context.Context, field graphql.CollectedField, obj *model.TimeSlotStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeSlotStat_timeSlot,
+		func(ctx context.Context) (any, error) {
+			return obj.TimeSlot, nil
+		},
+		nil,
+		ec.marshalNTimeSlot2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeSlot,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeSlotStat_timeSlot(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSlotStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TimeSlot_id(ctx, field)
+			case "label":
+				return ec.fieldContext_TimeSlot_label(ctx, field)
+			case "startAt":
+				return ec.fieldContext_TimeSlot_startAt(ctx, field)
+			case "endAt":
+				return ec.fieldContext_TimeSlot_endAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSlot", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSlotStat_summary(ctx context.Context, field graphql.CollectedField, obj *model.TimeSlotStat) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_TimeSlotStat_summary,
+		func(ctx context.Context) (any, error) {
+			return obj.Summary, nil
+		},
+		nil,
+		ec.marshalNSummary2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐSummary,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_TimeSlotStat_summary(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSlotStat",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "registeredCount":
+				return ec.fieldContext_Summary_registeredCount(ctx, field)
+			case "expectedCount":
+				return ec.fieldContext_Summary_expectedCount(ctx, field)
+			case "unregisteredCount":
+				return ec.fieldContext_Summary_unregisteredCount(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Summary", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _WhitelistParticipant_id(ctx context.Context, field graphql.CollectedField, obj *model.WhitelistParticipant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_WhitelistParticipant_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_WhitelistParticipant_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WhitelistParticipant",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _WhitelistParticipant_fullName(ctx context.Context, field graphql.CollectedField, obj *model.WhitelistParticipant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_WhitelistParticipant_fullName,
+		func(ctx context.Context) (any, error) {
+			return obj.FullName, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_WhitelistParticipant_fullName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WhitelistParticipant",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _WhitelistParticipant_faculty(ctx context.Context, field graphql.CollectedField, obj *model.WhitelistParticipant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_WhitelistParticipant_faculty,
+		func(ctx context.Context) (any, error) {
+			return obj.Faculty, nil
+		},
+		nil,
+		ec.marshalNFaculty2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFaculty,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_WhitelistParticipant_faculty(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WhitelistParticipant",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Faculty_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Faculty_name(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Faculty", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _WhitelistParticipant_state(ctx context.Context, field graphql.CollectedField, obj *model.WhitelistParticipant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_WhitelistParticipant_state,
+		func(ctx context.Context) (any, error) {
+			return obj.State, nil
+		},
+		nil,
+		ec.marshalNParticipantState2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐParticipantState,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_WhitelistParticipant_state(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WhitelistParticipant",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ParticipantState does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _WhitelistParticipant_registeredAt(ctx context.Context, field graphql.CollectedField, obj *model.WhitelistParticipant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_WhitelistParticipant_registeredAt,
+		func(ctx context.Context) (any, error) {
+			return obj.RegisteredAt, nil
+		},
+		nil,
+		ec.marshalODateTime2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_WhitelistParticipant_registeredAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WhitelistParticipant",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DateTime does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _WhitelistParticipant_registeredTimeSlot(ctx context.Context, field graphql.CollectedField, obj *model.WhitelistParticipant) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_WhitelistParticipant_registeredTimeSlot,
+		func(ctx context.Context) (any, error) {
+			return obj.RegisteredTimeSlot, nil
+		},
+		nil,
+		ec.marshalOTimeSlot2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeSlot,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_WhitelistParticipant_registeredTimeSlot(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WhitelistParticipant",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TimeSlot_id(ctx, field)
+			case "label":
+				return ec.fieldContext_TimeSlot_label(ctx, field)
+			case "startAt":
+				return ec.fieldContext_TimeSlot_startAt(ctx, field)
+			case "endAt":
+				return ec.fieldContext_TimeSlot_endAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSlot", field.Name)
 		},
 	}
 	return fc, nil
@@ -1983,6 +3424,80 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputRegistrationAnalyticsFilterInput(ctx context.Context, obj any) (model.RegistrationAnalyticsFilterInput, error) {
+	var it model.RegistrationAnalyticsFilterInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"facultyIds", "timeSlotIds"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "facultyIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("facultyIds"))
+			data, err := ec.unmarshalOID2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.FacultyIds = data
+		case "timeSlotIds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("timeSlotIds"))
+			data, err := ec.unmarshalOID2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.TimeSlotIds = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputRegistrationAnalyticsFocusInput(ctx context.Context, obj any) (model.RegistrationAnalyticsFocusInput, error) {
+	var it model.RegistrationAnalyticsFocusInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"dimension", "id"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "dimension":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("dimension"))
+			data, err := ec.unmarshalNFocusDimension2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFocusDimension(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Dimension = data
+		case "id":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ID = data
+		}
+	}
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -1990,6 +3505,192 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var facultyImplementors = []string{"Faculty"}
+
+func (ec *executionContext) _Faculty(ctx context.Context, sel ast.SelectionSet, obj *model.Faculty) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, facultyImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Faculty")
+		case "id":
+			out.Values[i] = ec._Faculty_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._Faculty_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var facultyStatImplementors = []string{"FacultyStat"}
+
+func (ec *executionContext) _FacultyStat(ctx context.Context, sel ast.SelectionSet, obj *model.FacultyStat) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, facultyStatImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FacultyStat")
+		case "faculty":
+			out.Values[i] = ec._FacultyStat_faculty(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "summary":
+			out.Values[i] = ec._FacultyStat_summary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var facultyTimeSlotStatImplementors = []string{"FacultyTimeSlotStat"}
+
+func (ec *executionContext) _FacultyTimeSlotStat(ctx context.Context, sel ast.SelectionSet, obj *model.FacultyTimeSlotStat) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, facultyTimeSlotStatImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FacultyTimeSlotStat")
+		case "faculty":
+			out.Values[i] = ec._FacultyTimeSlotStat_faculty(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "timeSlot":
+			out.Values[i] = ec._FacultyTimeSlotStat_timeSlot(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "summary":
+			out.Values[i] = ec._FacultyTimeSlotStat_summary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var focusImplementors = []string{"Focus"}
+
+func (ec *executionContext) _Focus(ctx context.Context, sel ast.SelectionSet, obj *model.Focus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, focusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Focus")
+		case "dimension":
+			out.Values[i] = ec._Focus_dimension(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "id":
+			out.Values[i] = ec._Focus_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "label":
+			out.Values[i] = ec._Focus_label(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
 
 var queryImplementors = []string{"Query"}
 
@@ -2032,6 +3733,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "registrationAnalytics":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_registrationAnalytics(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "whitelistParticipants":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_whitelistParticipants(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -2040,6 +3785,67 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var registrationAnalyticsImplementors = []string{"RegistrationAnalytics"}
+
+func (ec *executionContext) _RegistrationAnalytics(ctx context.Context, sel ast.SelectionSet, obj *model.RegistrationAnalytics) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, registrationAnalyticsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RegistrationAnalytics")
+		case "mode":
+			out.Values[i] = ec._RegistrationAnalytics_mode(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "summary":
+			out.Values[i] = ec._RegistrationAnalytics_summary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "focus":
+			out.Values[i] = ec._RegistrationAnalytics_focus(ctx, field, obj)
+		case "faculties":
+			out.Values[i] = ec._RegistrationAnalytics_faculties(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "timeSlots":
+			out.Values[i] = ec._RegistrationAnalytics_timeSlots(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "matrix":
+			out.Values[i] = ec._RegistrationAnalytics_matrix(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -2094,6 +3900,205 @@ func (ec *executionContext) _RegistrationSummary(ctx context.Context, sel ast.Se
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var summaryImplementors = []string{"Summary"}
+
+func (ec *executionContext) _Summary(ctx context.Context, sel ast.SelectionSet, obj *model.Summary) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, summaryImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Summary")
+		case "registeredCount":
+			out.Values[i] = ec._Summary_registeredCount(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expectedCount":
+			out.Values[i] = ec._Summary_expectedCount(ctx, field, obj)
+		case "unregisteredCount":
+			out.Values[i] = ec._Summary_unregisteredCount(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var timeSlotImplementors = []string{"TimeSlot"}
+
+func (ec *executionContext) _TimeSlot(ctx context.Context, sel ast.SelectionSet, obj *model.TimeSlot) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, timeSlotImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TimeSlot")
+		case "id":
+			out.Values[i] = ec._TimeSlot_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "label":
+			out.Values[i] = ec._TimeSlot_label(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "startAt":
+			out.Values[i] = ec._TimeSlot_startAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "endAt":
+			out.Values[i] = ec._TimeSlot_endAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var timeSlotStatImplementors = []string{"TimeSlotStat"}
+
+func (ec *executionContext) _TimeSlotStat(ctx context.Context, sel ast.SelectionSet, obj *model.TimeSlotStat) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, timeSlotStatImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TimeSlotStat")
+		case "timeSlot":
+			out.Values[i] = ec._TimeSlotStat_timeSlot(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "summary":
+			out.Values[i] = ec._TimeSlotStat_summary(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var whitelistParticipantImplementors = []string{"WhitelistParticipant"}
+
+func (ec *executionContext) _WhitelistParticipant(ctx context.Context, sel ast.SelectionSet, obj *model.WhitelistParticipant) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, whitelistParticipantImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("WhitelistParticipant")
+		case "id":
+			out.Values[i] = ec._WhitelistParticipant_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fullName":
+			out.Values[i] = ec._WhitelistParticipant_fullName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "faculty":
+			out.Values[i] = ec._WhitelistParticipant_faculty(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "state":
+			out.Values[i] = ec._WhitelistParticipant_state(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "registeredAt":
+			out.Values[i] = ec._WhitelistParticipant_registeredAt(ctx, field, obj)
+		case "registeredTimeSlot":
+			out.Values[i] = ec._WhitelistParticipant_registeredTimeSlot(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -2468,6 +4473,110 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) unmarshalNDateTime2string(ctx context.Context, v any) (string, error) {
+	res, err := graphql.UnmarshalString(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNDateTime2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
+func (ec *executionContext) marshalNFaculty2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFaculty(ctx context.Context, sel ast.SelectionSet, v *model.Faculty) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Faculty(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNFacultyStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStatᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FacultyStat) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNFacultyStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStat(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNFacultyStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyStat(ctx context.Context, sel ast.SelectionSet, v *model.FacultyStat) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FacultyStat(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNFacultyTimeSlotStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyTimeSlotStatᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.FacultyTimeSlotStat) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNFacultyTimeSlotStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyTimeSlotStat(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNFacultyTimeSlotStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFacultyTimeSlotStat(ctx context.Context, sel ast.SelectionSet, v *model.FacultyTimeSlotStat) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FacultyTimeSlotStat(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNFocusDimension2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFocusDimension(ctx context.Context, v any) (model.FocusDimension, error) {
+	var res model.FocusDimension
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFocusDimension2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFocusDimension(ctx context.Context, sel ast.SelectionSet, v model.FocusDimension) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
+	res, err := graphql.UnmarshalID(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalID(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
 	res, err := graphql.UnmarshalInt(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -2482,6 +4591,40 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNParticipantState2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐParticipantState(ctx context.Context, v any) (model.ParticipantState, error) {
+	var res model.ParticipantState
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNParticipantState2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐParticipantState(ctx context.Context, sel ast.SelectionSet, v model.ParticipantState) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNRegistrationAnalytics2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationAnalytics(ctx context.Context, sel ast.SelectionSet, v model.RegistrationAnalytics) graphql.Marshaler {
+	return ec._RegistrationAnalytics(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNRegistrationAnalytics2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationAnalytics(ctx context.Context, sel ast.SelectionSet, v *model.RegistrationAnalytics) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RegistrationAnalytics(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNRegistrationMode2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationMode(ctx context.Context, v any) (model.RegistrationMode, error) {
+	var res model.RegistrationMode
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNRegistrationMode2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationMode(ctx context.Context, sel ast.SelectionSet, v model.RegistrationMode) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) marshalNRegistrationSummary2githubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationSummary(ctx context.Context, sel ast.SelectionSet, v model.RegistrationSummary) graphql.Marshaler {
@@ -2512,6 +4655,78 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNSummary2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐSummary(ctx context.Context, sel ast.SelectionSet, v *model.Summary) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Summary(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNTimeSlot2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeSlot(ctx context.Context, sel ast.SelectionSet, v *model.TimeSlot) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TimeSlot(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNTimeSlotStat2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeSlotStatᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.TimeSlotStat) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNTimeSlotStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeSlotStat(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTimeSlotStat2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeSlotStat(ctx context.Context, sel ast.SelectionSet, v *model.TimeSlotStat) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TimeSlotStat(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNWhitelistParticipant2ᚕᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐWhitelistParticipantᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.WhitelistParticipant) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNWhitelistParticipant2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐWhitelistParticipant(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNWhitelistParticipant2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐWhitelistParticipant(ctx context.Context, sel ast.SelectionSet, v *model.WhitelistParticipant) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._WhitelistParticipant(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
@@ -2685,6 +4900,117 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
+func (ec *executionContext) unmarshalODateTime2ᚖstring(ctx context.Context, v any) (*string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalString(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalODateTime2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalString(*v)
+	return res
+}
+
+func (ec *executionContext) marshalOFocus2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐFocus(ctx context.Context, sel ast.SelectionSet, v *model.Focus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Focus(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOID2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNID2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOID2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNID2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalInt(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalInt(*v)
+	return res
+}
+
+func (ec *executionContext) unmarshalOParticipantState2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐParticipantState(ctx context.Context, v any) (*model.ParticipantState, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.ParticipantState)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOParticipantState2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐParticipantState(ctx context.Context, sel ast.SelectionSet, v *model.ParticipantState) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) unmarshalORegistrationAnalyticsFilterInput2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationAnalyticsFilterInput(ctx context.Context, v any) (*model.RegistrationAnalyticsFilterInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputRegistrationAnalyticsFilterInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalORegistrationAnalyticsFocusInput2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐRegistrationAnalyticsFocusInput(ctx context.Context, v any) (*model.RegistrationAnalyticsFocusInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputRegistrationAnalyticsFocusInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {
 	if v == nil {
 		return nil, nil
@@ -2701,6 +5027,13 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	_ = ctx
 	res := graphql.MarshalString(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOTimeSlot2ᚖgithubᚗcomᚋcunexᚑclubᚋquickattendᚑbackendᚋinternalᚋinfrastructureᚋhttpᚋhandlerᚋgraphqlᚋmodelᚐTimeSlot(ctx context.Context, sel ast.SelectionSet, v *model.TimeSlot) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TimeSlot(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {
