@@ -14,7 +14,10 @@ type AllRepo struct {
 }
 
 func NewRepository(db *gorm.DB) AllRepo {
-	repo := &repository{db: db}
+	repo := &repository{
+		db: db,
+	}
+
 	return AllRepo{
 		HealthCheck: repo,
 		Auth:        repo,
