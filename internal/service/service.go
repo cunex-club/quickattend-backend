@@ -20,6 +20,7 @@ type AllOfService struct {
 	Auth        AuthService
 	Event       EventService
 	Dashboard   DashboardService
+	User        UserService
 }
 
 func NewService(repo repository.AllRepo, cfg *config.Config, logger *zerolog.Logger, httpClient *http.Client) AllOfService {
@@ -35,5 +36,6 @@ func NewService(repo repository.AllRepo, cfg *config.Config, logger *zerolog.Log
 		Auth:        srv,
 		Event:       srv,
 		Dashboard:   srv,
+		User:        srv,
 	}
 }

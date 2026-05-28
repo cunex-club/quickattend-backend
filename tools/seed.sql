@@ -521,17 +521,17 @@ For i = 5 to 7
 -- Event ID for GraphQL testing: eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee
 -- =========================
 
-INSERT INTO users (id, ref_id, firstname_th, surname_th, title_th, firstname_en, surname_en, title_en)
+INSERT INTO users (id, ref_id, firstname_th, surname_th, title_th, firstname_en, surname_en, title_en, faculty_name_th, faculty_name_en, profile_image_url)
 VALUES
-  ('66666666-6666-6666-6666-666666666666', 7000000001, 'ปริญญา', 'อธิศักดิ์', 'นาย', 'Parinya', 'Atisak', 'Mr.'),
-  ('77777777-7777-7777-7777-777777777777', 7000000002, 'พิมพ์ชนก', 'สุวรรณ', 'นางสาว', 'Pimchanok', 'Suwan', 'Ms.'),
-  ('88888888-8888-8888-8888-888888888888', 7000000003, 'สิรภพ', 'ชาญชัย', 'นาย', 'Siraphop', 'Chanchai', 'Mr.'),
-  ('99999999-9999-9999-9999-999999999999', 7000000004, 'กัญญ์วรา', 'ศรีสุข', 'นางสาว', 'Kanwara', 'Srisuk', 'Ms.'),
-  ('abababab-abab-abab-abab-abababababab', 7000000005, 'ธีรภัทร', 'วงศ์ศรี', 'นาย', 'Theerapat', 'Wongsri', 'Mr.'),
-  ('bcbcbcbc-bcbc-bcbc-bcbc-bcbcbcbcbcbc', 40001, 'ภาสกร', 'ใจมั่น', 'นาย', 'Phatsakorn', 'Jaiman', 'Mr.'),
-  ('cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd', 40002, 'ชญานี', 'กุลดี', 'นางสาว', 'Chayanee', 'Kuldee', 'Ms.'),
-  ('dededede-dede-dede-dede-dededededede', 40003, 'ณัฐพล', 'ทรัพย์เพิ่ม', 'นาย', 'Nattaphon', 'Sapphoem', 'Mr.'),
-  ('efefefef-efef-efef-efef-efefefefefef', 40004, 'อชิรญา', 'พลอยงาม', 'นางสาว', 'Achiraya', 'Ployngam', 'Ms.')
+  ('66666666-6666-6666-6666-666666666666', 7000000001, 'ปริญญา', 'อธิศักดิ์', 'นาย', 'Parinya', 'Atisak', 'Mr.', 'คณะ 1', 'faculty 1', ''),
+  ('77777777-7777-7777-7777-777777777777', 7000000002, 'พิมพ์ชนก', 'สุวรรณ', 'นางสาว', 'Pimchanok', 'Suwan', 'Ms.', 'คณะ 2', 'faculty 2', ''),
+  ('88888888-8888-8888-8888-888888888888', 7000000003, 'สิรภพ', 'ชาญชัย', 'นาย', 'Siraphop', 'Chanchai', 'Mr.', 'คณะ 3', 'faculty 3', ''),
+  ('99999999-9999-9999-9999-999999999999', 7000000004, 'กัญญ์วรา', 'ศรีสุข', 'นางสาว', 'Kanwara', 'Srisuk', 'Ms.', 'คณะ 4', 'faculty 4', ''),
+  ('abababab-abab-abab-abab-abababababab', 7000000005, 'ธีรภัทร', 'วงศ์ศรี', 'นาย', 'Theerapat', 'Wongsri', 'Mr.', 'คณะ 5', 'faculty 5', ''),
+  ('bcbcbcbc-bcbc-bcbc-bcbc-bcbcbcbcbcbc', 40001, 'ภาสกร', 'ใจมั่น', 'นาย', 'Phatsakorn', 'Jaiman', 'Mr.', 'คณะ 6', 'faculty 6', ''),
+  ('cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd', 40002, 'ชญานี', 'กุลดี', 'นางสาว', 'Chayanee', 'Kuldee', 'Ms.', 'คณะ 7', 'faculty 7', ''),
+  ('dededede-dede-dede-dede-dededededede', 40003, 'ณัฐพล', 'ทรัพย์เพิ่ม', 'นาย', 'Nattaphon', 'Sapphoem', 'Mr.', 'คณะ 8', 'faculty 8', ''),
+  ('efefefef-efef-efef-efef-efefefefefef', 40004, 'อชิรญา', 'พลอยงาม', 'นางสาว', 'Achiraya', 'Ployngam', 'Ms.', 'คณะ 9', 'faculty 9', '')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO events (
@@ -740,13 +740,13 @@ ON CONFLICT (event_id, participant_id) DO NOTHING;
 
 -- Extra users for the whitelist dashboard scenario.
 -- Students = 10-digit ref_id, Staff = <10-digit ref_id.
-INSERT INTO users (id, ref_id, firstname_th, surname_th, title_th, firstname_en, surname_en, title_en)
+INSERT INTO users (id, ref_id, firstname_th, surname_th, title_th, firstname_en, surname_en, title_en, faculty_name_th, faculty_name_en, profile_image_url)
 VALUES
-  ('f1f1f1f1-f1f1-f1f1-f1f1-f1f1f1f1f1f1', 6610000001, 'วรัญญา', 'ศิริ', 'นางสาว', 'Waranya', 'Siri', 'Ms.'),
-  ('f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2', 6610000002, 'กฤติน', 'ทองดี', 'นาย', 'Kritin', 'Thongdee', 'Mr.'),
-  ('f3f3f3f3-f3f3-f3f3-f3f3-f3f3f3f3f3f3', 6610000003, 'ปุญญิศา', 'มีสุข', 'นางสาว', 'Punyisa', 'Meesuk', 'Ms.'),
-  ('f4f4f4f4-f4f4-f4f4-f4f4-f4f4f4f4f4f4', 50001,      'ชนินทร์', 'พัฒนา', 'นาย', 'Chanin', 'Pattana', 'Mr.'),
-  ('f5f5f5f5-f5f5-f5f5-f5f5-f5f5f5f5f5f5', 50002,      'อาริยา', 'บุญมี', 'นางสาว', 'Ariya', 'Boonmee', 'Ms.')
+  ('f1f1f1f1-f1f1-f1f1-f1f1-f1f1f1f1f1f1', 6610000001, 'วรัญญา', 'ศิริ', 'นางสาว', 'Waranya', 'Siri', 'Ms.', 'คณะ 10', 'faculty 10', ''),
+  ('f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2', 6610000002, 'กฤติน', 'ทองดี', 'นาย', 'Kritin', 'Thongdee', 'Mr.', 'คณะ 11', 'faculty 11', ''),
+  ('f3f3f3f3-f3f3-f3f3-f3f3-f3f3f3f3f3f3', 6610000003, 'ปุญญิศา', 'มีสุข', 'นางสาว', 'Punyisa', 'Meesuk', 'Ms.', 'คณะ 12', 'faculty 12', ''),
+  ('f4f4f4f4-f4f4-f4f4-f4f4-f4f4f4f4f4f4', 50001,      'ชนินทร์', 'พัฒนา', 'นาย', 'Chanin', 'Pattana', 'Mr.', 'คณะ 13', 'faculty 13', ''),
+  ('f5f5f5f5-f5f5-f5f5-f5f5-f5f5f5f5f5f5', 50002,      'อาริยา', 'บุญมี', 'นางสาว', 'Ariya', 'Boonmee', 'Ms.', 'คณะ 14', 'faculty 14', '')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO events (

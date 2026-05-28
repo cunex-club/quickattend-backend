@@ -14,4 +14,5 @@ func SetupRoutes(app *fiber.App, h *handler.AllOfHandler, mw *middleware.Middlew
 	EventRoutes(api, h, mw)
 	HealthCheckRoutes(api, h)
 	GraphQLRoutes(api, gqlResolver)
+	UserRoutes(api, h, mw)
 }
