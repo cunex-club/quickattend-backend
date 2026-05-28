@@ -645,6 +645,23 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
+	// Sync event user and whitelist pending
+	if err := s.repo.Auth.SyncWhitelistPendingToWhitelist(ctx, user.RefID); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", user.RefID).
+			Str("action", "sync_whitelist_pending").
+			Msg("failed to sync whitelist pending to whitelist")
+	}
+
+	if err := s.repo.Auth.SyncEventUserPendingToEventUser(ctx, user.ID, user.RefID); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", user.RefID).
+			Str("action", "sync_event_user_pending").
+			Msg("failed to sync event user pending to event user")
+	}
+
 	// Get event info for checking scanning/check in permission
 	event, getEventErr := s.repo.Event.GetEventForCheckin(ctx, eventIdUuid, userIdUuid)
 	if getEventErr != nil {
