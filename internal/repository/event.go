@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
@@ -43,7 +44,7 @@ type EventRepository interface {
 	CreateEvent(ctx context.Context, payload entity.CreateEventPayload) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, payload entity.CreateEventPayload) (*dtoRes.UpdateEventRes, error)
 
-	GetEventUserExport(ctx context.Context, eventID datatypes.UUID) (eventName string, rows []entity.EventPersonExportRow, err error)
+	GetEventUserExport(ctx context.Context, eventID datatypes.UUID) (*entity.EventExportData, error)
 }
 
 type GetEventsArguments struct {
@@ -736,6 +737,8 @@ type personRecord struct {
 	eventRole    *string
 	onWhitelist  bool
 	checkedInAt  *time.Time
+	scannerRefID *uint64
+	scannerName  *string
 	comment      *string
 }
 
@@ -760,17 +763,17 @@ func (p *personRecord) mergeUserFields(titleTH, firstTH, surTH, titleEN, firstEN
 	}
 }
 
-func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.UUID) (string, []entity.EventPersonExportRow, error) {
+func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.UUID) (*entity.EventExportData, error) {
 	db := r.db.WithContext(ctx)
 
-	// ---- 1. Verify event & get name ----
+	// ---- 1. Verify event & get metadata for the Summary sheet ----
 	var event entity.Event
-	if err := db.Select("name").
+	if err := db.Select("name", "organizer", "description", "start_time", "end_time", "location").
 		First(&event, "id = ?", eventID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", nil, errorx.ErrEventNotFound
+			return nil, errorx.ErrEventNotFound
 		}
-		return "", nil, err
+		return nil, err
 	}
 
 	people := make(map[uint64]*personRecord)
@@ -803,7 +806,7 @@ func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.U
 		Joins("JOIN users u ON u.id = eu.user_id").
 		Where("eu.event_id = ?", eventID).
 		Scan(&eus).Error; err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	for _, x := range eus {
 		p := getOrCreate(x.RefID)
@@ -815,29 +818,41 @@ func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.U
 
 	// ---- 3. Participants (people who got scanned) ----
 	type pRow struct {
-		RefID            uint64    `gorm:"column:ref_id"`
-		TitleTH          *string   `gorm:"column:title_th"`
-		FirstnameTH      *string   `gorm:"column:firstname_th"`
-		SurnameTH        *string   `gorm:"column:surname_th"`
-		TitleEN          *string   `gorm:"column:title_en"`
-		FirstnameEN      *string   `gorm:"column:firstname_en"`
-		SurnameEN        *string   `gorm:"column:surname_en"`
-		Organization     string    `gorm:"column:organization"`
-		ScannedTimestamp time.Time `gorm:"column:scanned_timestamp"`
-		Comment          *string   `gorm:"column:comment"`
+		RefID              uint64    `gorm:"column:ref_id"`
+		TitleTH            *string   `gorm:"column:title_th"`
+		FirstnameTH        *string   `gorm:"column:firstname_th"`
+		SurnameTH          *string   `gorm:"column:surname_th"`
+		TitleEN            *string   `gorm:"column:title_en"`
+		FirstnameEN        *string   `gorm:"column:firstname_en"`
+		SurnameEN          *string   `gorm:"column:surname_en"`
+		Organization       string    `gorm:"column:organization"`
+		ScannedTimestamp   time.Time `gorm:"column:scanned_timestamp"`
+		ScannerRefID       *uint64   `gorm:"column:scanner_ref_id"`
+		ScannerFirstnameTH *string   `gorm:"column:scanner_firstname_th"`
+		ScannerSurnameTH   *string   `gorm:"column:scanner_surname_th"`
+		ScannerFirstnameEN *string   `gorm:"column:scanner_firstname_en"`
+		ScannerSurnameEN   *string   `gorm:"column:scanner_surname_en"`
+		Comment            *string   `gorm:"column:comment"`
 	}
 	var parts []pRow
 	if err := db.Table("event_participants AS ep").
 		Select(`u.ref_id,
                 u.title_th, u.firstname_th, u.surname_th,
                 u.title_en, u.firstname_en, u.surname_en,
-                ep.organization, ep.scanned_timestamp, ep.comment`).
+                ep.organization, ep.scanned_timestamp,
+                scanner_user.ref_id AS scanner_ref_id,
+                scanner_user.firstname_th AS scanner_firstname_th,
+                scanner_user.surname_th   AS scanner_surname_th,
+                scanner_user.firstname_en AS scanner_firstname_en,
+                scanner_user.surname_en   AS scanner_surname_en,
+                ep.comment`).
 		Joins("JOIN users u ON u.id = ep.participant_id").
+		Joins("LEFT JOIN users scanner_user ON scanner_user.id = ep.scanner_id").
 		Where("ep.event_id = ?", eventID).
 		// Earliest scan first so MIN-like behavior on first hit
 		Order("ep.scanned_timestamp ASC").
 		Scan(&parts).Error; err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	for _, x := range parts {
 		p := getOrCreate(x.RefID)
@@ -848,10 +863,17 @@ func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.U
 			org := x.Organization
 			p.organization = &org
 		}
-		// Keep earliest scan
+		// One scan per (event, participant) is enforced by a unique constraint,
+		// so this loop body runs at most once per person; the comparison is
+		// kept only as a defensive guard.
 		if p.checkedInAt == nil || x.ScannedTimestamp.Before(*p.checkedInAt) {
 			ts := x.ScannedTimestamp
 			p.checkedInAt = &ts
+			p.scannerRefID = x.ScannerRefID
+			if name := fullName(x.ScannerFirstnameTH, x.ScannerSurnameTH,
+				x.ScannerFirstnameEN, x.ScannerSurnameEN); name != "" {
+				p.scannerName = &name
+			}
 		}
 		// Keep first non-empty comment
 		if p.comment == nil && x.Comment != nil && *x.Comment != "" {
@@ -878,7 +900,7 @@ func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.U
 		Joins("LEFT JOIN users u ON u.ref_id = ew.attendee_ref_id").
 		Where("ew.event_id = ?", eventID).
 		Scan(&wls).Error; err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	for _, x := range wls {
 		p := getOrCreate(x.RefID)
@@ -886,7 +908,7 @@ func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.U
 		p.mergeUserFields(x.TitleTH, x.FirstnameTH, x.SurnameTH,
 			x.TitleEN, x.FirstnameEN, x.SurnameEN)
 	}
-	
+
 	type wPendRow struct {
 		RefID uint64 `gorm:"column:attendee_ref_id"`
 	}
@@ -895,7 +917,7 @@ func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.U
 		Select("attendee_ref_id").
 		Where("event_id = ?", eventID).
 		Scan(&wlPendings).Error; err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	for _, x := range wlPendings {
 		p := getOrCreate(x.RefID)
@@ -919,6 +941,8 @@ func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.U
 			EventRole:    p.eventRole,
 			OnWhitelist:  p.onWhitelist,
 			CheckedInAt:  p.checkedInAt,
+			ScannerRefID: p.scannerRefID,
+			ScannerName:  p.scannerName,
 			Comment:      p.comment,
 		})
 	}
@@ -938,7 +962,17 @@ func (r *repository) GetEventUserExport(ctx context.Context, eventID datatypes.U
 		return *a.RefID < *b.RefID
 	})
 
-	return event.Name, rows, nil
+	return &entity.EventExportData{
+		Info: entity.EventExportInfo{
+			Name:        event.Name,
+			Organizer:   event.Organizer,
+			Description: event.Description,
+			StartTime:   event.StartTime,
+			EndTime:     event.EndTime,
+			Location:    event.Location,
+		},
+		Rows: rows,
+	}, nil
 }
 
 func derefOr(s *string, fallback string) string {
@@ -946,4 +980,13 @@ func derefOr(s *string, fallback string) string {
 		return fallback
 	}
 	return *s
+}
+
+// fullName builds a display name, preferring Thai over English. Returns "" when
+// no name parts are available (e.g. a scanner whose user row was deleted).
+func fullName(firstTH, surTH, firstEN, surEN *string) string {
+	first := derefOr(firstTH, derefOr(firstEN, ""))
+	sur := derefOr(surTH, derefOr(surEN, ""))
+	name := strings.TrimSpace(first + " " + sur)
+	return name
 }

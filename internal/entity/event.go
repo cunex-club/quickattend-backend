@@ -346,5 +346,24 @@ type EventPersonExportRow struct {
 	EventRole    *string // OWNER | MANAGER | STAFF | nil
 	OnWhitelist  bool
 	CheckedInAt  *time.Time
+	ScannerRefID *uint64
+	ScannerName  *string
 	Comment      *string
+}
+
+// EventExportInfo holds event metadata shown on the Summary sheet of an export.
+type EventExportInfo struct {
+	Name        string
+	Organizer   string
+	Description *string
+	StartTime   time.Time
+	EndTime     time.Time
+	Location    string
+}
+
+// EventExportData bundles the event metadata and the flattened people rows
+// returned by EventRepository.GetEventUserExport.
+type EventExportData struct {
+	Info EventExportInfo
+	Rows []EventPersonExportRow
 }

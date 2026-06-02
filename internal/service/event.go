@@ -1386,11 +1386,13 @@ func (s *service) ExportEventUserExcel(ctx context.Context, eventIdStr string, u
 			Msg("failed to check export permission")
 		return "", nil, fmt.Errorf("permission check: %w", errorx.ErrInternalDB)
 	}
-	if role == nil {
+	// Export carries attendee PII, so restrict it to event owners/managers —
+	// the same gate UpdateEvent uses. STAFF (scanners) cannot export.
+	if role == nil || (*role != string(entity.OWNER) && *role != string(entity.MANAGER)) {
 		return "", nil, errorx.ErrInsufficientPermissions
 	}
 
-	eventName, rows, err := s.repo.Event.GetEventUserExport(ctx, datatypes.UUID(datatypes.BinUUIDFromString(eventIdStr)))
+	data, err := s.repo.Event.GetEventUserExport(ctx, datatypes.UUID(eventUUID))
 	if err != nil {
 		if errors.Is(err, errorx.ErrEventNotFound) {
 			return "", nil, errorx.ErrEventNotFound
@@ -1402,7 +1404,7 @@ func (s *service) ExportEventUserExcel(ctx context.Context, eventIdStr string, u
 		return "", nil, fmt.Errorf("query export: %w", errorx.ErrInternalDB)
 	}
 
-	content, err := buildEventPeopleExcel(rows)
+	content, err := buildEventPeopleExcel(data)
 	if err != nil {
 		s.logger.Error().Err(err).
 			Str("event_id", eventIdStr).
@@ -1410,24 +1412,161 @@ func (s *service) ExportEventUserExcel(ctx context.Context, eventIdStr string, u
 		return "", nil, fmt.Errorf("build excel: %w", errorx.ErrExcelGeneration)
 	}
 
-	filename := sanitizeExcelFilename(eventName) + "_people.xlsx"
-	return filename, content, nil
+	return buildExportFilename(data.Info), content, nil
 }
 
-func buildEventPeopleExcel(rows []entity.EventPersonExportRow) ([]byte, error) {
+// exportFormatVersion is the schema version of the generated workbook. Bump it
+// whenever the columns/sheets change so downstream consumers can tell layouts
+// apart from the filename alone.
+const exportFormatVersion = "v1"
+
+// buildExportFilename produces a descriptive, sortable filename, e.g.
+//
+//	Orientation2026_attendance_20260602_v1_export-20260602-153045+0700.xlsx
+//
+// It embeds the event date, the format version, and the export timestamp (Thai
+// time) so multiple exports of the same event never collide.
+func buildExportFilename(info entity.EventExportInfo) string {
+	base := sanitizeExcelFilename(info.Name)
+	eventDate := info.StartTime.In(thaiLoc).Format("20060102")
+	exportedAt := time.Now().In(thaiLoc).Format("20060102-150405-0700")
+	return fmt.Sprintf("%s_attendance_%s_%s_export-%s.xlsx",
+		base, eventDate, exportFormatVersion, exportedAt)
+}
+
+func buildEventPeopleExcel(data *entity.EventExportData) ([]byte, error) {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
-	const sheet = "People"
-	f.SetSheetName(f.GetSheetName(0), sheet)
+	const peopleSheet = "People"
+	const summarySheet = "Summary"
+	f.SetSheetName(f.GetSheetName(0), peopleSheet)
+	if _, err := f.NewSheet(summarySheet); err != nil {
+		return nil, err
+	}
 
+	if err := writePeopleSheet(f, peopleSheet, data.Rows); err != nil {
+		return nil, err
+	}
+	if err := writeSummarySheet(f, summarySheet, data); err != nil {
+		return nil, err
+	}
+
+	// Open on the People sheet.
+	if idx, err := f.GetSheetIndex(peopleSheet); err == nil {
+		f.SetActiveSheet(idx)
+	}
+
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, err
+	}
+	return bytes.Clone(buf.Bytes()), nil
+}
+
+// writeSummarySheet renders event metadata and attendance statistics.
+func writeSummarySheet(f *excelize.File, sheet string, data *entity.EventExportData) error {
+	titleStyle, err := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{Bold: true, Size: 14},
+	})
+	if err != nil {
+		return err
+	}
+	labelStyle, err := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{Bold: true},
+	})
+	if err != nil {
+		return err
+	}
+
+	info := data.Info
+	stats := computeExportStats(data.Rows)
+
+	if err := f.SetCellValue(sheet, "A1", "Event Attendance Export"); err != nil {
+		return err
+	}
+	if err := f.SetCellStyle(sheet, "A1", "A1", titleStyle); err != nil {
+		return err
+	}
+
+	rows := [][2]string{
+		{"Event Name", info.Name},
+		{"Organizer", info.Organizer},
+		{"Location", info.Location},
+		{"Start (GMT+7)", info.StartTime.In(thaiLoc).Format("2006-01-02 15:04:05")},
+		{"End (GMT+7)", info.EndTime.In(thaiLoc).Format("2006-01-02 15:04:05")},
+		{"Description", valueOrDash(info.Description)},
+		{"Exported At (GMT+7)", time.Now().In(thaiLoc).Format("2006-01-02 15:04:05")},
+		{"Format Version", exportFormatVersion},
+		{"", ""},
+		{"Statistics", ""},
+		{"Total People", strconv.Itoa(stats.total)},
+		{"Checked In", strconv.Itoa(stats.checkedIn)},
+		{"On Whitelist (Expected)", strconv.Itoa(stats.onWhitelist)},
+		{"No-show (Whitelisted, not checked in)", strconv.Itoa(stats.noShow)},
+		{"Organizer Team (Owner/Manager/Staff)", strconv.Itoa(stats.organizerTeam)},
+	}
+
+	for i, kv := range rows {
+		r := i + 3 // leave a blank row under the title
+		labelCell, _ := excelize.CoordinatesToCellName(1, r)
+		valueCell, _ := excelize.CoordinatesToCellName(2, r)
+		if err := f.SetCellValue(sheet, labelCell, kv[0]); err != nil {
+			return err
+		}
+		if err := f.SetCellValue(sheet, valueCell, kv[1]); err != nil {
+			return err
+		}
+		if kv[0] != "" {
+			if err := f.SetCellStyle(sheet, labelCell, labelCell, labelStyle); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := f.SetColWidth(sheet, "A", "A", 38); err != nil {
+		return err
+	}
+	return f.SetColWidth(sheet, "B", "B", 48)
+}
+
+type exportStats struct {
+	total         int
+	checkedIn     int
+	onWhitelist   int
+	noShow        int
+	organizerTeam int
+}
+
+func computeExportStats(rows []entity.EventPersonExportRow) exportStats {
+	var s exportStats
+	s.total = len(rows)
+	for _, row := range rows {
+		if row.CheckedInAt != nil {
+			s.checkedIn++
+		}
+		if row.OnWhitelist {
+			s.onWhitelist++
+			if row.CheckedInAt == nil {
+				s.noShow++
+			}
+		}
+		if row.EventRole != nil && *row.EventRole != "" {
+			s.organizerTeam++
+		}
+	}
+	return s
+}
+
+// writePeopleSheet renders the per-person attendance table.
+func writePeopleSheet(f *excelize.File, sheet string, rows []entity.EventPersonExportRow) error {
 	headerStyle, err := f.NewStyle(&excelize.Style{
 		Font:      &excelize.Font{Bold: true},
 		Fill:      excelize.Fill{Type: "pattern", Color: []string{"#EDEDED"}, Pattern: 1},
 		Alignment: &excelize.Alignment{Vertical: "center"},
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	headers := []string{
@@ -1438,18 +1577,21 @@ func buildEventPeopleExcel(rows []entity.EventPersonExportRow) ([]byte, error) {
 		"Organization",
 		"Event Role",
 		"On Whitelist",
-		"Checked In At",
+		"Status",
+		"Checked In At (GMT+7)",
+		"Scanner Ref ID",
+		"Scanner Name",
 		"Comment",
 	}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		if err := f.SetCellValue(sheet, cell, h); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	lastCol, _ := excelize.CoordinatesToCellName(len(headers), 1)
 	if err := f.SetCellStyle(sheet, "A1", lastCol, headerStyle); err != nil {
-		return nil, err
+		return err
 	}
 
 	// --- Body ---
@@ -1467,12 +1609,15 @@ func buildEventPeopleExcel(rows []entity.EventPersonExportRow) ([]byte, error) {
 			valueOrEmpty(row.Organization),
 			valueOrDash(row.EventRole),
 			boolYesOrDash(row.OnWhitelist),
+			attendanceStatus(row),
 			formatTimePtr(row.CheckedInAt),
+			formatRefIDPtr(row.ScannerRefID),
+			valueOrDash(row.ScannerName),
 			valueOrEmpty(row.Comment),
 		}
 		startCell, _ := excelize.CoordinatesToCellName(1, r)
 		if err := f.SetSheetRow(sheet, startCell, &values); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -1480,28 +1625,32 @@ func buildEventPeopleExcel(rows []entity.EventPersonExportRow) ([]byte, error) {
 	if err := f.SetPanes(sheet, &excelize.Panes{
 		Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft",
 	}); err != nil {
-		return nil, err
+		return err
 	}
 
-	// --- Column widths ---
-	widths := []float64{6, 14, 10, 18, 18, 10, 18, 18, 28, 12, 14, 22, 40}
+	// --- Column widths (one per header) ---
+	widths := []float64{6, 14, 10, 18, 18, 10, 18, 18, 28, 12, 14, 12, 24, 16, 24, 40}
 	for i, w := range widths {
 		col, _ := excelize.ColumnNumberToName(i + 1)
 		if err := f.SetColWidth(sheet, col, col, w); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	// --- Enable autofilter on the header ---
-	if err := f.AutoFilter(sheet, "A1:"+lastCol, []excelize.AutoFilterOptions{}); err != nil {
-		return nil, err
-	}
+	return f.AutoFilter(sheet, "A1:"+lastCol, []excelize.AutoFilterOptions{})
+}
 
-	buf, err := f.WriteToBuffer()
-	if err != nil {
-		return nil, err
+// attendanceStatus derives a human-readable status for a person row.
+func attendanceStatus(row entity.EventPersonExportRow) string {
+	switch {
+	case row.CheckedInAt != nil:
+		return "Checked in"
+	case row.OnWhitelist:
+		return "No-show"
+	default:
+		return "—"
 	}
-	return bytes.Clone(buf.Bytes()), nil
 }
 
 func valueOrDash(s *string) string {
@@ -1536,7 +1685,7 @@ func formatTimePtr(t *time.Time) string {
 	if t == nil {
 		return ""
 	}
-	return t.UTC().Format(time.RFC3339)
+	return t.In(thaiLoc).Format("2006-01-02 15:04:05")
 }
 
 var invalidFilenameChars = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]+`)
