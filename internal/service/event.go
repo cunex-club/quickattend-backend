@@ -31,13 +31,13 @@ var thaiLoc = time.FixedZone(entity.ThaiTZ, 7*3600)
 
 type EventService interface {
 	DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError
-	DuplicateById(EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
+	DuplicateById(Req dtoReq.DuplicateEventReq, EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
 	Comment(checkInReq dtoReq.CommentReq, ctx context.Context) *response.APIError
-	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
+	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.PostParticipantRes, *response.APIError)
 
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
 
-	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error)
+	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq, userId string) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, userId string, updates dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error)
 
 	GetEventsValidateArgs(userIDStr string, queryParams map[string]string, ctx context.Context) (validated *GetEventsValidateArgsReturn, err *response.APIError)
@@ -225,7 +225,7 @@ func (s *service) DeleteById(eventIDStr string, userIDStr string, ctx context.Co
 	return nil
 }
 
-func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError) {
+func (s *service) DuplicateById(Req dtoReq.DuplicateEventReq, eventIDStr string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError) {
 	eventID, parseErr := uuid.Parse(eventIDStr)
 	if parseErr != nil {
 		return nil, &response.APIError{
@@ -287,14 +287,102 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 		}
 	}
 
+	// validate payload
+	// timezone
+	if err := validateThaiTimezone(Req.Timezone); err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+
+	// start_time, end_time
+	startTime, err := parseTime(Req.StartTime)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+	endTime, err := parseTime(Req.EndTime)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+	if !endTime.After(startTime) {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: "end_time must be after start_time",
+		}
+	}
+	if !isSameDay(startTime, endTime) {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: fmt.Sprintf("start_time and end_time must be on the same day in timezone %s", entity.ThaiTZ),
+		}
+	}
+
+	// agenda
+	agendas, err := buildAgendas(Req.Agenda, startTime, endTime)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+
+	// build new event
 	newEvent := *originalEvent
 	newEvent.ID = datatypes.UUID(uuid.New())
 
-	// breaking the memory link from originalEvent
+	// break the memory link from originalEvent, insert new information
+	// location
+	newEvent.Location = Req.Location
+
+	// start_time
+	newEvent.StartTime = startTime
+
+	// end_time
+	newEvent.EndTime = endTime
+
+	// evaluation_form
+	newEvent.EvaluationForm = Req.EvaluationForm
+
+	// location_point
+	newEvent.LocationPoint = entity.Point{
+		X: Req.LocationLong,
+		Y: Req.LocationLat,
+	}
+
+	// agenda
+	newEvent.EventAgenda = make([]entity.EventAgenda, 0, len(agendas))
+	for _, item := range agendas {
+		newEvent.EventAgenda = append(newEvent.EventAgenda, entity.EventAgenda{
+			ActivityName: item.ActivityName,
+			StartTime:    item.StartTime,
+			EndTime:      item.EndTime,
+		})
+	}
+
+	// copy over other existing info
 	// Whitelist
 	newEvent.EventWhitelist = make([]entity.EventWhitelist, 0, len(originalEvent.EventWhitelist))
 	for _, item := range originalEvent.EventWhitelist {
 		newEvent.EventWhitelist = append(newEvent.EventWhitelist, entity.EventWhitelist{
+			AttendeeRefID: item.AttendeeRefID,
+		})
+	}
+	newEvent.EventWhitelistPending = make([]entity.EventWhitelistPending, 0, len(originalEvent.EventWhitelistPending))
+	for _, item := range originalEvent.EventWhitelistPending {
+		newEvent.EventWhitelistPending = append(newEvent.EventWhitelistPending, entity.EventWhitelistPending{
 			AttendeeRefID: item.AttendeeRefID,
 		})
 	}
@@ -307,13 +395,19 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 		})
 	}
 
-	// Agenda
-	newEvent.EventAgenda = make([]entity.EventAgenda, 0, len(originalEvent.EventAgenda))
-	for _, item := range originalEvent.EventAgenda {
-		newEvent.EventAgenda = append(newEvent.EventAgenda, entity.EventAgenda{
-			ActivityName: item.ActivityName,
-			StartTime:    item.StartTime,
-			EndTime:      item.EndTime,
+	// Users
+	newEvent.EventUser = make([]entity.EventUser, 0, len(originalEvent.EventUser))
+	for _, item := range originalEvent.EventUser {
+		newEvent.EventUser = append(newEvent.EventUser, entity.EventUser{
+			UserID: item.UserID,
+			Role:   item.Role,
+		})
+	}
+	newEvent.EventUserPending = make([]entity.EventUserPending, 0, len(originalEvent.EventUserPending))
+	for _, item := range originalEvent.EventUserPending {
+		newEvent.EventUserPending = append(newEvent.EventUserPending, entity.EventUserPending{
+			UserRefID: item.UserRefID,
+			Role:      item.Role,
 		})
 	}
 
@@ -336,7 +430,7 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 	}, nil
 }
 
-func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
+func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.PostParticipantRes, *response.APIError) {
 	if code == "" {
 		return nil, &response.APIError{
 			Code:    "INVALID_QR",
@@ -510,18 +604,68 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	orgCode := uint8(tempCode)
 
 	// Insert participant now to allow inserting them into EventParticipants later
-	userToInsert := entity.User{
-		RefID:       refIdUInt,
-		FirstnameTH: CUNEXSuccess.FirstNameTH,
-		SurnameTH:   CUNEXSuccess.LastNameTH,
-		TitleTH:     "",
-		FirstnameEN: CUNEXSuccess.FirstNameEN,
-		SurnameEN:   CUNEXSuccess.LastNameEN,
-		TitleEN:     "",
+	var (
+		orgTH string
+		orgEN string
+	)
+	switch CUNEXSuccess.UserType {
+	case entity.STUDENTS:
+		orgTH = CUNEXSuccess.FacultyNameTH
+		orgEN = CUNEXSuccess.FacultyNameEN
+
+	case entity.STAFFS:
+		orgTH = CUNEXSuccess.DepartmentNameTH
+		orgEN = CUNEXSuccess.DepartmentNameEN
+
+	default:
+		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Invalid userType returned from CU NEX GET qrcode",
+			Status:  500,
+		}
 	}
-	user, createUserErr := s.CreateUserIfNotExists(&userToInsert, ctx)
-	if createUserErr != nil {
-		return nil, createUserErr
+
+	userToUpsert := entity.User{
+		RefID:           refIdUInt,
+		FirstnameTH:     CUNEXSuccess.FirstNameTH,
+		SurnameTH:       CUNEXSuccess.LastNameTH,
+		FirstnameEN:     CUNEXSuccess.FirstNameEN,
+		SurnameEN:       CUNEXSuccess.LastNameEN,
+		FacultyNameTH:   orgTH,
+		FacultyNameEN:   orgEN,
+		ProfileImageURL: CUNEXSuccess.ProfileImageUrl,
+	}
+	notToUpdate := []string{"title_th", "title_en"}
+	user, upsertErr := s.repo.Auth.UpsertUserByRefId(&userToUpsert, &notToUpdate, ctx)
+	if upsertErr != nil {
+		s.logger.Error().Err(upsertErr).
+			Uint64("participant_ref_id", refIdUInt).
+			Str("action", "upsert_user_by_ref_id").
+			Msg("failed to upsert user by ref id")
+
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB error",
+			Status:  500,
+		}
+	}
+
+	// Sync event user and whitelist pending
+	if err := s.repo.Auth.SyncWhitelistPendingToWhitelist(ctx, user.RefID); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", user.RefID).
+			Str("action", "sync_whitelist_pending").
+			Msg("failed to sync whitelist pending to whitelist")
+	}
+
+	if err := s.repo.Auth.SyncEventUserPendingToEventUser(ctx, user.ID, user.RefID); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", user.RefID).
+			Str("action", "sync_event_user_pending").
+			Msg("failed to sync event user pending to event user")
 	}
 
 	// Get event info for checking scanning/check in permission
@@ -556,30 +700,6 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	status, checkinTime, rowId, errCheckStatus := s.CheckCheckinStatus(ctx, eventIdUuid, user.RefID, user.ID, string(event.AttendenceType), orgCode, event.EndTime)
 	if errCheckStatus != nil {
 		return nil, errCheckStatus
-	}
-
-	// Format org before proceeding with steps according to status
-	// to make EventParticipants insertion possible
-	var (
-		orgTH string
-		orgEN string
-	)
-	switch CUNEXSuccess.UserType {
-	case entity.STUDENTS:
-		orgTH = CUNEXSuccess.FacultyNameTH
-		orgEN = CUNEXSuccess.FacultyNameEN
-
-	case entity.STAFFS:
-		orgTH = CUNEXSuccess.DepartmentNameTH
-		orgEN = CUNEXSuccess.DepartmentNameEN
-
-	default:
-		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Invalid userType returned from CU NEX GET qrcode",
-			Status:  500,
-		}
 	}
 
 	switch status {
@@ -618,7 +738,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	checkInCode := base64.StdEncoding.EncodeToString(raw)
 
 	// Finally, format response according to revealed_fields of this event
-	responseBody := dtoRes.GetParticipantRes{
+	responseBody := dtoRes.PostParticipantRes{
 		FirstnameTH:     nil,
 		SurnameTH:       nil,
 		TitleTH:         nil,
@@ -747,6 +867,38 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
+	// Format each attribute
+
+	usersDTO := make([]dtoRes.GetOneEventUser, 0, len(result.EventUser))
+	if len(result.EventUser) > 0 {
+		for _, user := range result.EventUser {
+			u := user.User
+			usersDTO = append(usersDTO, dtoRes.GetOneEventUser{
+				RefID:           s.FormatRefIdToStr(u.RefID),
+				FirstnameTH:     u.FirstnameTH,
+				SurnameTH:       u.SurnameTH,
+				TitleTH:         u.TitleTH,
+				FacultyNameTH:   u.FacultyNameTH,
+				FirstnameEN:     u.FirstnameEN,
+				SurnameEN:       u.SurnameEN,
+				TitleEN:         u.TitleEN,
+				FacultyNameEN:   u.FacultyNameEN,
+				ProfileImageURL: u.ProfileImageURL,
+				Role:            string(user.Role),
+			})
+		}
+	}
+
+	usersPendingDTO := make([]dtoRes.GetOneEventUserPending, 0, len(result.EventUserPending))
+	if len(result.EventUserPending) > 0 {
+		for _, user := range result.EventUserPending {
+			usersPendingDTO = append(usersPendingDTO, dtoRes.GetOneEventUserPending{
+				RefID: s.FormatRefIdToStr(user.UserRefID),
+				Role:  string(user.Role),
+			})
+		}
+	}
+
 	agendaDTO := make([]dtoRes.GetOneEventAgenda, 0, len(result.EventAgenda))
 	if len(result.EventAgenda) > 0 {
 		for _, slot := range result.EventAgenda {
@@ -758,18 +910,39 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
-	usersDTO := make([]dtoRes.GetOneEventUser, 0, len(result.EventUser))
-	if len(result.EventUser) > 0 {
-		for _, user := range result.EventUser {
-			u := user.User
-			usersDTO = append(usersDTO, dtoRes.GetOneEventUser{
-				FirstnameTH: u.FirstnameTH,
-				SurnameTH:   u.SurnameTH,
-				TitleTH:     u.TitleTH,
-				FirstnameEN: u.FirstnameEN,
-				SurnameEN:   u.SurnameEN,
-				TitleEN:     u.TitleEN,
-				Role:        string(user.Role),
+	allowedFacDTO := make([]dtoRes.GetOneEventAllowedFaculties, 0, len(result.EventAllowedFaculties))
+	if len(result.EventAllowedFaculties) > 0 {
+		for _, faculty := range result.EventAllowedFaculties {
+			allowedFacDTO = append(allowedFacDTO, dtoRes.GetOneEventAllowedFaculties{
+				FacultyNO: faculty.FacultyNO,
+			})
+		}
+	}
+
+	whitelistDTO := make([]dtoRes.GetOneEventWhitelist, 0, len(result.EventWhitelist))
+	if len(result.EventWhitelist) > 0 {
+		for _, wl := range result.EventWhitelist {
+			wlUser := wl.User
+			whitelistDTO = append(whitelistDTO, dtoRes.GetOneEventWhitelist{
+				RefID:           s.FormatRefIdToStr(wlUser.RefID),
+				FirstnameTH:     wlUser.FirstnameTH,
+				SurnameTH:       wlUser.SurnameTH,
+				TitleTH:         wlUser.TitleTH,
+				FacultyNameTH:   wlUser.FacultyNameTH,
+				FirstnameEN:     wlUser.FirstnameEN,
+				SurnameEN:       wlUser.SurnameEN,
+				TitleEN:         wlUser.TitleEN,
+				FacultyNameEN:   wlUser.FacultyNameEN,
+				ProfileImageURL: wlUser.ProfileImageURL,
+			})
+		}
+	}
+
+	whitelistPendingDTO := make([]dtoRes.GetOneEventWhitelistPending, 0, len(result.EventWhitelistPending))
+	if len(result.EventWhitelistPending) > 0 {
+		for _, wl := range result.EventWhitelistPending {
+			whitelistPendingDTO = append(whitelistPendingDTO, dtoRes.GetOneEventWhitelistPending{
+				RefID: s.FormatRefIdToStr(wl.AttendeeRefID),
 			})
 		}
 	}
@@ -781,21 +954,26 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 	finalRes := dtoRes.GetOneEventRes{
-		Name:            result.Name,
-		Organizer:       result.Organizer,
-		Description:     result.Description,
-		StartTime:       result.StartTime.UTC(),
-		EndTime:         result.EndTime.UTC(),
-		Location:        result.Location,
-		LocationLat:     result.LocationPoint.Y,
-		LocationLong:    result.LocationPoint.X,
-		TotalRegistered: result.TotalRegistered,
-		EvaluationForm:  result.EvaluationForm,
-		AllowAllToScan:  result.AllowAllToScan,
-		RevealedFields:  revealedFields,
-		Role:            result.Role,
-		Agenda:          agendaDTO,
-		User:            usersDTO,
+		Name:             result.Name,
+		Organizer:        result.Organizer,
+		Description:      result.Description,
+		StartTime:        result.StartTime.UTC(),
+		EndTime:          result.EndTime.UTC(),
+		Location:         result.Location,
+		LocationLat:      result.LocationPoint.Y,
+		LocationLong:     result.LocationPoint.X,
+		TotalRegistered:  result.TotalRegistered,
+		EvaluationForm:   result.EvaluationForm,
+		AllowAllToScan:   result.AllowAllToScan,
+		RevealedFields:   revealedFields,
+		AttendanceType:   result.AttendenceType,
+		Role:             result.Role,
+		Agenda:           agendaDTO,
+		User:             usersDTO,
+		UserPending:      usersPendingDTO,
+		AllowedFaculties: allowedFacDTO,
+		WhiteList:        whitelistDTO,
+		WhiteListPending: whitelistPendingDTO,
 	}
 
 	return &finalRes, nil
@@ -1065,7 +1243,22 @@ func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetDiscoveryEv
 	}
 }
 
-func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error) {
+func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq, userId string) (*dtoRes.CreateEventRes, error) {
+	userIdUUID, err := uuid.Parse(userId)
+	if err != nil {
+		return nil, errors.New("Invalid user id")
+	}
+
+	// Validate that the requester is listed as the event owner in the managers_and_staff payload.
+	// Check separately here instead of modifying buildCreateOrUpdatePayload() for minimal change.
+	isOwner, err := s.createEventCheckOwnerIsRequester(req.ManagersAndStaff, userIdUUID, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !isOwner {
+		return nil, errors.New("User must list themselves as the event's owner in managers_and_staff")
+	}
+
 	payload, err := buildCreateOrUpdatePayload(req)
 	if err != nil {
 		return nil, err
@@ -1193,6 +1386,7 @@ func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput,
 
 	out := make([]entity.EventUserInput, 0, len(in))
 	seenRole := make(map[uint64]string, len(in)) // ref_id -> role string
+	ownerCount := 0
 
 	for _, m := range in {
 		r, err := entity.ParseRole(m.Role)
@@ -1209,10 +1403,18 @@ func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput,
 		}
 
 		seenRole[m.RefID] = rs
+		if r == entity.OWNER {
+			ownerCount += 1
+		}
+
 		out = append(out, entity.EventUserInput{
 			RefID: m.RefID,
 			Role:  r,
 		})
+	}
+
+	if ownerCount != 1 {
+		return nil, fmt.Errorf("require exactly one owner in manager_and_staff")
 	}
 
 	return out, nil
@@ -1364,6 +1566,22 @@ func anyToUint8(v any) (uint8, error) {
 		return 0, fmt.Errorf("out of range")
 	}
 	return uint8(u), nil
+}
+
+// POST /events helper function.
+// Check if the requester is listed as the owner of event
+func (s *service) createEventCheckOwnerIsRequester(req []dtoReq.ManagerStaffReq, userId uuid.UUID, ctx context.Context) (bool, error) {
+	user, err := s.repo.Auth.GetUserById(datatypes.UUID(userId), ctx)
+	if err != nil {
+		return false, err
+	}
+
+	for _, person := range req {
+		if person.Role == string(entity.OWNER) && user.RefID != person.RefID {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func (s *service) ExportEventUserExcel(ctx context.Context, eventIdStr string, userIdStr string) (string, []byte, error) {

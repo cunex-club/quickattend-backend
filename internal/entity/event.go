@@ -203,9 +203,11 @@ type Event struct {
 	EvaluationForm        *string                 `gorm:"type:text;index:idx_events_evaluation_form_trgm,type:gin" json:"evaluation_form"`
 	RevealedFields        ParticipantField        `gorm:"type:participant_data[];not null" json:"revealed_fields"`
 	EventWhitelist        []EventWhitelist        `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_whitelist"`
+	EventWhitelistPending []EventWhitelistPending `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_whitelist_pendings"`
 	EventAllowedFaculties []EventAllowedFaculties `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_allowed_faculties"`
 	EventAgenda           []EventAgenda           `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_agenda"`
 	EventUser             []EventUser             `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_users"`
+	EventUserPending      []EventUserPending      `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_user_pendings"`
 }
 
 type EventWhitelist struct {

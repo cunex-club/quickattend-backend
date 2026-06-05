@@ -10,9 +10,12 @@ CREATE TABLE "users" (
     "firstname_th" text NOT NULL,
     "surname_th" text NOT NULL,
     "title_th" text NOT NULL,
+    "faculty_name_th" text NOT NULL,
     "firstname_en" text NOT NULL,
     "surname_en" text NOT NULL,
-    "title_en" text NOT NULL
+    "title_en" text NOT NULL,
+    "faculty_name_en" text NOT NULL,
+    "profile_image_url" text NOT NULL
 );
 
 CREATE TABLE "events" (
@@ -104,6 +107,17 @@ CREATE TABLE "event_whitelist_pendings" (
 
     CONSTRAINT "whitelist_pendings_unique_event_and_ref_id" UNIQUE ("event_id", "attendee_ref_id"),
     CONSTRAINT "fk_event_whitelist_pendings_event" FOREIGN KEY ("event_id") 
+        REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE "event_user_pendings" (
+    "id" uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    "role" role NOT NULL,
+    "user_ref_id" bigint NOT NULL,
+    "event_id" uuid NOT NULL,
+
+    CONSTRAINT "unique_user_and_event_pendings" UNIQUE ("user_ref_id", "event_id"),
+    CONSTRAINT "fk_event_user_pendings_event" FOREIGN KEY ("event_id") 
         REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
 

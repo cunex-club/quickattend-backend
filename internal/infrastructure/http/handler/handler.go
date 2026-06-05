@@ -16,6 +16,7 @@ type AllOfHandler struct {
 	HealthCheckHandler HealthCheckHandler
 	AuthHandler        AuthHandler
 	EventHandler       EventHandler
+	UserHandler        UserHandler
 }
 
 func NewHandler(srv *service.AllOfService, logger *zerolog.Logger, validator *validator.Validate) *AllOfHandler {
@@ -28,5 +29,6 @@ func NewHandler(srv *service.AllOfService, logger *zerolog.Logger, validator *va
 		HealthCheckHandler: h,
 		AuthHandler:        h,
 		EventHandler:       h,
+		UserHandler:        h,
 	}
 }

@@ -49,7 +49,15 @@ func (h *Handler) Duplicate(c *fiber.Ctx) error {
 	EventID := c.Params("id")
 	userIDStr := c.Locals("user_id").(string)
 
-	res, err := h.Service.Event.DuplicateById(EventID, userIDStr, c.UserContext())
+	var reqBody dtoReq.DuplicateEventReq
+	if err := c.BodyParser(&reqBody); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "Invalid JSON body")
+	}
+	if err := h.Validator.Struct(reqBody); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "Invalid JSON body")
+	}
+
+	res, err := h.Service.Event.DuplicateById(reqBody, EventID, userIDStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
@@ -148,6 +156,11 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateEvent(c *fiber.Ctx) error {
+	userIdStr, ok := c.Locals("user_id").(string)
+	if !ok {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "expect string user_id in JWT")
+	}
+
 	var req dtoReq.CreateEventReq
 	if err := c.BodyParser(&req); err != nil {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
@@ -157,7 +170,7 @@ func (h *Handler) CreateEvent(c *fiber.Ctx) error {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
 	}
 
-	res, err := h.Service.Event.CreateEvent(c.Context(), req)
+	res, err := h.Service.Event.CreateEvent(c.Context(), req, userIdStr)
 	if err != nil {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
 	}
