@@ -1243,14 +1243,13 @@ func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq, us
 		return nil, errors.New("Invalid user id")
 	}
 
-	// Validate that the requester is listed as the event owner in the managers_and_staff payload.
-	// Check separately here instead of modifying buildCreateOrUpdatePayload() for minimal change.
-	isOwner, err := s.createEventCheckOwnerIsRequester(req.ManagersAndStaff, userIdUUID, ctx)
+	// The requester always becomes the event's owner. We derive this from their
+	// authenticated identity rather than trusting the client to supply a correct
+	// OWNER entry in managers_and_staff (it previously could omit one entirely,
+	// silently creating events with no owner at all).
+	req.ManagersAndStaff, err = s.ensureRequesterIsOwner(req.ManagersAndStaff, userIdUUID, ctx)
 	if err != nil {
 		return nil, err
-	}
-	if !isOwner {
-		return nil, errors.New("User must list themselves as the event's owner in managers_and_staff")
 	}
 
 	payload, err := buildCreateOrUpdatePayload(req)
@@ -1276,6 +1275,33 @@ func (s *service) UpdateEvent(ctx context.Context, id string, userId string, req
 	}
 	if role == nil || (*role != string(entity.OWNER) && *role != string(entity.MANAGER)) {
 		return nil, errors.New("Cannot update event; user is not owner or manager")
+	}
+
+	// UpdateEvent replaces event_users wholesale from managers_and_staff below,
+	// but the client (e.g. the edit form) never includes the OWNER entry.
+	// Preserve the event's existing owner across the update instead of
+	// silently dropping it. The editor may be a MANAGER, not the owner, so we
+	// must not assume the editor becomes the owner here.
+	hasOwner := false
+	for _, person := range req.ManagersAndStaff {
+		if person.Role == string(entity.OWNER) {
+			hasOwner = true
+			break
+		}
+	}
+	if !hasOwner {
+		ownerRefID, ownerErr := s.repo.Event.GetEventOwnerRefID(idUUID, ctx)
+		if ownerErr != nil && ownerErr != gorm.ErrRecordNotFound {
+			return nil, ownerErr
+		}
+		if ownerErr == nil {
+			req.ManagersAndStaff = append(req.ManagersAndStaff, dtoReq.ManagerStaffReq{
+				RefID: ownerRefID,
+				Role:  string(entity.OWNER),
+			})
+		}
+		// ownerErr == gorm.ErrRecordNotFound: this event predates the owner
+		// fix and has no owner row yet; leave it as-is until backfilled.
 	}
 
 	payload, err := buildCreateOrUpdatePayload(dtoReq.CreateEventReq(req))
@@ -1563,17 +1589,28 @@ func anyToUint8(v any) (uint8, error) {
 }
 
 // POST /events helper function.
-// Check if the requester is listed as the owner of event
-func (s *service) createEventCheckOwnerIsRequester(req []dtoReq.ManagerStaffReq, userId uuid.UUID, ctx context.Context) (bool, error) {
+// Ensures the authenticated requester ends up listed as the event's owner.
+// If the client already listed an OWNER, it must match the requester (you
+// cannot hand ownership to someone else on creation). If the client listed
+// no OWNER at all, the requester is appended as owner automatically instead
+// of silently creating an event with nobody attached to it.
+func (s *service) ensureRequesterIsOwner(req []dtoReq.ManagerStaffReq, userId uuid.UUID, ctx context.Context) ([]dtoReq.ManagerStaffReq, error) {
 	user, err := s.repo.Auth.GetUserById(datatypes.UUID(userId), ctx)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	for _, person := range req {
-		if person.Role == string(entity.OWNER) && user.RefID != person.RefID {
-			return false, nil
+		if person.Role == string(entity.OWNER) {
+			if user.RefID != person.RefID {
+				return nil, errors.New("User must list themselves as the event's owner in managers_and_staff")
+			}
+			return req, nil
 		}
 	}
-	return true, nil
+
+	return append(req, dtoReq.ManagerStaffReq{
+		RefID: user.RefID,
+		Role:  string(entity.OWNER),
+	}), nil
 }

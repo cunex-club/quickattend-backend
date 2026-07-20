@@ -21,6 +21,7 @@ type EventRepository interface {
 	Comment(uuid.UUID, time.Time, string, context.Context) error
 	IsUserEventOwner(eventID uuid.UUID, userIDStr string, ctx context.Context) (bool, error)
 	GetUserRoleInEvent(eventID uuid.UUID, userID uuid.UUID, ctx context.Context) (*string, error)
+	GetEventOwnerRefID(eventID uuid.UUID, ctx context.Context) (uint64, error)
 
 	// For POST participant/:qrcode. Get user info not provided by CU NEX
 	GetUserForCheckin(ctx context.Context, refID uint64) (user *entity.CheckinUserQuery, err error)
@@ -467,6 +468,21 @@ func (r *repository) GetUserRoleInEvent(eventID uuid.UUID, userID uuid.UUID, ctx
 
 	v := string(eventUser.Role)
 	return &v, nil
+}
+
+func (r *repository) GetEventOwnerRefID(eventID uuid.UUID, ctx context.Context) (uint64, error) {
+	var refID uint64
+	err := r.db.WithContext(ctx).
+		Table("event_users eu").
+		Select("u.ref_id").
+		Joins("JOIN users u ON u.id = eu.user_id").
+		Where("eu.event_id = ? AND eu.role = ?", eventID, entity.OWNER).
+		Take(&refID).Error
+
+	if err != nil {
+		return 0, err
+	}
+	return refID, nil
 }
 
 func (r *repository) CreateEvent(ctx context.Context, payload entity.CreateEventPayload) (*dtoRes.CreateEventRes, error) {

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"os"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
@@ -35,7 +37,10 @@ func (h *Handler) AuthCallback(c *fiber.Ctx) error {
 		SameSite: "Lax",
 	})
 
-	frontendHomeURL := "https://quickattend.cunex.club/"
+	frontendHomeURL := os.Getenv("FRONTEND_HOME_URL")
+	if frontendHomeURL == "" {
+		frontendHomeURL = "https://quickattend.cunex.club/"
+	}
 	return c.Redirect(frontendHomeURL, fiber.StatusFound)
 }
 
