@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
@@ -33,6 +34,18 @@ func (r *repository) GetRegistrationSummary(ctx context.Context, eventID uuid.UU
 }
 
 func (r *repository) GetEventDashboardData(ctx context.Context, eventID uuid.UUID) (*dtoRes.EventDashboard, error) {
+	var startTime time.Time
+	if err := r.db.WithContext(ctx).
+		Model(&entity.Event{}).
+		Select("start_time").
+		Where("id = ?", eventID).
+		Scan(&startTime).Error; err != nil {
+		return nil, err
+	}
+	if time.Now().UTC().Before(startTime.UTC()) {
+		return nil, entity.ErrEventNotStarted
+	}
+
 	summary, err := r.GetRegistrationSummary(ctx, eventID)
 	if err != nil {
 		return nil, err
