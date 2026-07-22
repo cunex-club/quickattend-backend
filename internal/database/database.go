@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/postgres"
@@ -33,6 +34,15 @@ func Connect(config config.DatabaseConfig) (*gorm.DB, error) {
 		logger.Error().Err(err).Msg("Failed to create pg_trgm extension")
 		return nil, err
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to get underlying sql.DB")
+		return nil, err
+	}
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
 
 	return db, nil
 }

@@ -168,7 +168,7 @@ func (h *Handler) CreateEvent(c *fiber.Ctx) error {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
 	}
 
-	res, err := h.Service.Event.CreateEvent(c.Context(), req, userIdStr)
+	res, err := h.Service.Event.CreateEvent(c.UserContext(), req, userIdStr)
 	if err != nil {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
 	}
@@ -192,7 +192,7 @@ func (h *Handler) UpdateEvent(c *fiber.Ctx) error {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
 	}
 
-	res, err := h.Service.Event.UpdateEvent(c.Context(), id, userIdStr, req)
+	res, err := h.Service.Event.UpdateEvent(c.UserContext(), id, userIdStr, req)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.SendError(c, fiber.StatusNotFound, response.ErrNotFound, "not found")

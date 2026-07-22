@@ -37,7 +37,11 @@ func main() {
 	services := service.NewService(repos, cfg, &log.Logger, &http.Client{Timeout: 10 * time.Second})
 	handlers := handler.NewHandler(&services, &log.Logger, validator.New())
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	})
 
 	mw := middleware.NewMiddleware(cfg)
 	app.Use(
@@ -45,6 +49,7 @@ func main() {
 		mw.RequestID(),
 		mw.CORS(),
 		mw.RequestLogger(),
+		mw.Timeout(),
 	)
 
 	gqlResolver := &gql.Resolver{Service: &services}

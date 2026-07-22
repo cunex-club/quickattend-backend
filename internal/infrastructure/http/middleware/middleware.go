@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -14,6 +15,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog/log"
 )
+
+// RequestTimeout bounds how long a request's context stays valid, so a slow
+// downstream call (DB query, etc.) can't hold server resources indefinitely.
+const RequestTimeout = 10 * time.Second
 
 // เก็บ config
 type Middleware struct {
@@ -31,6 +36,15 @@ func (m *Middleware) Recover() fiber.Handler {
 
 func (m *Middleware) RequestID() fiber.Handler {
 	return requestid.New()
+}
+
+func (m *Middleware) Timeout() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		ctx, cancel := context.WithTimeout(c.UserContext(), RequestTimeout)
+		defer cancel()
+		c.SetUserContext(ctx)
+		return c.Next()
+	}
 }
 
 // --- CORS Middleware ---
