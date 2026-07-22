@@ -272,6 +272,7 @@ type CheckinUserQuery struct {
 // For retrieving result from DB in EventRepository.GetEventForCheckin
 type CheckinEventQuery struct {
 	AttendenceType  AttendanceType   `gorm:"column:attendence_type"`
+	StartTime       time.Time        `gorm:"column:start_time"`
 	EndTime         time.Time        `gorm:"column:end_time"`
 	AllowAllToScan  bool             `gorm:"column:allow_all_to_scan"`
 	RevealedFields  ParticipantField `gorm:"column:revealed_fields"`

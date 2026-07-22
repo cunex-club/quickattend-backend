@@ -691,7 +691,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	status, checkinTime, rowId, errCheckStatus := s.CheckCheckinStatus(ctx, eventIdUuid, user.RefID, user.ID, string(event.AttendenceType), orgCode, event.EndTime)
+	status, checkinTime, rowId, errCheckStatus := s.CheckCheckinStatus(ctx, eventIdUuid, user.RefID, user.ID, string(event.AttendenceType), orgCode, event.StartTime, event.EndTime)
 	if errCheckStatus != nil {
 		return nil, errCheckStatus
 	}
@@ -775,7 +775,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 }
 
 // returns (status, checkInTime, rowId (if duplication found), error)
-func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, participantId datatypes.UUID, attendanceType string, orgCode uint8, eventEndTime time.Time) (string, *time.Time, *datatypes.UUID, *response.APIError) {
+func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, participantId datatypes.UUID, attendanceType string, orgCode uint8, eventStartTime time.Time, eventEndTime time.Time) (string, *time.Time, *datatypes.UUID, *response.APIError) {
 	now := time.Now().UTC()
 
 	// Must check if already checked in, regardless of attendance type
@@ -813,8 +813,8 @@ func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID
 		}
 	}
 
-	// Cannot check in if already past the event's ending time
-	if now.After(eventEndTime.UTC()) {
+	// Cannot check in before the event has started, or after it has ended
+	if now.Before(eventStartTime.UTC()) || now.After(eventEndTime.UTC()) {
 		return string(dtoRes.FAIL), &now, nil, nil
 	}
 

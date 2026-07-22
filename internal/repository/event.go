@@ -342,7 +342,7 @@ func (r *repository) GetEventForCheckin(ctx context.Context, eventId datatypes.U
 
 	var event entity.CheckinEventQuery
 	getEventErr := withCtx.Raw(`
-			SELECT e.end_time, e.attendence_type, e.allow_all_to_scan, e.revealed_fields, 
+			SELECT e.start_time, e.end_time, e.attendence_type, e.allow_all_to_scan, e.revealed_fields,
 				(
 					SELECT (
 						EXISTS
