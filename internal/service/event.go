@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/xuri/excelize/v2"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
@@ -40,6 +42,7 @@ type EventService interface {
 	GetMyEventsService(userID datatypes.UUID, search string, ctx context.Context) (res *[]dtoRes.GetEventsRes, err *response.APIError)
 	GetDiscoveryEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetDiscoveryEventsRes, pagination *response.Pagination, err *response.APIError)
 	GetPastEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetEventsRes, pagination *response.Pagination, err *response.APIError)
+	ExportEventParticipants(ctx context.Context, eventID string, userID string) (filename string, content []byte, err *response.APIError)
 }
 
 type GetEventsValidateArgsReturn struct {
@@ -770,6 +773,132 @@ func firstNonBlank(values ...*string) *string {
 		}
 	}
 	return nil
+}
+
+func (s *service) ExportEventParticipants(ctx context.Context, eventID string, userID string) (string, []byte, *response.APIError) {
+	eventUUID, err := uuid.Parse(eventID)
+	if err != nil {
+		return "", nil, &response.APIError{Code: response.ErrBadRequest, Message: "invalid event id", Status: 400}
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return "", nil, &response.APIError{Code: response.ErrBadRequest, Message: "invalid user id", Status: 400}
+	}
+
+	role, err := s.repo.Event.GetUserRoleInEvent(eventUUID, userUUID, ctx)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to check export permission", Status: 500}
+	}
+	if role == nil || (*role != string(entity.OWNER) && *role != string(entity.MANAGER)) {
+		return "", nil, &response.APIError{Code: response.ErrForbidden, Message: "only event owners and managers can export participants", Status: 403}
+	}
+
+	data, err := s.repo.Event.GetScannedParticipantsForExport(ctx, datatypes.UUID(eventUUID))
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil, &response.APIError{Code: response.ErrNotFound, Message: "event not found", Status: 404}
+	}
+	if err != nil {
+		return "", nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to load participants", Status: 500}
+	}
+
+	content, err := buildParticipantWorkbook(data)
+	if err != nil {
+		return "", nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to generate export", Status: 500}
+	}
+
+	name := sanitizeExportFilename(data.EventName)
+	date := data.StartTime.In(thaiLoc).Format("20060102")
+	return fmt.Sprintf("%s_attendance_%s.xlsx", name, date), content, nil
+}
+
+func buildParticipantWorkbook(data *entity.EventParticipantExportData) ([]byte, error) {
+	book := excelize.NewFile()
+	defer func() { _ = book.Close() }()
+
+	const sheet = "Participants"
+	book.SetSheetName(book.GetSheetName(0), sheet)
+
+	headers := []any{"Check-in time (GMT+7)", "User type", "Ref ID", "Name TH", "Name EN", "Affiliation", "Scanner Ref ID", "Comment"}
+	if err := book.SetSheetRow(sheet, "A1", &headers); err != nil {
+		return nil, err
+	}
+
+	for i, row := range data.Rows {
+		values := []any{
+			row.ScannedTimestamp.In(thaiLoc).Format("2006-01-02 15:04:05"),
+			string(row.UserType),
+			formatExportRefID(row.RefID),
+			joinName(row.FirstnameTH, row.SurnameTH),
+			joinName(row.FirstnameEN, row.SurnameEN),
+			stringValue(row.Organization),
+			formatOptionalExportRefID(row.ScannerRefID),
+			stringValue(row.Comment),
+		}
+		cell, _ := excelize.CoordinatesToCellName(1, i+2)
+		if err := book.SetSheetRow(sheet, cell, &values); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := book.SetPanes(sheet, &excelize.Panes{Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"}); err != nil {
+		return nil, err
+	}
+	if err := book.AutoFilter(sheet, "A1:H1", []excelize.AutoFilterOptions{}); err != nil {
+		return nil, err
+	}
+	for column, width := range map[string]float64{"A": 22, "B": 12, "C": 14, "D": 28, "E": 28, "F": 28, "G": 16, "H": 40} {
+		if err := book.SetColWidth(sheet, column, column, width); err != nil {
+			return nil, err
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := book.Write(&buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func joinName(first *string, last *string) string {
+	return strings.TrimSpace(strings.Join([]string{stringValue(first), stringValue(last)}, " "))
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func formatExportRefID(value uint64) string {
+	text := strconv.FormatUint(value, 10)
+	if len(text) < 8 {
+		return strings.Repeat("0", 8-len(text)) + text
+	}
+	return text
+}
+
+func formatOptionalExportRefID(value *uint64) string {
+	if value == nil {
+		return ""
+	}
+	return formatExportRefID(*value)
+}
+
+func sanitizeExportFilename(name string) string {
+	name = strings.TrimSpace(name)
+	name = strings.Map(func(r rune) rune {
+		switch r {
+		case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
+			return '_'
+		default:
+			return r
+		}
+	}, name)
+	if name == "" {
+		return "event"
+	}
+	return name
 }
 
 // returns (status, checkInTime, rowId (if duplication found), error)

@@ -41,6 +41,39 @@ type EventRepository interface {
 
 	CreateEvent(ctx context.Context, payload entity.CreateEventPayload) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, payload entity.CreateEventPayload) (*dtoRes.UpdateEventRes, error)
+	GetScannedParticipantsForExport(ctx context.Context, eventID datatypes.UUID) (*entity.EventParticipantExportData, error)
+}
+
+func (r *repository) GetScannedParticipantsForExport(ctx context.Context, eventID datatypes.UUID) (*entity.EventParticipantExportData, error) {
+	db := r.db.WithContext(ctx)
+
+	var event entity.Event
+	if err := db.Select("name", "start_time").First(&event, "id = ?", eventID).Error; err != nil {
+		return nil, err
+	}
+
+	rows := make([]entity.EventParticipantExportRow, 0)
+	if err := db.Table("event_participants AS ep").
+		Select(`ep.scanned_timestamp,
+			u.user_type, u.ref_id,
+			u.firstname_th, u.surname_th,
+			u.firstname_en, u.surname_en,
+			ep.organization,
+			scanner.ref_id AS scanner_ref_id,
+			ep.comment`).
+		Joins("JOIN users u ON u.id = ep.participant_id").
+		Joins("LEFT JOIN users scanner ON scanner.id = ep.scanner_id").
+		Where("ep.event_id = ?", eventID).
+		Order("ep.scanned_timestamp ASC").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	return &entity.EventParticipantExportData{
+		EventName: event.Name,
+		StartTime: event.StartTime,
+		Rows:      rows,
+	}, nil
 }
 
 type GetEventsArguments struct {

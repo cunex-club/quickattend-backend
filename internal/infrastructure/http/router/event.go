@@ -12,6 +12,7 @@ func EventRoutes(r fiber.Router, h *handler.AllOfHandler, mw *middleware.Middlew
 	event.Delete("/:id", h.EventHandler.Delete)
 	event.Post("/:id/duplicate", h.EventHandler.Duplicate)
 	event.Get("/:id", h.EventHandler.GetOneEventHandler)
+	event.Get("/:id/export", h.EventHandler.ExportEventParticipants)
 	event.Post("/", h.EventHandler.CreateEvent)
 	event.Put("/:id", h.EventHandler.UpdateEvent)
 	event.Get("/", h.EventHandler.GetEvents)
