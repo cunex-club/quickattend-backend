@@ -30,7 +30,7 @@ var thaiLoc = time.FixedZone(entity.ThaiTZ, 7*3600)
 type EventService interface {
 	DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError
 	DuplicateById(Req dtoReq.DuplicateEventReq, EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
-	Comment(checkInReq dtoReq.CommentReq, ctx context.Context) *response.APIError
+	Comment(checkInReq dtoReq.CommentReq, userIdStr string, ctx context.Context) *response.APIError
 	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.PostParticipantRes, *response.APIError)
 
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
@@ -69,7 +69,15 @@ const (
 	Discovery
 )
 
-func (s *service) Comment(commentReq dtoReq.CommentReq, ctx context.Context) *response.APIError {
+func (s *service) Comment(commentReq dtoReq.CommentReq, userIdStr string, ctx context.Context) *response.APIError {
+	userIdUUID, err := uuid.Parse(userIdStr)
+	if err != nil {
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "invalid user_id from JWT claim",
+			Status:  400,
+		}
+	}
 
 	decoded, err := base64.StdEncoding.DecodeString(commentReq.EncodedOneTimeCode)
 	if err != nil {
@@ -115,6 +123,38 @@ func (s *service) Comment(commentReq dtoReq.CommentReq, ctx context.Context) *re
 		Str("timeStamp", timeStamp.String()).
 		Str("checkInRowId", checkInRowId.String()).
 		Msg("Received timeStamp and target row-id to check-in Event-Participant")
+
+	eventID, err := s.repo.Event.GetEventIDForCheckInRow(checkInRowId, ctx)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: entity.ErrCheckInTargetNotFound.Error(),
+				Status:  400,
+			}
+		}
+		return &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "internal db error",
+			Status:  500,
+		}
+	}
+
+	role, roleErr := s.repo.Event.GetUserRoleInEvent(eventID, userIdUUID, ctx)
+	if roleErr != nil && !errors.Is(roleErr, gorm.ErrRecordNotFound) {
+		return &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "internal db error",
+			Status:  500,
+		}
+	}
+	if role == nil {
+		return &response.APIError{
+			Code:    response.ErrForbidden,
+			Message: "user is not staff, manager, or owner of this event",
+			Status:  403,
+		}
+	}
 
 	if err := s.repo.Event.Comment(
 		checkInRowId,
@@ -459,7 +499,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	userIdUuid := datatypes.UUID(datatypes.BinUUIDFromString(userId))
 
 	// Request for participant profile
-	CUNEXGetQRURL := "https://culab-svc.azurewebsites.net/Service.svc/qrcodeinfo_for_all"
+	CUNEXGetQRURL := s.cfg.LLEConfig.QRCodeInfoURL
 	clientId := s.cfg.LLEConfig.QRClientID
 	if clientId == "" {
 		s.logger.Error().Str("Error", "Missing env config 'LLEClientId'")
@@ -530,8 +570,27 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 			Status:  500,
 		}
 
+	case 204:
+		// Per LLE reference: 204 means the qrcode/token could not be resolved
+		// for this project (expired, invalid, or issued to a different
+		// project) — distinct from an unexpected status code.
+		return nil, &response.APIError{
+			Code:    "INVALID_QR",
+			Message: "qrcode expired or invalid",
+			Status:  400,
+		}
+
 	case 403:
-		// Expired or invalid QR
+		// LLE reference: 403 from this endpoint has three distinct causes —
+		// (1) the qrcode parameter wasn't sent at all, (2) this ClientId has
+		// no scope for qrcodeinfo_for_all, (3) the QR is genuinely
+		// expired/used. We always send `code`, so log its presence to help
+		// tell (1)/(2) apart from (3) server-side, even though the
+		// user-facing message stays the same.
+		s.logger.Warn().
+			Bool("qrcode_param_sent", strings.TrimSpace(code) != "").
+			Str("Error", "403 from CU NEX GET qrcode — check ClientId scope before assuming the QR itself is expired/used").
+			Msg("CU NEX GET qrcode rejected the request")
 		return nil, &response.APIError{
 			Code:    "INVALID_QR",
 			Message: "qrcode expired or invalid",
@@ -574,17 +633,10 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	var orgCode uint8
-	if CUNEXSuccess.FacultyCode != nil && strings.TrimSpace(*CUNEXSuccess.FacultyCode) != "" {
-		tempCode, err := strconv.ParseUint(*CUNEXSuccess.FacultyCode, 10, 8)
-		if err != nil {
-			return nil, &response.APIError{
-				Code:    response.ErrInternalError,
-				Message: "Invalid facultyCode returned from CU NEX GET qrcode",
-				Status:  502,
-			}
-		}
-		orgCode = uint8(tempCode)
+	orgCode, nonNumericFacultyCode := parseFacultyOrgCode(CUNEXSuccess.FacultyCode)
+	if nonNumericFacultyCode != "" {
+		s.logger.Warn().Str("faculty_code", nonNumericFacultyCode).
+			Msg("non-numeric facultyCode from CU NEX; treated as no faculty match")
 	}
 
 	// Insert participant now to allow inserting them into EventParticipants later
@@ -775,6 +827,43 @@ func firstNonBlank(values ...*string) *string {
 	return nil
 }
 
+// parseFacultyOrgCode parses CU NEX's facultyCode into the numeric code used
+// by FACULTIES-restricted events. facultyCode isn't always numeric — CU NEX
+// returns letter codes such as "BG" for newly-created cross-faculty programs
+// — so a non-numeric or missing code returns (nil, "") rather than an error;
+// it simply can't match any event's allowed-faculty list. When the raw value
+// was non-empty but non-numeric, it is also returned so callers can log it.
+func parseFacultyOrgCode(facultyCode *string) (code *uint8, rejectedRaw string) {
+	if facultyCode == nil {
+		return nil, ""
+	}
+	raw := strings.TrimSpace(*facultyCode)
+	if raw == "" {
+		return nil, ""
+	}
+	parsed, err := strconv.ParseUint(raw, 10, 8)
+	if err != nil {
+		return nil, raw
+	}
+	parsedCode := uint8(parsed)
+	return &parsedCode, ""
+}
+
+// stripOwnerEntries drops any OWNER role from a managers_and_staff list.
+// Ownership must never be settable through the update-event request body —
+// it is always re-derived from the DB by the caller — otherwise a MANAGER
+// (who is allowed to call UpdateEvent) could grant OWNER to themselves or
+// anyone else simply by including an OWNER entry in the request.
+func stripOwnerEntries(entries []dtoReq.ManagerStaffReq) []dtoReq.ManagerStaffReq {
+	filtered := entries[:0:0]
+	for _, person := range entries {
+		if person.Role != string(entity.OWNER) {
+			filtered = append(filtered, person)
+		}
+	}
+	return filtered
+}
+
 func (s *service) ExportEventParticipants(ctx context.Context, eventID string, userID string) (string, []byte, *response.APIError) {
 	eventUUID, err := uuid.Parse(eventID)
 	if err != nil {
@@ -902,7 +991,7 @@ func sanitizeExportFilename(name string) string {
 }
 
 // returns (status, checkInTime, rowId (if duplication found), error)
-func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, participantId datatypes.UUID, attendanceType string, orgCode uint8, eventStartTime time.Time, eventEndTime time.Time) (string, *time.Time, *datatypes.UUID, *response.APIError) {
+func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, participantId datatypes.UUID, attendanceType string, orgCode *uint8, eventStartTime time.Time, eventEndTime time.Time) (string, *time.Time, *datatypes.UUID, *response.APIError) {
 	now := time.Now().UTC()
 
 	// Must check if already checked in, regardless of attendance type
@@ -1145,9 +1234,13 @@ func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string
 			}
 		}
 		if pageInt < 0 {
+			// Paging is 0-based (page=0 is the first page); OFFSET uses
+			// page*pageSize directly. Keep this message honest about that —
+			// a client that "fixes" this by sending page=1 would silently
+			// skip the first page of results.
 			return nil, &response.APIError{
 				Code:    response.ErrBadRequest,
-				Message: "URL query parameter 'page' must be greater than 0",
+				Message: "URL query parameter 'page' must be 0 or greater",
 				Status:  400,
 			}
 		}
@@ -1404,32 +1497,27 @@ func (s *service) UpdateEvent(ctx context.Context, id string, userId string, req
 		return nil, errors.New("Cannot update event; user is not owner or manager")
 	}
 
-	// UpdateEvent replaces event_users wholesale from managers_and_staff below,
-	// but the client (e.g. the edit form) never includes the OWNER entry.
-	// Preserve the event's existing owner across the update instead of
-	// silently dropping it. The editor may be a MANAGER, not the owner, so we
-	// must not assume the editor becomes the owner here.
-	hasOwner := false
-	for _, person := range req.ManagersAndStaff {
-		if person.Role == string(entity.OWNER) {
-			hasOwner = true
-			break
-		}
+	// UpdateEvent replaces event_users wholesale from managers_and_staff below.
+	// Ownership can never be assigned through this endpoint — the client (e.g.
+	// the edit form) never includes the OWNER entry, and a MANAGER (who is
+	// allowed to call this endpoint) must not be able to grant OWNER to
+	// themselves or anyone else by simply including an OWNER entry in the
+	// request. Strip whatever the client sent for OWNER and re-derive it from
+	// the DB every time.
+	req.ManagersAndStaff = stripOwnerEntries(req.ManagersAndStaff)
+
+	ownerRefID, ownerErr := s.repo.Event.GetEventOwnerRefID(idUUID, ctx)
+	if ownerErr != nil && ownerErr != gorm.ErrRecordNotFound {
+		return nil, ownerErr
 	}
-	if !hasOwner {
-		ownerRefID, ownerErr := s.repo.Event.GetEventOwnerRefID(idUUID, ctx)
-		if ownerErr != nil && ownerErr != gorm.ErrRecordNotFound {
-			return nil, ownerErr
-		}
-		if ownerErr == nil {
-			req.ManagersAndStaff = append(req.ManagersAndStaff, dtoReq.ManagerStaffReq{
-				RefID: ownerRefID,
-				Role:  string(entity.OWNER),
-			})
-		}
-		// ownerErr == gorm.ErrRecordNotFound: this event predates the owner
-		// fix and has no owner row yet; leave it as-is until backfilled.
+	if ownerErr == nil {
+		req.ManagersAndStaff = append(req.ManagersAndStaff, dtoReq.ManagerStaffReq{
+			RefID: ownerRefID,
+			Role:  string(entity.OWNER),
+		})
 	}
+	// ownerErr == gorm.ErrRecordNotFound: this event predates the owner fix
+	// and has no owner row yet; leave it as-is until backfilled.
 
 	payload, err := buildCreateOrUpdatePayload(dtoReq.CreateEventReq(req))
 	if err != nil {
@@ -1479,9 +1567,12 @@ func buildCreateOrUpdatePayload(req dtoReq.CreateEventReq) (entity.CreateEventPa
 		return entity.CreateEventPayload{}, err
 	}
 
+	// Point.X is longitude and Point.Y is latitude everywhere else in this
+	// codebase (see DuplicateById and the read-back in GetOneEventService) —
+	// keep create/update consistent with that convention.
 	locationPoint := entity.Point{
-		X: req.LocationLat,
-		Y: req.LocationLong,
+		X: req.LocationLong,
+		Y: req.LocationLat,
 	}
 
 	event := entity.Event{

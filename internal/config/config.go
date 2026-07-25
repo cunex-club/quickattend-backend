@@ -31,6 +31,9 @@ type LLEConfig struct {
 	ProfileClientSecret string `env:"LLE_PROFILE_CLIENT_SECRET,required"`
 	QRClientID          string `env:"LLE_QR_CLIENT_ID,required"`
 	QRClientSecret      string `env:"LLE_QR_CLIENT_SECRET,required"`
+	// QRCodeInfoURL lets this be pointed at the UAT host for testing without
+	// touching real CU NEX data. Defaults to PROD to match existing behavior.
+	QRCodeInfoURL string `env:"LLE_QR_CODE_INFO_URL" envDefault:"https://culab-svc.azurewebsites.net/Service.svc/qrcodeinfo_for_all"`
 }
 
 func Load() *Config {

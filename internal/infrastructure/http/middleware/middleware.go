@@ -128,10 +128,7 @@ func (m *Middleware) AuthRequired() fiber.Handler {
 			return response.SendError(c, fiber.StatusUnauthorized, response.ErrUnauthorized, "Missing user_id claim")
 		}
 
-		role, _ := claimString(claims, "role")
-
 		c.Locals("user_id", userID)
-		c.Locals("role", role)
 
 		return c.Next()
 	}

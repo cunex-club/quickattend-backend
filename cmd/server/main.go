@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"net/http/cookiejar"
 	"time"
 
 	"github.com/cunex-club/quickattend-backend/internal/config"
@@ -34,8 +35,19 @@ func main() {
 	log.Info().Msg("Successfully connected to the database")
 
 	repos := repository.NewRepository(db)
-	services := service.NewService(repos, cfg, &log.Logger, &http.Client{Timeout: 40 * time.Second})
-	handlers := handler.NewHandler(&services, &log.Logger, validator.New())
+
+	// Some CU NEX endpoints on PROD are pinned to a specific Azure instance
+	// via an ARRAffinity cookie; without a cookie jar, follow-up calls can
+	// land on a different instance and intermittently fail.
+	cunexCookieJar, err := cookiejar.New(nil)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create cookie jar for CU NEX HTTP client")
+	}
+	services := service.NewService(repos, cfg, &log.Logger, &http.Client{
+		Timeout: 40 * time.Second,
+		Jar:     cunexCookieJar,
+	})
+	handlers := handler.NewHandler(&services, &log.Logger, validator.New(), cfg)
 
 	app := fiber.New(fiber.Config{
 		ReadTimeout:  50 * time.Second,
