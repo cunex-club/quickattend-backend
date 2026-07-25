@@ -202,8 +202,8 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	userType := entity.UserTypes(strings.ToLower(strings.TrimSpace(UserData.UserType)))
-	if userType != entity.STUDENTS && userType != entity.STAFFS {
+	userType, validUserType := entity.ParseUserType(UserData.UserType)
+	if !validUserType {
 		return nil, &response.APIError{
 			Code:    response.ErrUnauthorized,
 			Message: "CU NEX profile returned an unsupported userType",

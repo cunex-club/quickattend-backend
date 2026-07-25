@@ -589,16 +589,8 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		orgTH *string
 		orgEN *string
 	)
-	switch CUNEXSuccess.UserType {
-	case entity.STUDENTS:
-		orgTH = CUNEXSuccess.FacultyNameTH
-		orgEN = CUNEXSuccess.FacultyNameEN
-
-	case entity.STAFFS:
-		orgTH = firstNonBlank(CUNEXSuccess.DepartmentNameTH, CUNEXSuccess.FacultyNameTH)
-		orgEN = firstNonBlank(CUNEXSuccess.DepartmentNameEN, CUNEXSuccess.FacultyNameEN)
-
-	default:
+	userType, validUserType := entity.ParseUserType(string(CUNEXSuccess.UserType))
+	if !validUserType {
 		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
@@ -607,9 +599,19 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
+	switch userType {
+	case entity.STUDENTS:
+		orgTH = CUNEXSuccess.FacultyNameTH
+		orgEN = CUNEXSuccess.FacultyNameEN
+
+	case entity.STAFFS:
+		orgTH = firstNonBlank(CUNEXSuccess.DepartmentNameTH, CUNEXSuccess.FacultyNameTH)
+		orgEN = firstNonBlank(CUNEXSuccess.DepartmentNameEN, CUNEXSuccess.FacultyNameEN)
+	}
+
 	userToUpsert := entity.User{
 		RefID:         refIdUInt,
-		UserType:      CUNEXSuccess.UserType,
+		UserType:      userType,
 		FirstnameTH:   CUNEXSuccess.FirstNameTH,
 		SurnameTH:     CUNEXSuccess.LastNameTH,
 		FirstnameEN:   CUNEXSuccess.FirstNameEN,

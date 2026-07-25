@@ -1,5 +1,7 @@
 package entity
 
+import "strings"
+
 type CUNEXProfileResponse struct {
 	Email         *string `json:"email"`
 	FacultyCode   *string `json:"facultyCode"`
@@ -23,6 +25,11 @@ const (
 	STUDENTS UserTypes = "student"
 	STAFFS   UserTypes = "staff"
 )
+
+func ParseUserType(value string) (UserTypes, bool) {
+	userType := UserTypes(strings.ToLower(strings.TrimSpace(value)))
+	return userType, userType == STUDENTS || userType == STAFFS
+}
 
 type CUNEXGetQRSuccessResponse struct {
 	DepartmentNameEN *string   `json:"departmentNameEN"`
