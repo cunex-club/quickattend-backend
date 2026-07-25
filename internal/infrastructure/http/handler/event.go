@@ -20,6 +20,21 @@ type EventHandler interface {
 	GetEvents(*fiber.Ctx) error
 	CreateEvent(c *fiber.Ctx) error
 	UpdateEvent(c *fiber.Ctx) error
+	ExportEventParticipants(c *fiber.Ctx) error
+}
+
+func (h *Handler) ExportEventParticipants(c *fiber.Ctx) error {
+	eventID := c.Params("id")
+	userID, ok := c.Locals("user_id").(string)
+	if !ok {
+		return response.SendError(c, fiber.StatusUnauthorized, response.ErrUnauthorized, "missing authenticated user")
+	}
+
+	filename, content, apiErr := h.Service.Event.ExportEventParticipants(c.UserContext(), eventID, userID)
+	if apiErr != nil {
+		return response.SendError(c, apiErr.Status, apiErr.Code, apiErr.Message)
+	}
+	return response.Excel(c, filename, content)
 }
 
 func (h *Handler) Delete(c *fiber.Ctx) error {
