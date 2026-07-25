@@ -19,6 +19,9 @@ type EventRepository interface {
 	DeleteById(uuid.UUID, string, context.Context) error
 	Create(*entity.Event, context.Context) (*entity.Event, error)
 	Comment(uuid.UUID, time.Time, string, context.Context) error
+	// GetEventIDForCheckInRow looks up which event a check-in row belongs to,
+	// so callers can authorize a comment write before touching the row.
+	GetEventIDForCheckInRow(checkInRowId uuid.UUID, ctx context.Context) (datatypes.UUID, error)
 	IsUserEventOwner(eventID uuid.UUID, userIDStr string, ctx context.Context) (bool, error)
 	GetUserRoleInEvent(eventID uuid.UUID, userID uuid.UUID, ctx context.Context) (*string, error)
 	GetEventOwnerRefID(eventID uuid.UUID, ctx context.Context) (uint64, error)
@@ -30,7 +33,7 @@ type EventRepository interface {
 	// Check if user has already checked in to the event
 	CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, participantID datatypes.UUID) (rowId *datatypes.UUID, err error)
 	// Check if user is in whitelist / allowed org or faculty of the event
-	CheckEventAccess(ctx context.Context, orgCode uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
+	CheckEventAccess(ctx context.Context, orgCode *uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
 	InsertScanRecord(ctx context.Context, record *entity.EventParticipants) (rowId *datatypes.UUID, err error)
 
 	GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (result *entity.GetOneEventQuery, err error)
@@ -84,6 +87,19 @@ type GetEventsArguments struct {
 	Ctx      context.Context
 }
 
+func (r *repository) GetEventIDForCheckInRow(checkInRowId uuid.UUID, ctx context.Context) (datatypes.UUID, error) {
+	var eventID datatypes.UUID
+	err := r.db.WithContext(ctx).
+		Model(&entity.EventParticipants{}).
+		Select("event_id").
+		Where("id = ?", checkInRowId).
+		Take(&eventID).Error
+	if err != nil {
+		return datatypes.UUID{}, err
+	}
+	return eventID, nil
+}
+
 func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
 	if checkInRowId == uuid.Nil {
 		return entity.ErrNilUUID
@@ -91,8 +107,7 @@ func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, commen
 
 	result := r.db.WithContext(ctx).
 		Model(&entity.EventParticipants{}).
-		// Where("id = ? AND comment_timestamp IS NULL", checkInRowId).
-		Where("id = ?", checkInRowId).
+		Where("id = ? AND comment_timestamp IS NULL", checkInRowId).
 		Updates(map[string]any{
 			"comment_timestamp": timeStamp,
 			"comment":           comment,
@@ -422,12 +437,18 @@ func (r *repository) CheckEventParticipation(ctx context.Context, eventId dataty
 	return &rowId, nil
 }
 
-func (r *repository) CheckEventAccess(ctx context.Context, orgCode uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (bool, error) {
+func (r *repository) CheckEventAccess(ctx context.Context, orgCode *uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (bool, error) {
 	withCtx := r.db.WithContext(ctx)
 	var found bool
 
 	switch attendanceType {
 	case string(entity.AttendanceFaculties):
+		if orgCode == nil {
+			// No numeric faculty code to compare (e.g. CU NEX returned a
+			// non-numeric code, or the participant has no faculty at all) —
+			// there's nothing for this event's allowed-faculty list to match.
+			return false, nil
+		}
 		checkErr := withCtx.Raw(`SELECT EXISTS (
 			SELECT 1 FROM event_allowed_faculties
 			WHERE event_id = ? AND faculty_no = ?

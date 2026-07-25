@@ -85,7 +85,9 @@ func (h *Handler) Comment(c *fiber.Ctx) error {
 		return response.SendError(c, 400, response.ErrBadRequest, "invalid JSON body")
 	}
 
-	err := h.Service.Event.Comment(req, c.UserContext())
+	userIDStr, _ := c.Locals("user_id").(string)
+
+	err := h.Service.Event.Comment(req, userIDStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}

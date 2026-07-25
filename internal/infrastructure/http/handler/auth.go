@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"os"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -45,11 +44,7 @@ func (h *Handler) AuthCallback(c *fiber.Ctx) error {
 		MaxAge:   sessionCookieMaxAge,
 	})
 
-	frontendHomeURL := os.Getenv("FRONTEND_HOME_URL")
-	if frontendHomeURL == "" {
-		frontendHomeURL = "https://quickattend.cunex.club/"
-	}
-	return c.Redirect(frontendHomeURL, fiber.StatusFound)
+	return c.Redirect(h.Config.FrontendHomeURL, fiber.StatusFound)
 }
 
 func (h *Handler) AuthCunex(c *fiber.Ctx) error {
