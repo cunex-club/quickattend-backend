@@ -303,6 +303,27 @@ type GetOneEventQuery struct {
 
 // ====================================================
 
+type EventParticipantExportRow struct {
+	ScannedTimestamp time.Time `gorm:"column:scanned_timestamp"`
+	UserType         UserTypes `gorm:"column:user_type"`
+	RefID            uint64    `gorm:"column:ref_id"`
+	FirstnameTH      *string   `gorm:"column:firstname_th"`
+	SurnameTH        *string   `gorm:"column:surname_th"`
+	FirstnameEN      *string   `gorm:"column:firstname_en"`
+	SurnameEN        *string   `gorm:"column:surname_en"`
+	Organization     *string   `gorm:"column:organization"`
+	ScannerRefID     *uint64   `gorm:"column:scanner_ref_id"`
+	Comment          *string   `gorm:"column:comment"`
+}
+
+type EventParticipantExportData struct {
+	EventName string
+	StartTime time.Time
+	Rows      []EventParticipantExportRow
+}
+
+// ====================================================
+
 // for getting My Events and Past Events from DB in GET /events
 type GetEventsQueryResult struct {
 	ID             datatypes.UUID `gorm:"column:id"`
