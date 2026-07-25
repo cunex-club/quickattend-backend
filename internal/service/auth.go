@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -24,6 +25,8 @@ type AuthService interface {
 	VerifyCUNEXToken(string, context.Context) (*dtoRes.VerifyTokenRes, *response.APIError)
 	CreateUserIfNotExists(*entity.User, context.Context) (*entity.User, *response.APIError)
 }
+
+const sessionLifetime = 8 * time.Hour
 
 func (s *service) GetUserService(userIDStr string, ctx context.Context) (*dtoRes.GetAuthUserRes, *response.APIError) {
 	uuidValidateErr := uuid.Validate(userIDStr)
@@ -55,17 +58,17 @@ func (s *service) GetUserService(userIDStr string, ctx context.Context) (*dtoRes
 	}
 
 	userDTO := dtoRes.GetAuthUserRes{
-		ID:              user.ID.String(),
-		RefID:           s.FormatRefIdToStr(user.RefID),
-		FirstnameTH:     user.FirstnameTH,
-		SurnameTH:       user.SurnameTH,
-		TitleTH:         user.TitleTH,
-		FacultyNameTH:   user.FacultyNameTH,
-		FirstnameEN:     user.FirstnameEN,
-		SurnameEN:       user.SurnameEN,
-		TitleEN:         user.TitleEN,
-		FacultyNameEN:   user.FacultyNameEN,
-		ProfileImageURL: user.ProfileImageURL,
+		ID:            user.ID.String(),
+		RefID:         s.FormatRefIdToStr(user.RefID),
+		UserType:      string(user.UserType),
+		FirstnameTH:   user.FirstnameTH,
+		SurnameTH:     user.SurnameTH,
+		TitleTH:       user.TitleTH,
+		FacultyNameTH: user.FacultyNameTH,
+		FirstnameEN:   user.FirstnameEN,
+		SurnameEN:     user.SurnameEN,
+		TitleEN:       user.TitleEN,
+		FacultyNameEN: user.FacultyNameEN,
 	}
 
 	return &userDTO, nil
@@ -114,7 +117,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	ClientId := s.cfg.LLEConfig.ClientId
+	ClientId := s.cfg.LLEConfig.ProfileClientID
 	if ClientId == "" {
 		return nil, &response.APIError{
 			Code:    "ClientId_NOT_FOUND",
@@ -123,7 +126,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	ClientSecret := s.cfg.LLEConfig.ClientSecret
+	ClientSecret := s.cfg.LLEConfig.ProfileClientSecret
 	if ClientSecret == "" {
 		return nil, &response.APIError{
 			Code:    "ClientSecret_NOT_FOUND",
@@ -157,6 +160,13 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 			Status:  http.StatusUnauthorized,
 		}
 	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "unexpected response from CU NEX profile API",
+			Status:  http.StatusBadGateway,
+		}
+	}
 
 	var UserData entity.CUNEXProfileResponse
 	if err := json.NewDecoder(resp.Body).Decode(&UserData); err != nil {
@@ -167,7 +177,22 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	convRefId, convRefIdErr := strconv.ParseUint(UserData.RefId, 10, 64)
+	if UserData.RefId == nil || strings.TrimSpace(*UserData.RefId) == "" {
+		return nil, &response.APIError{
+			Code:    response.ErrUnauthorized,
+			Message: "CU NEX profile does not contain a refId",
+			Status:  http.StatusUnauthorized,
+		}
+	}
+	if !isAllowedRefID(*UserData.RefId, s.cfg.BackofficeAllowedRefIDs) {
+		return nil, &response.APIError{
+			Code:    response.ErrForbidden,
+			Message: "user is not allowed to access this backoffice",
+			Status:  http.StatusForbidden,
+		}
+	}
+
+	convRefId, convRefIdErr := strconv.ParseUint(*UserData.RefId, 10, 64)
 
 	if convRefIdErr != nil {
 		return nil, &response.APIError{
@@ -177,8 +202,18 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
+	userType, validUserType := entity.ParseUserType(UserData.UserType)
+	if !validUserType {
+		return nil, &response.APIError{
+			Code:    response.ErrUnauthorized,
+			Message: "CU NEX profile returned an unsupported userType",
+			Status:  http.StatusUnauthorized,
+		}
+	}
+
 	User := entity.User{
 		RefID:         convRefId,
+		UserType:      userType,
 		FirstnameTH:   UserData.FirstNameTH,
 		SurnameTH:     UserData.LastNameTH,
 		FirstnameEN:   UserData.FirstNameEN,
@@ -202,12 +237,11 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	// 	FacultyNameEN: "LL",
 	// }
 
-	notToUpdate := []string{"profile_image_url"}
-	upsertUser, upsertErr := s.repo.Auth.UpsertUserByRefId(&User, &notToUpdate, ctx)
+	upsertUser, upsertErr := s.repo.Auth.UpsertUserByRefId(&User, nil, ctx)
 	if upsertErr != nil {
 		s.logger.Error().
-			Err(err).
-			Uint64("user_ref_id", upsertUser.RefID).
+			Err(upsertErr).
+			Uint64("user_ref_id", convRefId).
 			Str("action", "upsert_user_by_ref_id").
 			Msg("failed to upsert user by ref id")
 
@@ -239,9 +273,14 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		t   *jwt.Token
 	)
 
+	now := time.Now()
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"user_id": upsertUser.ID.String(),
+			"user_id":   upsertUser.ID.String(),
+			"ref_id":    *UserData.RefId,
+			"user_type": string(userType),
+			"iat":       now.Unix(),
+			"exp":       now.Add(sessionLifetime).Unix(),
 		})
 
 	JWTSecret := s.cfg.JWTSecret
@@ -266,6 +305,16 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	return &dtoRes.VerifyTokenRes{
 		AccessToken: access_token,
 	}, nil
+}
+
+func isAllowedRefID(refID string, allowedCSV string) bool {
+	refID = strings.TrimSpace(refID)
+	for _, allowed := range strings.Split(allowedCSV, ",") {
+		if refID != "" && refID == strings.TrimSpace(allowed) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *service) FormatRefIdToStr(refId uint64) string {

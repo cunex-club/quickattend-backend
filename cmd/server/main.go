@@ -34,12 +34,12 @@ func main() {
 	log.Info().Msg("Successfully connected to the database")
 
 	repos := repository.NewRepository(db)
-	services := service.NewService(repos, cfg, &log.Logger, &http.Client{Timeout: 10 * time.Second})
+	services := service.NewService(repos, cfg, &log.Logger, &http.Client{Timeout: 40 * time.Second})
 	handlers := handler.NewHandler(&services, &log.Logger, validator.New())
 
 	app := fiber.New(fiber.Config{
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  50 * time.Second,
+		WriteTimeout: 50 * time.Second,
 		IdleTimeout:  30 * time.Second,
 	})
 

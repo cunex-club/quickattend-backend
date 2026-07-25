@@ -41,17 +41,17 @@ type GetOneEventAgenda struct {
 }
 
 type GetOneEventUser struct {
-	RefID           string `json:"ref_id"`
-	FirstnameTH     string `json:"firstname_th"`
-	SurnameTH       string `json:"surname_th"`
-	TitleTH         string `json:"title_th"`
-	FacultyNameTH   string `json:"faculty_name_th"`
-	FirstnameEN     string `json:"firstname_en"`
-	SurnameEN       string `json:"surname_en"`
-	TitleEN         string `json:"title_en"`
-	FacultyNameEN   string `json:"faculty_name_en"`
-	ProfileImageURL string `json:"profile_image_url"`
-	Role            string `json:"role"`
+	RefID         string  `json:"ref_id"`
+	UserType      string  `json:"user_type"`
+	FirstnameTH   *string `json:"firstname_th"`
+	SurnameTH     *string `json:"surname_th"`
+	TitleTH       *string `json:"title_th"`
+	FacultyNameTH *string `json:"faculty_name_th"`
+	FirstnameEN   *string `json:"firstname_en"`
+	SurnameEN     *string `json:"surname_en"`
+	TitleEN       *string `json:"title_en"`
+	FacultyNameEN *string `json:"faculty_name_en"`
+	Role          string  `json:"role"`
 }
 
 type GetOneEventUserPending struct {
@@ -64,16 +64,16 @@ type GetOneEventAllowedFaculties struct {
 }
 
 type GetOneEventWhitelist struct {
-	RefID           string `json:"ref_id"`
-	FirstnameTH     string `json:"firstname_th"`
-	SurnameTH       string `json:"surname_th"`
-	TitleTH         string `json:"title_th"`
-	FacultyNameTH   string `json:"faculty_name_th"`
-	FirstnameEN     string `json:"firstname_en"`
-	SurnameEN       string `json:"surname_en"`
-	TitleEN         string `json:"title_en"`
-	FacultyNameEN   string `json:"faculty_name_en"`
-	ProfileImageURL string `json:"profile_image_url"`
+	RefID         string  `json:"ref_id"`
+	UserType      string  `json:"user_type"`
+	FirstnameTH   *string `json:"firstname_th"`
+	SurnameTH     *string `json:"surname_th"`
+	TitleTH       *string `json:"title_th"`
+	FacultyNameTH *string `json:"faculty_name_th"`
+	FirstnameEN   *string `json:"firstname_en"`
+	SurnameEN     *string `json:"surname_en"`
+	TitleEN       *string `json:"title_en"`
+	FacultyNameEN *string `json:"faculty_name_en"`
 }
 
 type GetOneEventWhitelistPending struct {

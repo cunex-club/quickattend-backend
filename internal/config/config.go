@@ -6,8 +6,11 @@ import (
 )
 
 type Config struct {
-	AppEnv    string `env:"APP_ENV" envDefault:"development"`
-	JWTSecret string `env:"JWT_SECRET,required"`
+	AppEnv                  string `env:"APP_ENV" envDefault:"development"`
+	JWTSecret               string `env:"JWT_SECRET,required"`
+	FrontendHomeURL         string `env:"FRONTEND_HOME_URL" envDefault:"https://quickattend.cunex.club/"`
+	AllowedOrigins          string `env:"ALLOWED_ORIGINS" envDefault:"https://quickattend.cunex.club"`
+	BackofficeAllowedRefIDs string `env:"BACKOFFICE_ALLOWED_REF_IDS,required"`
 
 	DatabaseConfig DatabaseConfig
 	LLEConfig      LLEConfig
@@ -24,8 +27,10 @@ type DatabaseConfig struct {
 }
 
 type LLEConfig struct {
-	ClientId     string `env:"LLEClientId,required"`
-	ClientSecret string `env:"LLEClientSecret,required"`
+	ProfileClientID     string `env:"LLE_PROFILE_CLIENT_ID,required"`
+	ProfileClientSecret string `env:"LLE_PROFILE_CLIENT_SECRET,required"`
+	QRClientID          string `env:"LLE_QR_CLIENT_ID,required"`
+	QRClientSecret      string `env:"LLE_QR_CLIENT_SECRET,required"`
 }
 
 func Load() *Config {

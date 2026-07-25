@@ -10,7 +10,7 @@ on:
 jobs:
   build-test:
     concurrency:
-      group: build-test-${{ github.action_ref }}
+      group: build-test-${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
     name: Build and Test
     runs-on: ubuntu-latest

@@ -18,7 +18,7 @@ import (
 
 // RequestTimeout bounds how long a request's context stays valid, so a slow
 // downstream call (DB query, etc.) can't hold server resources indefinitely.
-const RequestTimeout = 10 * time.Second
+const RequestTimeout = 45 * time.Second
 
 // เก็บ config
 type Middleware struct {
@@ -49,9 +49,8 @@ func (m *Middleware) Timeout() fiber.Handler {
 
 // --- CORS Middleware ---
 func (m *Middleware) CORS() fiber.Handler {
-	allowedOrigins := "*"
 	return cors.New(cors.Config{
-		AllowOrigins:     allowedOrigins,
+		AllowOrigins:     m.cfg.AllowedOrigins,
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowCredentials: false,

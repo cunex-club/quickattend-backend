@@ -20,7 +20,15 @@ func (r *queryResolver) EventDashboardData(ctx context.Context, eventID string) 
 		return nil, fmt.Errorf("invalid event id: %w", err)
 	}
 
-	data, err := r.Service.Dashboard.GetEventDashboardData(ctx, parsedEventID)
+	// AuthRequired stores the caller on the Fiber Locals, which the net/http
+	// adaptor exposes through the request context.
+	userIDStr, _ := ctx.Value("user_id").(string)
+	parsedUserID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("unauthenticated")
+	}
+
+	data, err := r.Service.Dashboard.GetEventDashboardData(ctx, parsedEventID, parsedUserID)
 	if err != nil {
 		return nil, err
 	}
