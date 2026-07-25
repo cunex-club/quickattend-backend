@@ -140,7 +140,7 @@ func (s *service) Comment(commentReq dtoReq.CommentReq, userIdStr string, ctx co
 		}
 	}
 
-	role, roleErr := s.repo.Event.GetUserRoleInEvent(uuid.UUID(eventID), userIdUUID, ctx)
+	role, roleErr := s.repo.Event.GetUserRoleInEvent(eventID, userIdUUID, ctx)
 	if roleErr != nil && !errors.Is(roleErr, gorm.ErrRecordNotFound) {
 		return &response.APIError{
 			Code:    response.ErrInternalError,

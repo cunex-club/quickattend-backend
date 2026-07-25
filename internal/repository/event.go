@@ -21,7 +21,7 @@ type EventRepository interface {
 	Comment(uuid.UUID, time.Time, string, context.Context) error
 	// GetEventIDForCheckInRow looks up which event a check-in row belongs to,
 	// so callers can authorize a comment write before touching the row.
-	GetEventIDForCheckInRow(checkInRowId uuid.UUID, ctx context.Context) (datatypes.UUID, error)
+	GetEventIDForCheckInRow(checkInRowId uuid.UUID, ctx context.Context) (uuid.UUID, error)
 	IsUserEventOwner(eventID uuid.UUID, userIDStr string, ctx context.Context) (bool, error)
 	GetUserRoleInEvent(eventID uuid.UUID, userID uuid.UUID, ctx context.Context) (*string, error)
 	GetEventOwnerRefID(eventID uuid.UUID, ctx context.Context) (uint64, error)
@@ -87,15 +87,23 @@ type GetEventsArguments struct {
 	Ctx      context.Context
 }
 
-func (r *repository) GetEventIDForCheckInRow(checkInRowId uuid.UUID, ctx context.Context) (datatypes.UUID, error) {
-	var eventID datatypes.UUID
+func (r *repository) GetEventIDForCheckInRow(checkInRowId uuid.UUID, ctx context.Context) (uuid.UUID, error) {
+	// Scan into a string rather than straight into a UUID type: datatypes.UUID
+	// is a [16]byte array, and GORM treats an array destination as a
+	// multi-row scan (see CheckEventParticipation, which does the same).
+	var eventIDStr string
 	err := r.db.WithContext(ctx).
 		Model(&entity.EventParticipants{}).
 		Select("event_id").
 		Where("id = ?", checkInRowId).
-		Take(&eventID).Error
+		Take(&eventIDStr).Error
 	if err != nil {
-		return datatypes.UUID{}, err
+		return uuid.Nil, err
+	}
+
+	eventID, err := uuid.Parse(eventIDStr)
+	if err != nil {
+		return uuid.Nil, err
 	}
 	return eventID, nil
 }
