@@ -117,7 +117,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	ClientId := s.cfg.LLEConfig.ProfileClientID
+	ClientId := s.cfg.LLEConfig.ClientID
 	if ClientId == "" {
 		return nil, &response.APIError{
 			Code:    "ClientId_NOT_FOUND",
@@ -126,7 +126,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	ClientSecret := s.cfg.LLEConfig.ProfileClientSecret
+	ClientSecret := s.cfg.LLEConfig.ClientSecret
 	if ClientSecret == "" {
 		return nil, &response.APIError{
 			Code:    "ClientSecret_NOT_FOUND",

@@ -500,21 +500,12 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 
 	// Request for participant profile
 	CUNEXGetQRURL := s.cfg.LLEConfig.QRCodeInfoURL
-	clientId := s.cfg.LLEConfig.QRClientID
-	if clientId == "" {
-		s.logger.Error().Str("Error", "Missing env config 'LLEClientId'")
+	clientId, clientSecret := s.cfg.LLEConfig.QRCredentials()
+	if clientId == "" || clientSecret == "" {
+		s.logger.Error().Str("Error", "Missing env config 'LLE_CLIENT_ID'/'LLE_CLIENT_SECRET'")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Missing env config 'LLEClientId'",
-			Status:  500,
-		}
-	}
-	clientSecret := s.cfg.LLEConfig.QRClientSecret
-	if clientSecret == "" {
-		s.logger.Error().Str("Error", "Missing env config 'LLEClientSecret'")
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Missing env config 'LLEClientSecret'",
+			Message: "Missing CU NEX client credentials",
 			Status:  500,
 		}
 	}
