@@ -6,11 +6,10 @@ import (
 )
 
 type Config struct {
-	AppEnv                  string `env:"APP_ENV" envDefault:"development"`
-	JWTSecret               string `env:"JWT_SECRET,required"`
-	FrontendHomeURL         string `env:"FRONTEND_HOME_URL" envDefault:"https://quickattend.cunex.club/"`
-	AllowedOrigins          string `env:"ALLOWED_ORIGINS" envDefault:"https://quickattend.cunex.club"`
-	BackofficeAllowedRefIDs string `env:"BACKOFFICE_ALLOWED_REF_IDS,required"`
+	AppEnv          string `env:"APP_ENV" envDefault:"development"`
+	JWTSecret       string `env:"JWT_SECRET,required"`
+	FrontendHomeURL string `env:"FRONTEND_HOME_URL" envDefault:"https://quickattend.cunex.club/"`
+	AllowedOrigins  string `env:"ALLOWED_ORIGINS" envDefault:"https://quickattend.cunex.club"`
 
 	DatabaseConfig DatabaseConfig
 	LLEConfig      LLEConfig

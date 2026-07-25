@@ -184,14 +184,6 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 			Status:  http.StatusUnauthorized,
 		}
 	}
-	if !isAllowedRefID(*UserData.RefId, s.cfg.BackofficeAllowedRefIDs) {
-		return nil, &response.APIError{
-			Code:    response.ErrForbidden,
-			Message: "user is not allowed to access this backoffice",
-			Status:  http.StatusForbidden,
-		}
-	}
-
 	convRefId, convRefIdErr := strconv.ParseUint(*UserData.RefId, 10, 64)
 
 	if convRefIdErr != nil {
@@ -305,16 +297,6 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 	return &dtoRes.VerifyTokenRes{
 		AccessToken: access_token,
 	}, nil
-}
-
-func isAllowedRefID(refID string, allowedCSV string) bool {
-	refID = strings.TrimSpace(refID)
-	for _, allowed := range strings.Split(allowedCSV, ",") {
-		if refID != "" && refID == strings.TrimSpace(allowed) {
-			return true
-		}
-	}
-	return false
 }
 
 func (s *service) FormatRefIdToStr(refId uint64) string {
