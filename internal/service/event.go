@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/uuid"
+	"github.com/xuri/excelize/v2"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
@@ -27,19 +29,20 @@ var thaiLoc = time.FixedZone(entity.ThaiTZ, 7*3600)
 
 type EventService interface {
 	DeleteById(eventIDStr string, userIDStr string, ctx context.Context) *response.APIError
-	DuplicateById(EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
-	Comment(checkInReq dtoReq.CommentReq, ctx context.Context) *response.APIError
-	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError)
+	DuplicateById(Req dtoReq.DuplicateEventReq, EventID string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError)
+	Comment(checkInReq dtoReq.CommentReq, userIdStr string, ctx context.Context) *response.APIError
+	PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.PostParticipantRes, *response.APIError)
 
 	GetOneEventService(eventIdStr string, userIdStr string, ctx context.Context) (res *dtoRes.GetOneEventRes, err *response.APIError)
 
-	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error)
+	CreateEvent(ctx context.Context, req dtoReq.CreateEventReq, userId string) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, userId string, updates dtoReq.UpdateEventReq) (*dtoRes.UpdateEventRes, error)
 
 	GetEventsValidateArgs(userIDStr string, queryParams map[string]string, ctx context.Context) (validated *GetEventsValidateArgsReturn, err *response.APIError)
 	GetMyEventsService(userID datatypes.UUID, search string, ctx context.Context) (res *[]dtoRes.GetEventsRes, err *response.APIError)
 	GetDiscoveryEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetDiscoveryEventsRes, pagination *response.Pagination, err *response.APIError)
 	GetPastEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetEventsRes, pagination *response.Pagination, err *response.APIError)
+	ExportEventParticipants(ctx context.Context, eventID string, userID string) (filename string, content []byte, err *response.APIError)
 }
 
 type GetEventsValidateArgsReturn struct {
@@ -66,7 +69,15 @@ const (
 	Discovery
 )
 
-func (s *service) Comment(commentReq dtoReq.CommentReq, ctx context.Context) *response.APIError {
+func (s *service) Comment(commentReq dtoReq.CommentReq, userIdStr string, ctx context.Context) *response.APIError {
+	userIdUUID, err := uuid.Parse(userIdStr)
+	if err != nil {
+		return &response.APIError{
+			Code:    response.ErrBadRequest,
+			Message: "invalid user_id from JWT claim",
+			Status:  400,
+		}
+	}
 
 	decoded, err := base64.StdEncoding.DecodeString(commentReq.EncodedOneTimeCode)
 	if err != nil {
@@ -112,6 +123,38 @@ func (s *service) Comment(commentReq dtoReq.CommentReq, ctx context.Context) *re
 		Str("timeStamp", timeStamp.String()).
 		Str("checkInRowId", checkInRowId.String()).
 		Msg("Received timeStamp and target row-id to check-in Event-Participant")
+
+	eventID, err := s.repo.Event.GetEventIDForCheckInRow(checkInRowId, ctx)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: entity.ErrCheckInTargetNotFound.Error(),
+				Status:  400,
+			}
+		}
+		return &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "internal db error",
+			Status:  500,
+		}
+	}
+
+	role, roleErr := s.repo.Event.GetUserRoleInEvent(eventID, userIdUUID, ctx)
+	if roleErr != nil && !errors.Is(roleErr, gorm.ErrRecordNotFound) {
+		return &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "internal db error",
+			Status:  500,
+		}
+	}
+	if role == nil {
+		return &response.APIError{
+			Code:    response.ErrForbidden,
+			Message: "user is not staff, manager, or owner of this event",
+			Status:  403,
+		}
+	}
 
 	if err := s.repo.Event.Comment(
 		checkInRowId,
@@ -219,7 +262,7 @@ func (s *service) DeleteById(eventIDStr string, userIDStr string, ctx context.Co
 	return nil
 }
 
-func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError) {
+func (s *service) DuplicateById(Req dtoReq.DuplicateEventReq, eventIDStr string, userIDStr string, ctx context.Context) (*dtoRes.DuplicateEventRes, *response.APIError) {
 	eventID, parseErr := uuid.Parse(eventIDStr)
 	if parseErr != nil {
 		return nil, &response.APIError{
@@ -281,14 +324,102 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 		}
 	}
 
+	// validate payload
+	// timezone
+	if err := validateThaiTimezone(Req.Timezone); err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+
+	// start_time, end_time
+	startTime, err := parseTime(Req.StartTime)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+	endTime, err := parseTime(Req.EndTime)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+	if !endTime.After(startTime) {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: "end_time must be after start_time",
+		}
+	}
+	if !isSameDay(startTime, endTime) {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: fmt.Sprintf("start_time and end_time must be on the same day in timezone %s", entity.ThaiTZ),
+		}
+	}
+
+	// agenda
+	agendas, err := buildAgendas(Req.Agenda, startTime, endTime)
+	if err != nil {
+		return nil, &response.APIError{
+			Code:    response.ErrBadRequest,
+			Status:  400,
+			Message: err.Error(),
+		}
+	}
+
+	// build new event
 	newEvent := *originalEvent
 	newEvent.ID = datatypes.UUID(uuid.New())
 
-	// breaking the memory link from originalEvent
+	// break the memory link from originalEvent, insert new information
+	// location
+	newEvent.Location = Req.Location
+
+	// start_time
+	newEvent.StartTime = startTime
+
+	// end_time
+	newEvent.EndTime = endTime
+
+	// evaluation_form
+	newEvent.EvaluationForm = Req.EvaluationForm
+
+	// location_point
+	newEvent.LocationPoint = entity.Point{
+		X: Req.LocationLong,
+		Y: Req.LocationLat,
+	}
+
+	// agenda
+	newEvent.EventAgenda = make([]entity.EventAgenda, 0, len(agendas))
+	for _, item := range agendas {
+		newEvent.EventAgenda = append(newEvent.EventAgenda, entity.EventAgenda{
+			ActivityName: item.ActivityName,
+			StartTime:    item.StartTime,
+			EndTime:      item.EndTime,
+		})
+	}
+
+	// copy over other existing info
 	// Whitelist
 	newEvent.EventWhitelist = make([]entity.EventWhitelist, 0, len(originalEvent.EventWhitelist))
 	for _, item := range originalEvent.EventWhitelist {
 		newEvent.EventWhitelist = append(newEvent.EventWhitelist, entity.EventWhitelist{
+			AttendeeRefID: item.AttendeeRefID,
+		})
+	}
+	newEvent.EventWhitelistPending = make([]entity.EventWhitelistPending, 0, len(originalEvent.EventWhitelistPending))
+	for _, item := range originalEvent.EventWhitelistPending {
+		newEvent.EventWhitelistPending = append(newEvent.EventWhitelistPending, entity.EventWhitelistPending{
 			AttendeeRefID: item.AttendeeRefID,
 		})
 	}
@@ -301,13 +432,19 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 		})
 	}
 
-	// Agenda
-	newEvent.EventAgenda = make([]entity.EventAgenda, 0, len(originalEvent.EventAgenda))
-	for _, item := range originalEvent.EventAgenda {
-		newEvent.EventAgenda = append(newEvent.EventAgenda, entity.EventAgenda{
-			ActivityName: item.ActivityName,
-			StartTime:    item.StartTime,
-			EndTime:      item.EndTime,
+	// Users
+	newEvent.EventUser = make([]entity.EventUser, 0, len(originalEvent.EventUser))
+	for _, item := range originalEvent.EventUser {
+		newEvent.EventUser = append(newEvent.EventUser, entity.EventUser{
+			UserID: item.UserID,
+			Role:   item.Role,
+		})
+	}
+	newEvent.EventUserPending = make([]entity.EventUserPending, 0, len(originalEvent.EventUserPending))
+	for _, item := range originalEvent.EventUserPending {
+		newEvent.EventUserPending = append(newEvent.EventUserPending, entity.EventUserPending{
+			UserRefID: item.UserRefID,
+			Role:      item.Role,
 		})
 	}
 
@@ -330,35 +467,12 @@ func (s *service) DuplicateById(eventIDStr string, userIDStr string, ctx context
 	}, nil
 }
 
-func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.GetParticipantRes, *response.APIError) {
+func (s *service) PostParticipantService(code string, eventId string, userId string, scannedLocX float64, scannedLocY float64, ctx context.Context) (*dtoRes.PostParticipantRes, *response.APIError) {
 	if code == "" {
 		return nil, &response.APIError{
 			Code:    "INVALID_QR",
 			Message: "Missing URL path parameter 'qrcode'",
 			Status:  400,
-		}
-	}
-	if len(code) != 10 {
-		return nil, &response.APIError{
-			Code:    "INVALID_QR",
-			Message: "URL path parameter 'qrcode' must have length of 10",
-			Status:  400,
-		}
-	}
-	numbers := []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
-	for _, r := range code {
-		isDigit := false
-		for _, num := range numbers {
-			if string(r) == num {
-				isDigit = true
-			}
-		}
-		if !isDigit {
-			return nil, &response.APIError{
-				Code:    "INVALID_QR",
-				Message: "URL path parameter 'qrcode' contains non-number character(s)",
-				Status:  400,
-			}
 		}
 	}
 
@@ -385,22 +499,13 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	userIdUuid := datatypes.UUID(datatypes.BinUUIDFromString(userId))
 
 	// Request for participant profile
-	CUNEXGetQRURL := "https://culab-svc.azurewebsites.net/Service.svc/qrcodeinfo_for_all"
-	clientId := s.cfg.LLEConfig.ClientId
-	if clientId == "" {
-		s.logger.Error().Str("Error", "Missing env config 'LLEClientId'")
+	CUNEXGetQRURL := s.cfg.LLEConfig.QRCodeInfoURL
+	clientId, clientSecret := s.cfg.LLEConfig.QRCredentials()
+	if clientId == "" || clientSecret == "" {
+		s.logger.Error().Str("Error", "Missing env config 'LLE_CLIENT_ID'/'LLE_CLIENT_SECRET'")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Missing env config 'LLEClientId'",
-			Status:  500,
-		}
-	}
-	clientSecret := s.cfg.LLEConfig.ClientSecret
-	if clientSecret == "" {
-		s.logger.Error().Str("Error", "Missing env config 'LLEClientSecret'")
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Missing env config 'LLEClientSecret'",
+			Message: "Missing CU NEX client credentials",
 			Status:  500,
 		}
 	}
@@ -456,8 +561,27 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 			Status:  500,
 		}
 
+	case 204:
+		// Per LLE reference: 204 means the qrcode/token could not be resolved
+		// for this project (expired, invalid, or issued to a different
+		// project) — distinct from an unexpected status code.
+		return nil, &response.APIError{
+			Code:    "INVALID_QR",
+			Message: "qrcode expired or invalid",
+			Status:  400,
+		}
+
 	case 403:
-		// Expired or invalid QR
+		// LLE reference: 403 from this endpoint has three distinct causes —
+		// (1) the qrcode parameter wasn't sent at all, (2) this ClientId has
+		// no scope for qrcodeinfo_for_all, (3) the QR is genuinely
+		// expired/used. We always send `code`, so log its presence to help
+		// tell (1)/(2) apart from (3) server-side, even though the
+		// user-facing message stays the same.
+		s.logger.Warn().
+			Bool("qrcode_param_sent", strings.TrimSpace(code) != "").
+			Str("Error", "403 from CU NEX GET qrcode — check ClientId scope before assuming the QR itself is expired/used").
+			Msg("CU NEX GET qrcode rejected the request")
 		return nil, &response.APIError{
 			Code:    "INVALID_QR",
 			Message: "qrcode expired or invalid",
@@ -483,9 +607,16 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	}
 
 	// Format participant info from CU NEX API to fit our uses
-	refIdUInt, convertErr := strconv.ParseUint(CUNEXSuccess.RefId, 10, 64)
+	if CUNEXSuccess.RefId == nil || strings.TrimSpace(*CUNEXSuccess.RefId) == "" {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Missing refID from CU NEX GET qrcode",
+			Status:  502,
+		}
+	}
+	refIdUInt, convertErr := strconv.ParseUint(*CUNEXSuccess.RefId, 10, 64)
 	if convertErr != nil {
-		s.logger.Error().Err(convertErr).Str("Error", fmt.Sprintf("Invalid refID returned from CU NEX GET qrcode; could not convert %s to uint64", CUNEXSuccess.RefId))
+		s.logger.Error().Err(convertErr).Str("Error", "Invalid refID returned from CU NEX GET qrcode")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "Invalid refID returned from CU NEX GET qrcode",
@@ -493,29 +624,77 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	tempCode, err := strconv.ParseUint(CUNEXSuccess.FacultyCode, 10, 8)
-	if err != nil {
+	orgCode, nonNumericFacultyCode := parseFacultyOrgCode(CUNEXSuccess.FacultyCode)
+	if nonNumericFacultyCode != "" {
+		s.logger.Warn().Str("faculty_code", nonNumericFacultyCode).
+			Msg("non-numeric facultyCode from CU NEX; treated as no faculty match")
+	}
+
+	// Insert participant now to allow inserting them into EventParticipants later
+	var (
+		orgTH *string
+		orgEN *string
+	)
+	userType, validUserType := entity.ParseUserType(string(CUNEXSuccess.UserType))
+	if !validUserType {
+		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
-			Message: "Invalid facultyCode returned from CU NEX GET qrcode",
+			Message: "Invalid userType returned from CU NEX GET qrcode",
 			Status:  500,
 		}
 	}
-	orgCode := uint8(tempCode)
 
-	// Insert participant now to allow inserting them into EventParticipants later
-	userToInsert := entity.User{
-		RefID:       refIdUInt,
-		FirstnameTH: CUNEXSuccess.FirstNameTH,
-		SurnameTH:   CUNEXSuccess.LastNameTH,
-		TitleTH:     "",
-		FirstnameEN: CUNEXSuccess.FirstNameEN,
-		SurnameEN:   CUNEXSuccess.LastNameEN,
-		TitleEN:     "",
+	switch userType {
+	case entity.STUDENTS:
+		orgTH = CUNEXSuccess.FacultyNameTH
+		orgEN = CUNEXSuccess.FacultyNameEN
+
+	case entity.STAFFS:
+		orgTH = firstNonBlank(CUNEXSuccess.DepartmentNameTH, CUNEXSuccess.FacultyNameTH)
+		orgEN = firstNonBlank(CUNEXSuccess.DepartmentNameEN, CUNEXSuccess.FacultyNameEN)
 	}
-	user, createUserErr := s.CreateUserIfNotExists(&userToInsert, ctx)
-	if createUserErr != nil {
-		return nil, createUserErr
+
+	userToUpsert := entity.User{
+		RefID:         refIdUInt,
+		UserType:      userType,
+		FirstnameTH:   CUNEXSuccess.FirstNameTH,
+		SurnameTH:     CUNEXSuccess.LastNameTH,
+		FirstnameEN:   CUNEXSuccess.FirstNameEN,
+		SurnameEN:     CUNEXSuccess.LastNameEN,
+		FacultyNameTH: orgTH,
+		FacultyNameEN: orgEN,
+	}
+	notToUpdate := []string{"title_th", "title_en"}
+	user, upsertErr := s.repo.Auth.UpsertUserByRefId(&userToUpsert, &notToUpdate, ctx)
+	if upsertErr != nil {
+		s.logger.Error().Err(upsertErr).
+			Uint64("participant_ref_id", refIdUInt).
+			Str("action", "upsert_user_by_ref_id").
+			Msg("failed to upsert user by ref id")
+
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Internal DB error",
+			Status:  500,
+		}
+	}
+
+	// Sync event user and whitelist pending
+	if err := s.repo.Auth.SyncWhitelistPendingToWhitelist(ctx, user.RefID); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", user.RefID).
+			Str("action", "sync_whitelist_pending").
+			Msg("failed to sync whitelist pending to whitelist")
+	}
+
+	if err := s.repo.Auth.SyncEventUserPendingToEventUser(ctx, user.ID, user.RefID); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", user.RefID).
+			Str("action", "sync_event_user_pending").
+			Msg("failed to sync event user pending to event user")
 	}
 
 	// Get event info for checking scanning/check in permission
@@ -547,33 +726,9 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	status, checkinTime, rowId, errCheckStatus := s.CheckCheckinStatus(ctx, eventIdUuid, user.RefID, user.ID, string(event.AttendenceType), orgCode, event.EndTime)
+	status, checkinTime, rowId, errCheckStatus := s.CheckCheckinStatus(ctx, eventIdUuid, user.RefID, user.ID, string(event.AttendenceType), orgCode, event.StartTime, event.EndTime)
 	if errCheckStatus != nil {
 		return nil, errCheckStatus
-	}
-
-	// Format org before proceeding with steps according to status
-	// to make EventParticipants insertion possible
-	var (
-		orgTH string
-		orgEN string
-	)
-	switch CUNEXSuccess.UserType {
-	case entity.STUDENTS:
-		orgTH = CUNEXSuccess.FacultyNameTH
-		orgEN = CUNEXSuccess.FacultyNameEN
-
-	case entity.STAFFS:
-		orgTH = CUNEXSuccess.DepartmentNameTH
-		orgEN = CUNEXSuccess.DepartmentNameEN
-
-	default:
-		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Invalid userType returned from CU NEX GET qrcode",
-			Status:  500,
-		}
 	}
 
 	switch status {
@@ -612,7 +767,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	checkInCode := base64.StdEncoding.EncodeToString(raw)
 
 	// Finally, format response according to revealed_fields of this event
-	responseBody := dtoRes.GetParticipantRes{
+	responseBody := dtoRes.PostParticipantRes{
 		FirstnameTH:     nil,
 		SurnameTH:       nil,
 		TitleTH:         nil,
@@ -631,19 +786,19 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	for _, field := range event.RevealedFields {
 		switch field {
 		case entity.ParticipantName:
-			responseBody.FirstnameTH = &CUNEXSuccess.FirstNameTH
-			responseBody.FirstnameEN = &CUNEXSuccess.FirstNameEN
-			responseBody.TitleTH = &user.TitleTH
-			responseBody.SurnameTH = &CUNEXSuccess.LastNameTH
-			responseBody.SurnameEN = &CUNEXSuccess.LastNameEN
-			responseBody.TitleEN = &user.TitleEN
+			responseBody.FirstnameTH = CUNEXSuccess.FirstNameTH
+			responseBody.FirstnameEN = CUNEXSuccess.FirstNameEN
+			responseBody.TitleTH = user.TitleTH
+			responseBody.SurnameTH = CUNEXSuccess.LastNameTH
+			responseBody.SurnameEN = CUNEXSuccess.LastNameEN
+			responseBody.TitleEN = user.TitleEN
 
 		case entity.ParticipantOrganization:
-			responseBody.OrganizationTH = &orgTH
-			responseBody.OrganizationEN = &orgEN
+			responseBody.OrganizationTH = orgTH
+			responseBody.OrganizationEN = orgEN
 
 		case entity.ParticipantPhoto:
-			responseBody.ProfileImageUrl = &CUNEXSuccess.ProfileImageUrl
+			responseBody.ProfileImageUrl = CUNEXSuccess.ProfileImageUrl
 
 		case entity.ParticipantRefID:
 			temp := s.FormatRefIdToStr(refIdUInt)
@@ -654,8 +809,180 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	return &responseBody, nil
 }
 
+func firstNonBlank(values ...*string) *string {
+	for _, value := range values {
+		if value != nil && strings.TrimSpace(*value) != "" {
+			return value
+		}
+	}
+	return nil
+}
+
+// parseFacultyOrgCode parses CU NEX's facultyCode into the numeric code used
+// by FACULTIES-restricted events. facultyCode isn't always numeric — CU NEX
+// returns letter codes such as "BG" for newly-created cross-faculty programs
+// — so a non-numeric or missing code returns (nil, "") rather than an error;
+// it simply can't match any event's allowed-faculty list. When the raw value
+// was non-empty but non-numeric, it is also returned so callers can log it.
+func parseFacultyOrgCode(facultyCode *string) (code *uint8, rejectedRaw string) {
+	if facultyCode == nil {
+		return nil, ""
+	}
+	raw := strings.TrimSpace(*facultyCode)
+	if raw == "" {
+		return nil, ""
+	}
+	parsed, err := strconv.ParseUint(raw, 10, 8)
+	if err != nil {
+		return nil, raw
+	}
+	parsedCode := uint8(parsed)
+	return &parsedCode, ""
+}
+
+// stripOwnerEntries drops any OWNER role from a managers_and_staff list.
+// Ownership must never be settable through the update-event request body —
+// it is always re-derived from the DB by the caller — otherwise a MANAGER
+// (who is allowed to call UpdateEvent) could grant OWNER to themselves or
+// anyone else simply by including an OWNER entry in the request.
+func stripOwnerEntries(entries []dtoReq.ManagerStaffReq) []dtoReq.ManagerStaffReq {
+	filtered := entries[:0:0]
+	for _, person := range entries {
+		if person.Role != string(entity.OWNER) {
+			filtered = append(filtered, person)
+		}
+	}
+	return filtered
+}
+
+func (s *service) ExportEventParticipants(ctx context.Context, eventID string, userID string) (string, []byte, *response.APIError) {
+	eventUUID, err := uuid.Parse(eventID)
+	if err != nil {
+		return "", nil, &response.APIError{Code: response.ErrBadRequest, Message: "invalid event id", Status: 400}
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return "", nil, &response.APIError{Code: response.ErrBadRequest, Message: "invalid user id", Status: 400}
+	}
+
+	role, err := s.repo.Event.GetUserRoleInEvent(eventUUID, userUUID, ctx)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to check export permission", Status: 500}
+	}
+	if role == nil || (*role != string(entity.OWNER) && *role != string(entity.MANAGER)) {
+		return "", nil, &response.APIError{Code: response.ErrForbidden, Message: "only event owners and managers can export participants", Status: 403}
+	}
+
+	data, err := s.repo.Event.GetScannedParticipantsForExport(ctx, datatypes.UUID(eventUUID))
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", nil, &response.APIError{Code: response.ErrNotFound, Message: "event not found", Status: 404}
+	}
+	if err != nil {
+		return "", nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to load participants", Status: 500}
+	}
+
+	content, err := buildParticipantWorkbook(data)
+	if err != nil {
+		return "", nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to generate export", Status: 500}
+	}
+
+	name := sanitizeExportFilename(data.EventName)
+	date := data.StartTime.In(thaiLoc).Format("20060102")
+	return fmt.Sprintf("%s_attendance_%s.xlsx", name, date), content, nil
+}
+
+func buildParticipantWorkbook(data *entity.EventParticipantExportData) ([]byte, error) {
+	book := excelize.NewFile()
+	defer func() { _ = book.Close() }()
+
+	const sheet = "Participants"
+	book.SetSheetName(book.GetSheetName(0), sheet)
+
+	headers := []any{"Check-in time (GMT+7)", "User type", "Ref ID", "Name TH", "Name EN", "Affiliation", "Scanner Ref ID", "Comment"}
+	if err := book.SetSheetRow(sheet, "A1", &headers); err != nil {
+		return nil, err
+	}
+
+	for i, row := range data.Rows {
+		values := []any{
+			row.ScannedTimestamp.In(thaiLoc).Format("2006-01-02 15:04:05"),
+			string(row.UserType),
+			formatExportRefID(row.RefID),
+			joinName(row.FirstnameTH, row.SurnameTH),
+			joinName(row.FirstnameEN, row.SurnameEN),
+			stringValue(row.Organization),
+			formatOptionalExportRefID(row.ScannerRefID),
+			stringValue(row.Comment),
+		}
+		cell, _ := excelize.CoordinatesToCellName(1, i+2)
+		if err := book.SetSheetRow(sheet, cell, &values); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := book.SetPanes(sheet, &excelize.Panes{Freeze: true, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"}); err != nil {
+		return nil, err
+	}
+	if err := book.AutoFilter(sheet, "A1:H1", []excelize.AutoFilterOptions{}); err != nil {
+		return nil, err
+	}
+	for column, width := range map[string]float64{"A": 22, "B": 12, "C": 14, "D": 28, "E": 28, "F": 28, "G": 16, "H": 40} {
+		if err := book.SetColWidth(sheet, column, column, width); err != nil {
+			return nil, err
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := book.Write(&buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func joinName(first *string, last *string) string {
+	return strings.TrimSpace(strings.Join([]string{stringValue(first), stringValue(last)}, " "))
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func formatExportRefID(value uint64) string {
+	text := strconv.FormatUint(value, 10)
+	if len(text) < 8 {
+		return strings.Repeat("0", 8-len(text)) + text
+	}
+	return text
+}
+
+func formatOptionalExportRefID(value *uint64) string {
+	if value == nil {
+		return ""
+	}
+	return formatExportRefID(*value)
+}
+
+func sanitizeExportFilename(name string) string {
+	name = strings.TrimSpace(name)
+	name = strings.Map(func(r rune) rune {
+		switch r {
+		case '/', '\\', ':', '*', '?', '"', '<', '>', '|':
+			return '_'
+		default:
+			return r
+		}
+	}, name)
+	if name == "" {
+		return "event"
+	}
+	return name
+}
+
 // returns (status, checkInTime, rowId (if duplication found), error)
-func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, participantId datatypes.UUID, attendanceType string, orgCode uint8, eventEndTime time.Time) (string, *time.Time, *datatypes.UUID, *response.APIError) {
+func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID, participantRefId uint64, participantId datatypes.UUID, attendanceType string, orgCode *uint8, eventStartTime time.Time, eventEndTime time.Time) (string, *time.Time, *datatypes.UUID, *response.APIError) {
 	now := time.Now().UTC()
 
 	// Must check if already checked in, regardless of attendance type
@@ -693,8 +1020,8 @@ func (s *service) CheckCheckinStatus(ctx context.Context, eventId datatypes.UUID
 		}
 	}
 
-	// Cannot check in if already past the event's ending time
-	if now.After(eventEndTime.UTC()) {
+	// Cannot check in before the event has started, or after it has ended
+	if now.Before(eventStartTime.UTC()) || now.After(eventEndTime.UTC()) {
 		return string(dtoRes.FAIL), &now, nil, nil
 	}
 
@@ -741,6 +1068,38 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
+	// Format each attribute
+
+	usersDTO := make([]dtoRes.GetOneEventUser, 0, len(result.EventUser))
+	if len(result.EventUser) > 0 {
+		for _, user := range result.EventUser {
+			u := user.User
+			usersDTO = append(usersDTO, dtoRes.GetOneEventUser{
+				RefID:         s.FormatRefIdToStr(u.RefID),
+				UserType:      string(u.UserType),
+				FirstnameTH:   u.FirstnameTH,
+				SurnameTH:     u.SurnameTH,
+				TitleTH:       u.TitleTH,
+				FacultyNameTH: u.FacultyNameTH,
+				FirstnameEN:   u.FirstnameEN,
+				SurnameEN:     u.SurnameEN,
+				TitleEN:       u.TitleEN,
+				FacultyNameEN: u.FacultyNameEN,
+				Role:          string(user.Role),
+			})
+		}
+	}
+
+	usersPendingDTO := make([]dtoRes.GetOneEventUserPending, 0, len(result.EventUserPending))
+	if len(result.EventUserPending) > 0 {
+		for _, user := range result.EventUserPending {
+			usersPendingDTO = append(usersPendingDTO, dtoRes.GetOneEventUserPending{
+				RefID: s.FormatRefIdToStr(user.UserRefID),
+				Role:  string(user.Role),
+			})
+		}
+	}
+
 	agendaDTO := make([]dtoRes.GetOneEventAgenda, 0, len(result.EventAgenda))
 	if len(result.EventAgenda) > 0 {
 		for _, slot := range result.EventAgenda {
@@ -752,18 +1111,39 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 
-	usersDTO := make([]dtoRes.GetOneEventUser, 0, len(result.EventUser))
-	if len(result.EventUser) > 0 {
-		for _, user := range result.EventUser {
-			u := user.User
-			usersDTO = append(usersDTO, dtoRes.GetOneEventUser{
-				FirstnameTH: u.FirstnameTH,
-				SurnameTH:   u.SurnameTH,
-				TitleTH:     u.TitleTH,
-				FirstnameEN: u.FirstnameEN,
-				SurnameEN:   u.SurnameEN,
-				TitleEN:     u.TitleEN,
-				Role:        string(user.Role),
+	allowedFacDTO := make([]dtoRes.GetOneEventAllowedFaculties, 0, len(result.EventAllowedFaculties))
+	if len(result.EventAllowedFaculties) > 0 {
+		for _, faculty := range result.EventAllowedFaculties {
+			allowedFacDTO = append(allowedFacDTO, dtoRes.GetOneEventAllowedFaculties{
+				FacultyNO: faculty.FacultyNO,
+			})
+		}
+	}
+
+	whitelistDTO := make([]dtoRes.GetOneEventWhitelist, 0, len(result.EventWhitelist))
+	if len(result.EventWhitelist) > 0 {
+		for _, wl := range result.EventWhitelist {
+			wlUser := wl.User
+			whitelistDTO = append(whitelistDTO, dtoRes.GetOneEventWhitelist{
+				RefID:         s.FormatRefIdToStr(wlUser.RefID),
+				UserType:      string(wlUser.UserType),
+				FirstnameTH:   wlUser.FirstnameTH,
+				SurnameTH:     wlUser.SurnameTH,
+				TitleTH:       wlUser.TitleTH,
+				FacultyNameTH: wlUser.FacultyNameTH,
+				FirstnameEN:   wlUser.FirstnameEN,
+				SurnameEN:     wlUser.SurnameEN,
+				TitleEN:       wlUser.TitleEN,
+				FacultyNameEN: wlUser.FacultyNameEN,
+			})
+		}
+	}
+
+	whitelistPendingDTO := make([]dtoRes.GetOneEventWhitelistPending, 0, len(result.EventWhitelistPending))
+	if len(result.EventWhitelistPending) > 0 {
+		for _, wl := range result.EventWhitelistPending {
+			whitelistPendingDTO = append(whitelistPendingDTO, dtoRes.GetOneEventWhitelistPending{
+				RefID: s.FormatRefIdToStr(wl.AttendeeRefID),
 			})
 		}
 	}
@@ -775,21 +1155,26 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		}
 	}
 	finalRes := dtoRes.GetOneEventRes{
-		Name:            result.Name,
-		Organizer:       result.Organizer,
-		Description:     result.Description,
-		StartTime:       result.StartTime.UTC(),
-		EndTime:         result.EndTime.UTC(),
-		Location:        result.Location,
-		LocationLat:     result.LocationPoint.Y,
-		LocationLong:    result.LocationPoint.X,
-		TotalRegistered: result.TotalRegistered,
-		EvaluationForm:  result.EvaluationForm,
-		AllowAllToScan:  result.AllowAllToScan,
-		RevealedFields:  revealedFields,
-		Role:            result.Role,
-		Agenda:          agendaDTO,
-		User:            usersDTO,
+		Name:             result.Name,
+		Organizer:        result.Organizer,
+		Description:      result.Description,
+		StartTime:        result.StartTime.UTC(),
+		EndTime:          result.EndTime.UTC(),
+		Location:         result.Location,
+		LocationLat:      result.LocationPoint.Y,
+		LocationLong:     result.LocationPoint.X,
+		TotalRegistered:  result.TotalRegistered,
+		EvaluationForm:   result.EvaluationForm,
+		AllowAllToScan:   result.AllowAllToScan,
+		RevealedFields:   revealedFields,
+		AttendanceType:   result.AttendenceType,
+		Role:             result.Role,
+		Agenda:           agendaDTO,
+		User:             usersDTO,
+		UserPending:      usersPendingDTO,
+		AllowedFaculties: allowedFacDTO,
+		WhiteList:        whitelistDTO,
+		WhiteListPending: whitelistPendingDTO,
 	}
 
 	return &finalRes, nil
@@ -840,9 +1225,13 @@ func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string
 			}
 		}
 		if pageInt < 0 {
+			// Paging is 0-based (page=0 is the first page); OFFSET uses
+			// page*pageSize directly. Keep this message honest about that —
+			// a client that "fixes" this by sending page=1 would silently
+			// skip the first page of results.
 			return nil, &response.APIError{
 				Code:    response.ErrBadRequest,
-				Message: "URL query parameter 'page' must be greater than 0",
+				Message: "URL query parameter 'page' must be 0 or greater",
 				Status:  400,
 			}
 		}
@@ -1059,7 +1448,21 @@ func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetDiscoveryEv
 	}
 }
 
-func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq) (*dtoRes.CreateEventRes, error) {
+func (s *service) CreateEvent(ctx context.Context, req dtoReq.CreateEventReq, userId string) (*dtoRes.CreateEventRes, error) {
+	userIdUUID, err := uuid.Parse(userId)
+	if err != nil {
+		return nil, errors.New("Invalid user id")
+	}
+
+	// The requester always becomes the event's owner. We derive this from their
+	// authenticated identity rather than trusting the client to supply a correct
+	// OWNER entry in managers_and_staff (it previously could omit one entirely,
+	// silently creating events with no owner at all).
+	req.ManagersAndStaff, err = s.ensureRequesterIsOwner(req.ManagersAndStaff, userIdUUID, ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	payload, err := buildCreateOrUpdatePayload(req)
 	if err != nil {
 		return nil, err
@@ -1084,6 +1487,28 @@ func (s *service) UpdateEvent(ctx context.Context, id string, userId string, req
 	if role == nil || (*role != string(entity.OWNER) && *role != string(entity.MANAGER)) {
 		return nil, errors.New("Cannot update event; user is not owner or manager")
 	}
+
+	// UpdateEvent replaces event_users wholesale from managers_and_staff below.
+	// Ownership can never be assigned through this endpoint — the client (e.g.
+	// the edit form) never includes the OWNER entry, and a MANAGER (who is
+	// allowed to call this endpoint) must not be able to grant OWNER to
+	// themselves or anyone else by simply including an OWNER entry in the
+	// request. Strip whatever the client sent for OWNER and re-derive it from
+	// the DB every time.
+	req.ManagersAndStaff = stripOwnerEntries(req.ManagersAndStaff)
+
+	ownerRefID, ownerErr := s.repo.Event.GetEventOwnerRefID(idUUID, ctx)
+	if ownerErr != nil && ownerErr != gorm.ErrRecordNotFound {
+		return nil, ownerErr
+	}
+	if ownerErr == nil {
+		req.ManagersAndStaff = append(req.ManagersAndStaff, dtoReq.ManagerStaffReq{
+			RefID: ownerRefID,
+			Role:  string(entity.OWNER),
+		})
+	}
+	// ownerErr == gorm.ErrRecordNotFound: this event predates the owner fix
+	// and has no owner row yet; leave it as-is until backfilled.
 
 	payload, err := buildCreateOrUpdatePayload(dtoReq.CreateEventReq(req))
 	if err != nil {
@@ -1133,9 +1558,12 @@ func buildCreateOrUpdatePayload(req dtoReq.CreateEventReq) (entity.CreateEventPa
 		return entity.CreateEventPayload{}, err
 	}
 
+	// Point.X is longitude and Point.Y is latitude everywhere else in this
+	// codebase (see DuplicateById and the read-back in GetOneEventService) —
+	// keep create/update consistent with that convention.
 	locationPoint := entity.Point{
-		X: req.LocationLat,
-		Y: req.LocationLong,
+		X: req.LocationLong,
+		Y: req.LocationLat,
 	}
 
 	event := entity.Event{
@@ -1187,6 +1615,7 @@ func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput,
 
 	out := make([]entity.EventUserInput, 0, len(in))
 	seenRole := make(map[uint64]string, len(in)) // ref_id -> role string
+	ownerCount := 0
 
 	for _, m := range in {
 		r, err := entity.ParseRole(m.Role)
@@ -1203,10 +1632,18 @@ func buildEventUsersInput(in []dtoReq.ManagerStaffReq) ([]entity.EventUserInput,
 		}
 
 		seenRole[m.RefID] = rs
+		if r == entity.OWNER {
+			ownerCount += 1
+		}
+
 		out = append(out, entity.EventUserInput{
 			RefID: m.RefID,
 			Role:  r,
 		})
+	}
+
+	if ownerCount != 1 {
+		return nil, fmt.Errorf("require exactly one owner in manager_and_staff")
 	}
 
 	return out, nil
@@ -1358,4 +1795,31 @@ func anyToUint8(v any) (uint8, error) {
 		return 0, fmt.Errorf("out of range")
 	}
 	return uint8(u), nil
+}
+
+// POST /events helper function.
+// Ensures the authenticated requester ends up listed as the event's owner.
+// If the client already listed an OWNER, it must match the requester (you
+// cannot hand ownership to someone else on creation). If the client listed
+// no OWNER at all, the requester is appended as owner automatically instead
+// of silently creating an event with nobody attached to it.
+func (s *service) ensureRequesterIsOwner(req []dtoReq.ManagerStaffReq, userId uuid.UUID, ctx context.Context) ([]dtoReq.ManagerStaffReq, error) {
+	user, err := s.repo.Auth.GetUserById(datatypes.UUID(userId), ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, person := range req {
+		if person.Role == string(entity.OWNER) {
+			if user.RefID != person.RefID {
+				return nil, errors.New("User must list themselves as the event's owner in managers_and_staff")
+			}
+			return req, nil
+		}
+	}
+
+	return append(req, dtoReq.ManagerStaffReq{
+		RefID: user.RefID,
+		Role:  string(entity.OWNER),
+	}), nil
 }

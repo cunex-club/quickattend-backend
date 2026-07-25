@@ -1,11 +1,6 @@
 package response
 
-type VerifyTokenRes struct {
-	AccessToken string `json:"access_token"`
-}
-
-type GetAuthUserRes struct {
-	ID            string  `json:"id"`
+type GetUserByRefIdRes struct {
 	RefID         string  `json:"ref_id"`
 	UserType      string  `json:"user_type"`
 	FirstnameTH   *string `json:"firstname_th"`

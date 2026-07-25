@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -24,6 +25,8 @@ type AuthService interface {
 	VerifyCUNEXToken(string, context.Context) (*dtoRes.VerifyTokenRes, *response.APIError)
 	CreateUserIfNotExists(*entity.User, context.Context) (*entity.User, *response.APIError)
 }
+
+const sessionLifetime = 8 * time.Hour
 
 func (s *service) GetUserService(userIDStr string, ctx context.Context) (*dtoRes.GetAuthUserRes, *response.APIError) {
 	uuidValidateErr := uuid.Validate(userIDStr)
@@ -55,14 +58,17 @@ func (s *service) GetUserService(userIDStr string, ctx context.Context) (*dtoRes
 	}
 
 	userDTO := dtoRes.GetAuthUserRes{
-		ID:          user.ID.String(),
-		RefID:       s.FormatRefIdToStr(user.RefID),
-		FirstnameTH: user.FirstnameTH,
-		SurnameTH:   user.SurnameTH,
-		TitleTH:     user.TitleTH,
-		FirstnameEN: user.FirstnameEN,
-		SurnameEN:   user.SurnameEN,
-		TitleEN:     user.TitleEN,
+		ID:            user.ID.String(),
+		RefID:         s.FormatRefIdToStr(user.RefID),
+		UserType:      string(user.UserType),
+		FirstnameTH:   user.FirstnameTH,
+		SurnameTH:     user.SurnameTH,
+		TitleTH:       user.TitleTH,
+		FacultyNameTH: user.FacultyNameTH,
+		FirstnameEN:   user.FirstnameEN,
+		SurnameEN:     user.SurnameEN,
+		TitleEN:       user.TitleEN,
+		FacultyNameEN: user.FacultyNameEN,
 	}
 
 	return &userDTO, nil
@@ -91,7 +97,6 @@ func (s *service) CreateUserIfNotExists(user *entity.User, ctx context.Context) 
 	return created, nil
 }
 
-
 func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.VerifyTokenRes, *response.APIError) {
 	if strings.TrimSpace(token) == "" {
 		return nil, &response.APIError{
@@ -112,7 +117,7 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	ClientId := s.cfg.LLEConfig.ClientId
+	ClientId := s.cfg.LLEConfig.ClientID
 	if ClientId == "" {
 		return nil, &response.APIError{
 			Code:    "ClientId_NOT_FOUND",
@@ -155,6 +160,13 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 			Status:  http.StatusUnauthorized,
 		}
 	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "unexpected response from CU NEX profile API",
+			Status:  http.StatusBadGateway,
+		}
+	}
 
 	var UserData entity.CUNEXProfileResponse
 	if err := json.NewDecoder(resp.Body).Decode(&UserData); err != nil {
@@ -165,7 +177,14 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
-	convRefId, convRefIdErr := strconv.ParseUint(UserData.RefId, 10, 64)
+	if UserData.RefId == nil || strings.TrimSpace(*UserData.RefId) == "" {
+		return nil, &response.APIError{
+			Code:    response.ErrUnauthorized,
+			Message: "CU NEX profile does not contain a refId",
+			Status:  http.StatusUnauthorized,
+		}
+	}
+	convRefId, convRefIdErr := strconv.ParseUint(*UserData.RefId, 10, 64)
 
 	if convRefIdErr != nil {
 		return nil, &response.APIError{
@@ -175,42 +194,70 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		}
 	}
 
+	userType, validUserType := entity.ParseUserType(UserData.UserType)
+	if !validUserType {
+		return nil, &response.APIError{
+			Code:    response.ErrUnauthorized,
+			Message: "CU NEX profile returned an unsupported userType",
+			Status:  http.StatusUnauthorized,
+		}
+	}
+
 	User := entity.User{
-		RefID:       convRefId,
-		FirstnameTH: UserData.FirstNameTH,
-		SurnameTH:   UserData.LastNameTH,
-		FirstnameEN: UserData.FirstNameEN,
-		SurnameEN:   UserData.LastNameEN,
-		TitleTH:     UserData.TitleNameTH,
-		TitleEN:     UserData.TitleNameEN,
+		RefID:         convRefId,
+		UserType:      userType,
+		FirstnameTH:   UserData.FirstNameTH,
+		SurnameTH:     UserData.LastNameTH,
+		FirstnameEN:   UserData.FirstNameEN,
+		SurnameEN:     UserData.LastNameEN,
+		TitleTH:       UserData.TitleNameTH,
+		TitleEN:       UserData.TitleNameEN,
+		FacultyNameTH: UserData.FacultyNameTH,
+		FacultyNameEN: UserData.FacultyNameEN,
 	}
 
 	// // ### MOCK USER DATA ###
 	// User := entity.User{
-	// 	RefID:       987654321,
-	// 	FirstnameTH: "AB",
-	// 	SurnameTH:   "CD",
-	// 	TitleTH:     "EEEE",
-	// 	FirstnameEN: "FG",
-	// 	SurnameEN:   "HI",
-	// 	TitleEN:     "JJJJ",
+	// 	RefID:         987654321,
+	// 	FirstnameTH:   "AB",
+	// 	SurnameTH:     "CD",
+	// 	TitleTH:       "EEEE",
+	// 	FirstnameEN:   "FG",
+	// 	SurnameEN:     "HI",
+	// 	TitleEN:       "JJJJ",
+	// 	FacultyNameTH: "KK",
+	// 	FacultyNameEN: "LL",
 	// }
 
-	createdUser, createdUserErr := s.CreateUserIfNotExists(&User, ctx)
-	if createdUserErr != nil {
+	upsertUser, upsertErr := s.repo.Auth.UpsertUserByRefId(&User, nil, ctx)
+	if upsertErr != nil {
+		s.logger.Error().
+			Err(upsertErr).
+			Uint64("user_ref_id", convRefId).
+			Str("action", "upsert_user_by_ref_id").
+			Msg("failed to upsert user by ref id")
+
 		return nil, &response.APIError{
-			Code:    createdUserErr.Code,
-			Message: createdUserErr.Message,
-			Status:  createdUserErr.Status,
+			Code:    response.ErrInternalError,
+			Message: "Failed to upsert user by ref id",
+			Status:  500,
 		}
 	}
 
-	if err := s.repo.Auth.SyncWhitelistPendingToWhitelist(ctx, createdUser.RefID); err != nil {
+	if err := s.repo.Auth.SyncWhitelistPendingToWhitelist(ctx, upsertUser.RefID); err != nil {
 		s.logger.Error().
 			Err(err).
-			Uint64("user_ref_id", createdUser.RefID).
+			Uint64("user_ref_id", upsertUser.RefID).
 			Str("action", "sync_whitelist_pending").
 			Msg("failed to sync whitelist pending to whitelist")
+	}
+
+	if err := s.repo.Auth.SyncEventUserPendingToEventUser(ctx, upsertUser.ID, upsertUser.RefID); err != nil {
+		s.logger.Error().
+			Err(err).
+			Uint64("user_ref_id", upsertUser.RefID).
+			Str("action", "sync_event_user_pending").
+			Msg("failed to sync event user pending to event user")
 	}
 
 	var (
@@ -218,9 +265,14 @@ func (s *service) VerifyCUNEXToken(token string, ctx context.Context) (*dtoRes.V
 		t   *jwt.Token
 	)
 
+	now := time.Now()
 	t = jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
-			"user_id": createdUser.ID.String(),
+			"user_id":   upsertUser.ID.String(),
+			"ref_id":    *UserData.RefId,
+			"user_type": string(userType),
+			"iat":       now.Unix(),
+			"exp":       now.Add(sessionLifetime).Unix(),
 		})
 
 	JWTSecret := s.cfg.JWTSecret

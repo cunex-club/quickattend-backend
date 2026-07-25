@@ -3,16 +3,20 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE TYPE attendence_type AS ENUM ('WHITELIST', 'FACULTIES', 'ALL');
 CREATE TYPE role AS ENUM ('OWNER', 'STAFF', 'MANAGER');
 CREATE TYPE participant_data AS ENUM ('NAME', 'ORGANIZATION', 'REFID', 'PHOTO');
+CREATE TYPE user_type AS ENUM ('student', 'staff');
 
 CREATE TABLE "users" (
     "id" uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     "ref_id" bigint NOT NULL UNIQUE,
-    "firstname_th" text NOT NULL,
-    "surname_th" text NOT NULL,
-    "title_th" text NOT NULL,
-    "firstname_en" text NOT NULL,
-    "surname_en" text NOT NULL,
-    "title_en" text NOT NULL
+    "user_type" user_type NOT NULL,
+    "firstname_th" text,
+    "surname_th" text,
+    "title_th" text,
+    "faculty_name_th" text,
+    "firstname_en" text,
+    "surname_en" text,
+    "title_en" text,
+    "faculty_name_en" text
 );
 
 CREATE TABLE "events" (
@@ -71,7 +75,7 @@ CREATE TABLE "event_participants" (
     "comment" text,
     "scanned_timestamp" timestamptz NOT NULL,
     "participant_id" uuid NOT NULL,
-    "organization" text NOT NULL,
+    "organization" text,
     "scanned_location" point NOT NULL,
     "scanner_id" uuid,
 
@@ -104,6 +108,17 @@ CREATE TABLE "event_whitelist_pendings" (
 
     CONSTRAINT "whitelist_pendings_unique_event_and_ref_id" UNIQUE ("event_id", "attendee_ref_id"),
     CONSTRAINT "fk_event_whitelist_pendings_event" FOREIGN KEY ("event_id") 
+        REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE "event_user_pendings" (
+    "id" uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    "role" role NOT NULL,
+    "user_ref_id" bigint NOT NULL,
+    "event_id" uuid NOT NULL,
+
+    CONSTRAINT "unique_user_and_event_pendings" UNIQUE ("user_ref_id", "event_id"),
+    CONSTRAINT "fk_event_user_pendings_event" FOREIGN KEY ("event_id") 
         REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
 

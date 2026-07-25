@@ -203,9 +203,11 @@ type Event struct {
 	EvaluationForm        *string                 `gorm:"type:text;index:idx_events_evaluation_form_trgm,type:gin" json:"evaluation_form"`
 	RevealedFields        ParticipantField        `gorm:"type:participant_data[];not null" json:"revealed_fields"`
 	EventWhitelist        []EventWhitelist        `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_whitelist"`
+	EventWhitelistPending []EventWhitelistPending `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_whitelist_pendings"`
 	EventAllowedFaculties []EventAllowedFaculties `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_allowed_faculties"`
 	EventAgenda           []EventAgenda           `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_agenda"`
 	EventUser             []EventUser             `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_users"`
+	EventUserPending      []EventUserPending      `gorm:"foreignKey:EventID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE" json:"event_user_pendings"`
 }
 
 type EventWhitelist struct {
@@ -250,7 +252,7 @@ type EventParticipants struct {
 	ScannedTimestamp time.Time       `gorm:"type:timestamptz;not null" json:"scanned_timestamp"`
 	Comment          *string         `gorm:"type:text" json:"comment"`
 	ParticipantID    datatypes.UUID  `gorm:"type:uuid;not null;index:unique_event_and_participant,unique" json:"participant_id"`
-	Organization     string          `gorm:"type:text;not null" json:"organization"`
+	Organization     *string         `gorm:"type:text" json:"organization"`
 	ScannedLocation  Point           `gorm:"type:point;not null" json:"scanned_location"`
 	ScannerID        *datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
 
@@ -263,13 +265,14 @@ type EventParticipants struct {
 
 // For retrieving result from DB in EventRepository.GetUserForCheckin
 type CheckinUserQuery struct {
-	TitleTH string `gorm:"column:title_th"`
-	TitleEN string `gorm:"column:title_en"`
+	TitleTH *string `gorm:"column:title_th"`
+	TitleEN *string `gorm:"column:title_en"`
 }
 
 // For retrieving result from DB in EventRepository.GetEventForCheckin
 type CheckinEventQuery struct {
 	AttendenceType  AttendanceType   `gorm:"column:attendence_type"`
+	StartTime       time.Time        `gorm:"column:start_time"`
 	EndTime         time.Time        `gorm:"column:end_time"`
 	AllowAllToScan  bool             `gorm:"column:allow_all_to_scan"`
 	RevealedFields  ParticipantField `gorm:"column:revealed_fields"`
@@ -296,6 +299,27 @@ type GetOneEventQuery struct {
 	Event
 	Role            *string `gorm:"column:role"`
 	TotalRegistered uint16  `gorm:"column:total_registered"`
+}
+
+// ====================================================
+
+type EventParticipantExportRow struct {
+	ScannedTimestamp time.Time `gorm:"column:scanned_timestamp"`
+	UserType         UserTypes `gorm:"column:user_type"`
+	RefID            uint64    `gorm:"column:ref_id"`
+	FirstnameTH      *string   `gorm:"column:firstname_th"`
+	SurnameTH        *string   `gorm:"column:surname_th"`
+	FirstnameEN      *string   `gorm:"column:firstname_en"`
+	SurnameEN        *string   `gorm:"column:surname_en"`
+	Organization     *string   `gorm:"column:organization"`
+	ScannerRefID     *uint64   `gorm:"column:scanner_ref_id"`
+	Comment          *string   `gorm:"column:comment"`
+}
+
+type EventParticipantExportData struct {
+	EventName string
+	StartTime time.Time
+	Rows      []EventParticipantExportRow
 }
 
 // ====================================================

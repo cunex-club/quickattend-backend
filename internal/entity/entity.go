@@ -7,4 +7,5 @@ var (
 	ErrAlreadyCommented = errors.New("already commented")
 	ErrCheckInTargetNotFound = errors.New("check in target not found")
 	ErrInsufficientPermissions = errors.New("insufficient permissions")
+	ErrEventNotStarted = errors.New("event has not started yet")
 )

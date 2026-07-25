@@ -2,6 +2,8 @@ package response
 
 import (
 	"time"
+
+	"github.com/cunex-club/quickattend-backend/internal/entity"
 )
 
 type DuplicateEventRes struct {
@@ -16,7 +18,7 @@ const (
 	FAIL      status = "fail"
 )
 
-type GetParticipantRes struct {
+type PostParticipantRes struct {
 	FirstnameTH     *string   `json:"firstname_th"`
 	SurnameTH       *string   `json:"surname_th"`
 	TitleTH         *string   `json:"title_th"`
@@ -39,31 +41,66 @@ type GetOneEventAgenda struct {
 }
 
 type GetOneEventUser struct {
-	FirstnameTH string `json:"firstname_th"`
-	SurnameTH   string `json:"surname_th"`
-	TitleTH     string `json:"title_th"`
-	FirstnameEN string `json:"firstname_en"`
-	SurnameEN   string `json:"surname_en"`
-	TitleEN     string `json:"title_en"`
-	Role        string `json:"role"`
+	RefID         string  `json:"ref_id"`
+	UserType      string  `json:"user_type"`
+	FirstnameTH   *string `json:"firstname_th"`
+	SurnameTH     *string `json:"surname_th"`
+	TitleTH       *string `json:"title_th"`
+	FacultyNameTH *string `json:"faculty_name_th"`
+	FirstnameEN   *string `json:"firstname_en"`
+	SurnameEN     *string `json:"surname_en"`
+	TitleEN       *string `json:"title_en"`
+	FacultyNameEN *string `json:"faculty_name_en"`
+	Role          string  `json:"role"`
+}
+
+type GetOneEventUserPending struct {
+	RefID string `json:"ref_id"`
+	Role  string `json:"role"`
+}
+
+type GetOneEventAllowedFaculties struct {
+	FacultyNO uint8 `json:"faculty_no"`
+}
+
+type GetOneEventWhitelist struct {
+	RefID         string  `json:"ref_id"`
+	UserType      string  `json:"user_type"`
+	FirstnameTH   *string `json:"firstname_th"`
+	SurnameTH     *string `json:"surname_th"`
+	TitleTH       *string `json:"title_th"`
+	FacultyNameTH *string `json:"faculty_name_th"`
+	FirstnameEN   *string `json:"firstname_en"`
+	SurnameEN     *string `json:"surname_en"`
+	TitleEN       *string `json:"title_en"`
+	FacultyNameEN *string `json:"faculty_name_en"`
+}
+
+type GetOneEventWhitelistPending struct {
+	RefID string `json:"ref_id"`
 }
 
 type GetOneEventRes struct {
-	Name            string              `json:"name"`
-	Organizer       string              `json:"organizer"`
-	Description     *string             `json:"description"`
-	StartTime       time.Time           `json:"start_time"`
-	EndTime         time.Time           `json:"end_time"`
-	Location        string              `json:"location"`
-	LocationLat     float64             `json:"location_lat"`
-	LocationLong    float64             `json:"location_long"`
-	TotalRegistered uint16              `json:"total_registered"`
-	EvaluationForm  *string             `json:"evaluation_form"`
-	AllowAllToScan  bool                `json:"allow_all_to_scan"`
-	RevealedFields  []string            `json:"revealed_fields"`
-	Role            *string             `json:"role"`
-	Agenda          []GetOneEventAgenda `json:"agenda"`
-	User            []GetOneEventUser   `json:"users"`
+	Name             string                        `json:"name"`
+	Organizer        string                        `json:"organizer"`
+	Description      *string                       `json:"description"`
+	StartTime        time.Time                     `json:"start_time"`
+	EndTime          time.Time                     `json:"end_time"`
+	Location         string                        `json:"location"`
+	LocationLat      float64                       `json:"location_lat"`
+	LocationLong     float64                       `json:"location_long"`
+	TotalRegistered  uint16                        `json:"total_registered"`
+	EvaluationForm   *string                       `json:"evaluation_form"`
+	AllowAllToScan   bool                          `json:"allow_all_to_scan"`
+	AttendanceType   entity.AttendanceType         `json:"attendance_type"`
+	RevealedFields   []string                      `json:"revealed_fields"`
+	Role             *string                       `json:"role"`
+	Agenda           []GetOneEventAgenda           `json:"agenda"`
+	User             []GetOneEventUser             `json:"users"`
+	UserPending      []GetOneEventUserPending      `json:"users_pending"`
+	AllowedFaculties []GetOneEventAllowedFaculties `json:"allowed_faculties"`
+	WhiteList        []GetOneEventWhitelist        `json:"whitelist"`
+	WhiteListPending []GetOneEventWhitelistPending `json:"whitelist_pending"`
 }
 
 type GetEventsRes struct {

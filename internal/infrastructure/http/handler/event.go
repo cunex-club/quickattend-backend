@@ -20,6 +20,21 @@ type EventHandler interface {
 	GetEvents(*fiber.Ctx) error
 	CreateEvent(c *fiber.Ctx) error
 	UpdateEvent(c *fiber.Ctx) error
+	ExportEventParticipants(c *fiber.Ctx) error
+}
+
+func (h *Handler) ExportEventParticipants(c *fiber.Ctx) error {
+	eventID := c.Params("id")
+	userID, ok := c.Locals("user_id").(string)
+	if !ok {
+		return response.SendError(c, fiber.StatusUnauthorized, response.ErrUnauthorized, "missing authenticated user")
+	}
+
+	filename, content, apiErr := h.Service.Event.ExportEventParticipants(c.UserContext(), eventID, userID)
+	if apiErr != nil {
+		return response.SendError(c, apiErr.Status, apiErr.Code, apiErr.Message)
+	}
+	return response.Excel(c, filename, content)
 }
 
 func (h *Handler) Delete(c *fiber.Ctx) error {
@@ -47,7 +62,15 @@ func (h *Handler) Duplicate(c *fiber.Ctx) error {
 	EventID := c.Params("id")
 	userIDStr := c.Locals("user_id").(string)
 
-	res, err := h.Service.Event.DuplicateById(EventID, userIDStr, c.UserContext())
+	var reqBody dtoReq.DuplicateEventReq
+	if err := c.BodyParser(&reqBody); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "Invalid JSON body")
+	}
+	if err := h.Validator.Struct(reqBody); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "Invalid JSON body")
+	}
+
+	res, err := h.Service.Event.DuplicateById(reqBody, EventID, userIDStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
@@ -62,7 +85,9 @@ func (h *Handler) Comment(c *fiber.Ctx) error {
 		return response.SendError(c, 400, response.ErrBadRequest, "invalid JSON body")
 	}
 
-	err := h.Service.Event.Comment(req, c.UserContext())
+	userIDStr, _ := c.Locals("user_id").(string)
+
+	err := h.Service.Event.Comment(req, userIDStr, c.UserContext())
 	if err != nil {
 		return response.SendError(c, err.Status, err.Code, err.Message)
 	}
@@ -146,6 +171,11 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 }
 
 func (h *Handler) CreateEvent(c *fiber.Ctx) error {
+	userIdStr, ok := c.Locals("user_id").(string)
+	if !ok {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "expect string user_id in JWT")
+	}
+
 	var req dtoReq.CreateEventReq
 	if err := c.BodyParser(&req); err != nil {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
@@ -155,7 +185,7 @@ func (h *Handler) CreateEvent(c *fiber.Ctx) error {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
 	}
 
-	res, err := h.Service.Event.CreateEvent(c.Context(), req)
+	res, err := h.Service.Event.CreateEvent(c.UserContext(), req, userIdStr)
 	if err != nil {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrValidation, err.Error())
 	}
@@ -179,7 +209,7 @@ func (h *Handler) UpdateEvent(c *fiber.Ctx) error {
 		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid json body")
 	}
 
-	res, err := h.Service.Event.UpdateEvent(c.Context(), id, userIdStr, req)
+	res, err := h.Service.Event.UpdateEvent(c.UserContext(), id, userIdStr, req)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.SendError(c, fiber.StatusNotFound, response.ErrNotFound, "not found")

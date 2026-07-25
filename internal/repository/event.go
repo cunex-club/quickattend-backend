@@ -19,8 +19,12 @@ type EventRepository interface {
 	DeleteById(uuid.UUID, string, context.Context) error
 	Create(*entity.Event, context.Context) (*entity.Event, error)
 	Comment(uuid.UUID, time.Time, string, context.Context) error
+	// GetEventIDForCheckInRow looks up which event a check-in row belongs to,
+	// so callers can authorize a comment write before touching the row.
+	GetEventIDForCheckInRow(checkInRowId uuid.UUID, ctx context.Context) (uuid.UUID, error)
 	IsUserEventOwner(eventID uuid.UUID, userIDStr string, ctx context.Context) (bool, error)
 	GetUserRoleInEvent(eventID uuid.UUID, userID uuid.UUID, ctx context.Context) (*string, error)
+	GetEventOwnerRefID(eventID uuid.UUID, ctx context.Context) (uint64, error)
 
 	// For POST participant/:qrcode. Get user info not provided by CU NEX
 	GetUserForCheckin(ctx context.Context, refID uint64) (user *entity.CheckinUserQuery, err error)
@@ -29,7 +33,7 @@ type EventRepository interface {
 	// Check if user has already checked in to the event
 	CheckEventParticipation(ctx context.Context, eventId datatypes.UUID, participantID datatypes.UUID) (rowId *datatypes.UUID, err error)
 	// Check if user is in whitelist / allowed org or faculty of the event
-	CheckEventAccess(ctx context.Context, orgCode uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
+	CheckEventAccess(ctx context.Context, orgCode *uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (allow bool, err error)
 	InsertScanRecord(ctx context.Context, record *entity.EventParticipants) (rowId *datatypes.UUID, err error)
 
 	GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (result *entity.GetOneEventQuery, err error)
@@ -40,6 +44,39 @@ type EventRepository interface {
 
 	CreateEvent(ctx context.Context, payload entity.CreateEventPayload) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, payload entity.CreateEventPayload) (*dtoRes.UpdateEventRes, error)
+	GetScannedParticipantsForExport(ctx context.Context, eventID datatypes.UUID) (*entity.EventParticipantExportData, error)
+}
+
+func (r *repository) GetScannedParticipantsForExport(ctx context.Context, eventID datatypes.UUID) (*entity.EventParticipantExportData, error) {
+	db := r.db.WithContext(ctx)
+
+	var event entity.Event
+	if err := db.Select("name", "start_time").First(&event, "id = ?", eventID).Error; err != nil {
+		return nil, err
+	}
+
+	rows := make([]entity.EventParticipantExportRow, 0)
+	if err := db.Table("event_participants AS ep").
+		Select(`ep.scanned_timestamp,
+			u.user_type, u.ref_id,
+			u.firstname_th, u.surname_th,
+			u.firstname_en, u.surname_en,
+			ep.organization,
+			scanner.ref_id AS scanner_ref_id,
+			ep.comment`).
+		Joins("JOIN users u ON u.id = ep.participant_id").
+		Joins("LEFT JOIN users scanner ON scanner.id = ep.scanner_id").
+		Where("ep.event_id = ?", eventID).
+		Order("ep.scanned_timestamp ASC").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	return &entity.EventParticipantExportData{
+		EventName: event.Name,
+		StartTime: event.StartTime,
+		Rows:      rows,
+	}, nil
 }
 
 type GetEventsArguments struct {
@@ -50,6 +87,27 @@ type GetEventsArguments struct {
 	Ctx      context.Context
 }
 
+func (r *repository) GetEventIDForCheckInRow(checkInRowId uuid.UUID, ctx context.Context) (uuid.UUID, error) {
+	// Scan into a string rather than straight into a UUID type: datatypes.UUID
+	// is a [16]byte array, and GORM treats an array destination as a
+	// multi-row scan (see CheckEventParticipation, which does the same).
+	var eventIDStr string
+	err := r.db.WithContext(ctx).
+		Model(&entity.EventParticipants{}).
+		Select("event_id").
+		Where("id = ?", checkInRowId).
+		Take(&eventIDStr).Error
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	eventID, err := uuid.Parse(eventIDStr)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return eventID, nil
+}
+
 func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, comment string, ctx context.Context) error {
 	if checkInRowId == uuid.Nil {
 		return entity.ErrNilUUID
@@ -57,8 +115,7 @@ func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, commen
 
 	result := r.db.WithContext(ctx).
 		Model(&entity.EventParticipants{}).
-		// Where("id = ? AND comment_timestamp IS NULL", checkInRowId).
-		Where("id = ?", checkInRowId).
+		Where("id = ? AND comment_timestamp IS NULL", checkInRowId).
 		Updates(map[string]any{
 			"comment_timestamp": timeStamp,
 			"comment":           comment,
@@ -92,11 +149,18 @@ func (r *repository) Comment(checkInRowId uuid.UUID, timeStamp time.Time, commen
 
 func (r *repository) FindById(id uuid.UUID, ctx context.Context) (*entity.Event, error) {
 	var event entity.Event
+
+	// Only preload what's necessary for event duplication
 	err := r.db.WithContext(ctx).
-		Preload("EventWhitelist").
+		Model(&entity.Event{}).
+		Preload("EventUser.User").
+		Preload("EventUserPending").
 		Preload("EventAllowedFaculties").
-		Preload("EventAgenda").
-		First(&event, "id = ?", id).Error
+		Preload("EventWhitelist.User").
+		Preload("EventWhitelistPending").
+		Where("id = ?", id).
+		First(&event).
+		Error
 	if err != nil {
 		return nil, err
 	}
@@ -133,28 +197,59 @@ func (r *repository) DeleteById(id uuid.UUID, userIdStr string, ctx context.Cont
 func (r *repository) GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, ctx context.Context) (*entity.GetOneEventQuery, error) {
 	withCtx := r.db.WithContext(ctx)
 
-	var result entity.GetOneEventQuery
-	err := withCtx.
+	var event entity.Event
+	errEvent := withCtx.
 		Model(&entity.Event{}).
-		Preload("EventUser.User").
+		Preload("EventUser.User", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("ref_id")
+		}).
+		Preload("EventUserPending", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("user_ref_id")
+		}).
 		Preload("EventAgenda", func(tx *gorm.DB) *gorm.DB {
 			return tx.Order("start_time")
 		}).
-		Select("events.*",
-			"eu.role AS role",
-			"COUNT(DISTINCT ep.participant_id) AS total_registered",
-		).
-		Joins("LEFT JOIN event_participants ep ON events.id = ep.event_id").
-		Joins("LEFT JOIN event_users eu ON events.id = eu.event_id AND eu.user_id = ?", userId).
-		Where("events.id = ?", eventId).
-		Group("events.id, eu.role").
-		First(&result).
+		Preload("EventAllowedFaculties", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("faculty_no")
+		}).
+		Preload("EventWhitelist.User", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("ref_id")
+		}).
+		Preload("EventWhitelistPending", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("attendee_ref_id")
+		}).
+		Where("id = ?", eventId).
+		First(&event).
 		Error
-
-	if err != nil {
-		return nil, err
+	if errEvent != nil {
+		return nil, errEvent
 	}
 
+	var registerCount uint16
+	errCount := withCtx.Model(&entity.EventParticipants{}).
+		Select("COUNT(DISTINCT participant_id)").
+		Where("event_id = ?", eventId).
+		Scan(&registerCount).
+		Error
+	if errCount != nil {
+		return nil, errCount
+	}
+
+	var role *string
+	errRole := withCtx.Model(&entity.EventUser{}).
+		Select("role").
+		Where("user_id = ? AND event_id = ?", userId, eventId).
+		Scan(&role).
+		Error
+	if errRole != nil {
+		return nil, errRole
+	}
+
+	result := entity.GetOneEventQuery{
+		Event:           event,
+		Role:            role,
+		TotalRegistered: registerCount,
+	}
 	return &result, nil
 }
 
@@ -303,7 +398,7 @@ func (r *repository) GetEventForCheckin(ctx context.Context, eventId datatypes.U
 
 	var event entity.CheckinEventQuery
 	getEventErr := withCtx.Raw(`
-			SELECT e.end_time, e.attendence_type, e.allow_all_to_scan, e.revealed_fields, 
+			SELECT e.start_time, e.end_time, e.attendence_type, e.allow_all_to_scan, e.revealed_fields,
 				(
 					SELECT (
 						EXISTS
@@ -350,12 +445,18 @@ func (r *repository) CheckEventParticipation(ctx context.Context, eventId dataty
 	return &rowId, nil
 }
 
-func (r *repository) CheckEventAccess(ctx context.Context, orgCode uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (bool, error) {
+func (r *repository) CheckEventAccess(ctx context.Context, orgCode *uint8, refID uint64, attendanceType string, eventId datatypes.UUID) (bool, error) {
 	withCtx := r.db.WithContext(ctx)
 	var found bool
 
 	switch attendanceType {
 	case string(entity.AttendanceFaculties):
+		if orgCode == nil {
+			// No numeric faculty code to compare (e.g. CU NEX returned a
+			// non-numeric code, or the participant has no faculty at all) —
+			// there's nothing for this event's allowed-faculty list to match.
+			return false, nil
+		}
 		checkErr := withCtx.Raw(`SELECT EXISTS (
 			SELECT 1 FROM event_allowed_faculties
 			WHERE event_id = ? AND faculty_no = ?
@@ -367,10 +468,18 @@ func (r *repository) CheckEventAccess(ctx context.Context, orgCode uint8, refID 
 		return found, nil
 
 	case string(entity.AttendanceWhitelist):
-		checkErr := withCtx.Raw(`SELECT EXISTS (
-			SELECT 1 FROM event_whitelists
-			WHERE event_id = ? AND attendee_ref_id = ?
-		) AS subQuery`, eventId, refID).Scan(&found).Error
+		checkErr := withCtx.Raw(`SELECT (
+            SELECT (
+                EXISTS (
+                    SELECT 1 FROM event_whitelists 
+                    WHERE event_id = ? AND attendee_ref_id = ?
+                )
+                OR EXISTS (
+                    SELECT 1 FROM event_whitelist_pendings
+                    WHERE event_id = ? AND attendee_ref_id = ?
+                )
+            ) AS innerSubQuery
+        ) AS subQuery`, eventId, refID, eventId, refID).Scan(&found).Error
 		if checkErr != nil {
 			return false, checkErr
 		}
@@ -421,6 +530,21 @@ func (r *repository) GetUserRoleInEvent(eventID uuid.UUID, userID uuid.UUID, ctx
 
 	v := string(eventUser.Role)
 	return &v, nil
+}
+
+func (r *repository) GetEventOwnerRefID(eventID uuid.UUID, ctx context.Context) (uint64, error) {
+	var refID uint64
+	err := r.db.WithContext(ctx).
+		Table("event_users eu").
+		Select("u.ref_id").
+		Joins("JOIN users u ON u.id = eu.user_id").
+		Where("eu.event_id = ? AND eu.role = ?", eventID, entity.OWNER).
+		Take(&refID).Error
+
+	if err != nil {
+		return 0, err
+	}
+	return refID, nil
 }
 
 func (r *repository) CreateEvent(ctx context.Context, payload entity.CreateEventPayload) (*dtoRes.CreateEventRes, error) {
@@ -478,12 +602,17 @@ func (r *repository) CreateEvent(ctx context.Context, payload entity.CreateEvent
 			}
 		}
 
-		eventUsers, err := buildEventUsersFromInput(ctx, tx, payload.Event.ID, payload.EventUsersInput)
+		eventUsers, eventUsersPend, err := splitEventUserAndPending(ctx, tx, payload.Event.ID, payload.EventUsersInput)
 		if err != nil {
 			return err
 		}
 		if len(eventUsers) > 0 {
 			if err := tx.Create(&eventUsers).Error; err != nil {
+				return err
+			}
+		}
+		if len(eventUsersPend) > 0 {
+			if err := tx.Create(&eventUsersPend).Error; err != nil {
 				return err
 			}
 		}
@@ -541,6 +670,9 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 		if err := tx.Where("event_id = ?", existing.ID).Delete(&entity.EventUser{}).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("event_id = ?", existing.ID).Delete(&entity.EventUserPending{}).Error; err != nil {
+			return err
+		}
 
 		if len(payload.Agendas) > 0 {
 			for i := range payload.Agendas {
@@ -589,12 +721,17 @@ func (r *repository) UpdateEvent(ctx context.Context, id string, payload entity.
 			}
 		}
 
-		eventUsers, err := buildEventUsersFromInput(ctx, tx, existing.ID, payload.EventUsersInput)
+		eventUsers, eventUsersPend, err := splitEventUserAndPending(ctx, tx, existing.ID, payload.EventUsersInput)
 		if err != nil {
 			return err
 		}
 		if len(eventUsers) > 0 {
 			if err := tx.Create(&eventUsers).Error; err != nil {
+				return err
+			}
+		}
+		if len(eventUsersPend) > 0 {
+			if err := tx.Create(&eventUsersPend).Error; err != nil {
 				return err
 			}
 		}
@@ -668,9 +805,9 @@ func splitWhitelistAndPending(ctx context.Context, tx *gorm.DB, wl []entity.Even
 	return okOut, pendOut, nil
 }
 
-func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatypes.UUID, in []entity.EventUserInput) ([]entity.EventUser, error) {
+func splitEventUserAndPending(ctx context.Context, tx *gorm.DB, eventID datatypes.UUID, in []entity.EventUserInput) ([]entity.EventUser, []entity.EventUserPending, error) {
 	if len(in) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// dedup by ref_id (ถ้า ref_id ซ้ำแต่ role ต่างกัน -> error)
@@ -681,7 +818,7 @@ func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatype
 		rs := string(x.Role) // role underlying type = string
 		if old, ok := seenRole[x.RefID]; ok {
 			if old != rs {
-				return nil, fmt.Errorf("duplicate ref_id with different role in managers_and_staff: %d", x.RefID)
+				return nil, nil, fmt.Errorf("duplicate ref_id with different role in managers_and_staff: %d", x.RefID)
 			}
 			continue
 		}
@@ -695,27 +832,36 @@ func buildEventUsersFromInput(ctx context.Context, tx *gorm.DB, eventID datatype
 	}
 
 	var users []entity.User
-	if err := tx.WithContext(ctx).Where("ref_id IN ?", refIDs).Find(&users).Error; err != nil {
-		return nil, err
+	if err := tx.WithContext(ctx).
+		Select("id", "ref_id").
+		Where("ref_id IN ?", refIDs).
+		Find(&users).Error; err != nil {
+		return nil, nil, err
 	}
 
-	userByRef := make(map[uint64]entity.User, len(users))
+	userFromDB := make(map[uint64]entity.User, len(users))
 	for _, u := range users {
-		userByRef[u.RefID] = u
+		userFromDB[u.RefID] = u
 	}
 
-	out := make([]entity.EventUser, 0, len(dedup))
+	outOK := make([]entity.EventUser, 0, len(userFromDB))
+	outPend := make([]entity.EventUserPending, 0)
 	for _, x := range dedup {
-		u, ok := userByRef[x.RefID]
+		u, ok := userFromDB[x.RefID]
 		if !ok {
-			return nil, fmt.Errorf("unknown ref_id in managers_and_staff: %d", x.RefID)
+			outPend = append(outPend, entity.EventUserPending{
+				EventID:   eventID,
+				UserRefID: x.RefID,
+				Role:      x.Role,
+			})
+			continue
 		}
-		out = append(out, entity.EventUser{
+		outOK = append(outOK, entity.EventUser{
 			EventID: eventID,
 			UserID:  u.ID,
 			Role:    x.Role, // ✅ ใช้ role value เดิมได้เลย
 		})
 	}
 
-	return out, nil
+	return outOK, outPend, nil
 }

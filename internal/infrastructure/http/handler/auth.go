@@ -1,10 +1,18 @@
 package handler
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/response"
 )
+
+const sessionCookieMaxAge = 8 * 60 * 60
+
+type cunexTokenRequest struct {
+	Token string `json:"token"`
+}
 
 type AuthHandler interface {
 	AuthCunex(c *fiber.Ctx) error
@@ -33,16 +41,20 @@ func (h *Handler) AuthCallback(c *fiber.Ctx) error {
 		Secure:   true,
 		HTTPOnly: true,
 		SameSite: "Lax",
+		MaxAge:   sessionCookieMaxAge,
 	})
 
-	frontendHomeURL := "https://quickattend.cunex.club/"
-	return c.Redirect(frontendHomeURL, fiber.StatusFound)
+	return c.Redirect(h.Config.FrontendHomeURL, fiber.StatusFound)
 }
 
 func (h *Handler) AuthCunex(c *fiber.Ctx) error {
-	token := c.Query("token")
+	var req cunexTokenRequest
+	if err := c.BodyParser(&req); err != nil {
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "invalid JSON body")
+	}
+	token := strings.TrimSpace(req.Token)
 	if token == "" {
-		return response.SendError(c, 400, response.ErrBadRequest, "missing token in request URL")
+		return response.SendError(c, fiber.StatusBadRequest, response.ErrBadRequest, "missing token in request body")
 	}
 
 	ctx := c.UserContext()
@@ -58,9 +70,10 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 		Secure:   true,
 		HTTPOnly: true,
 		SameSite: "Lax",
+		MaxAge:   sessionCookieMaxAge,
 	})
 
-	return response.OK(c, res)
+	return response.OK(c, fiber.Map{"authenticated": true})
 }
 
 func (h *Handler) AuthUser(c *fiber.Ctx) error {

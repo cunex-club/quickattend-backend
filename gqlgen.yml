@@ -1,0 +1,17 @@
+schema:
+  - internal/infrastructure/http/handler/graphql/*.graphqls
+
+exec:
+  package: graphql
+  layout: single-file
+  filename: internal/infrastructure/http/handler/graphql/generated.go
+
+model:
+  package: model
+  filename: internal/infrastructure/http/handler/graphql/model/models_gen.go
+
+resolver:
+  package: graphql
+  layout: follow-schema
+  dir: internal/infrastructure/http/handler/graphql
+  filename_template: "{name}.resolvers.go"

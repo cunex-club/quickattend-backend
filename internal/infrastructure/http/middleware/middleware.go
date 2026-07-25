@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -14,6 +15,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog/log"
 )
+
+// RequestTimeout bounds how long a request's context stays valid, so a slow
+// downstream call (DB query, etc.) can't hold server resources indefinitely.
+const RequestTimeout = 45 * time.Second
 
 // เก็บ config
 type Middleware struct {
@@ -33,11 +38,19 @@ func (m *Middleware) RequestID() fiber.Handler {
 	return requestid.New()
 }
 
+func (m *Middleware) Timeout() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		ctx, cancel := context.WithTimeout(c.UserContext(), RequestTimeout)
+		defer cancel()
+		c.SetUserContext(ctx)
+		return c.Next()
+	}
+}
+
 // --- CORS Middleware ---
 func (m *Middleware) CORS() fiber.Handler {
-	allowedOrigins := "*"
 	return cors.New(cors.Config{
-		AllowOrigins:     allowedOrigins,
+		AllowOrigins:     m.cfg.AllowedOrigins,
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowCredentials: false,
@@ -115,10 +128,7 @@ func (m *Middleware) AuthRequired() fiber.Handler {
 			return response.SendError(c, fiber.StatusUnauthorized, response.ErrUnauthorized, "Missing user_id claim")
 		}
 
-		role, _ := claimString(claims, "role")
-
 		c.Locals("user_id", userID)
-		c.Locals("role", role)
 
 		return c.Next()
 	}
