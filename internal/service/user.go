@@ -42,15 +42,15 @@ func (s *service) GetUserByRefId(refIdStr string, ctx context.Context) (*dtoRes.
 	}
 
 	return &dtoRes.GetUserByRefIdRes{
-		RefID:           s.FormatRefIdToStr(user.RefID),
-		FirstnameTH:     user.FirstnameTH,
-		SurnameTH:       user.SurnameTH,
-		TitleTH:         user.TitleTH,
-		FacultyNameTH:   user.FacultyNameTH,
-		FirstnameEN:     user.FirstnameEN,
-		SurnameEN:       user.SurnameEN,
-		TitleEN:         user.TitleEN,
-		FacultyNameEN:   user.FacultyNameEN,
-		ProfileImageURL: user.ProfileImageURL,
+		RefID:         s.FormatRefIdToStr(user.RefID),
+		UserType:      string(user.UserType),
+		FirstnameTH:   user.FirstnameTH,
+		SurnameTH:     user.SurnameTH,
+		TitleTH:       user.TitleTH,
+		FacultyNameTH: user.FacultyNameTH,
+		FirstnameEN:   user.FirstnameEN,
+		SurnameEN:     user.SurnameEN,
+		TitleEN:       user.TitleEN,
+		FacultyNameEN: user.FacultyNameEN,
 	}, nil
 }

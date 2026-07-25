@@ -53,17 +53,17 @@ func ParseRole(s string) (role, error) {
 // ====================================================
 
 type User struct {
-	ID              datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	RefID           uint64         `gorm:"type:bigint;not null;unique" json:"ref_id"`
-	FirstnameTH     string         `gorm:"type:text;not null" json:"firstname_th"`
-	SurnameTH       string         `gorm:"type:text;not null" json:"surname_th"`
-	TitleTH         string         `gorm:"type:text;not null" json:"title_th"`
-	FacultyNameTH   string         `gorm:"type:text;not null" json:"faculty_name_th"`
-	FirstnameEN     string         `gorm:"type:text;not null" json:"firstname_en"`
-	SurnameEN       string         `gorm:"type:text;not null" json:"surname_en"`
-	TitleEN         string         `gorm:"type:text;not null" json:"title_en"`
-	FacultyNameEN   string         `gorm:"type:text;not null" json:"faculty_name_en"`
-	ProfileImageURL string         `gorm:"type:text;not null" json:"profile_image_url"`
+	ID            datatypes.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	RefID         uint64         `gorm:"type:bigint;not null;unique" json:"ref_id"`
+	UserType      UserTypes      `gorm:"type:user_type;not null" json:"user_type"`
+	FirstnameTH   *string        `gorm:"type:text" json:"firstname_th"`
+	SurnameTH     *string        `gorm:"type:text" json:"surname_th"`
+	TitleTH       *string        `gorm:"type:text" json:"title_th"`
+	FacultyNameTH *string        `gorm:"type:text" json:"faculty_name_th"`
+	FirstnameEN   *string        `gorm:"type:text" json:"firstname_en"`
+	SurnameEN     *string        `gorm:"type:text" json:"surname_en"`
+	TitleEN       *string        `gorm:"type:text" json:"title_en"`
+	FacultyNameEN *string        `gorm:"type:text" json:"faculty_name_en"`
 }
 
 type EventUser struct {

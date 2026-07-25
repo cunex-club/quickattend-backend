@@ -50,16 +50,16 @@ func (r *repository) CreateUser(user *entity.User, ctx context.Context) (*entity
 
 func (r *repository) UpsertUserByRefId(user *entity.User, fieldsToOmit *[]string, ctx context.Context) (*entity.User, error) {
 	userMap := map[string]any{
-		"ref_id":            user.RefID,
-		"firstname_th":      user.FirstnameTH,
-		"surname_th":        user.SurnameTH,
-		"title_th":          user.TitleTH,
-		"faculty_name_th":   user.FacultyNameTH,
-		"firstname_en":      user.FirstnameEN,
-		"surname_en":        user.SurnameEN,
-		"title_en":          user.TitleEN,
-		"faculty_name_en":   user.FacultyNameEN,
-		"profile_image_url": user.ProfileImageURL,
+		"ref_id":          user.RefID,
+		"user_type":       user.UserType,
+		"firstname_th":    user.FirstnameTH,
+		"surname_th":      user.SurnameTH,
+		"title_th":        user.TitleTH,
+		"faculty_name_th": user.FacultyNameTH,
+		"firstname_en":    user.FirstnameEN,
+		"surname_en":      user.SurnameEN,
+		"title_en":        user.TitleEN,
+		"faculty_name_en": user.FacultyNameEN,
 	}
 	if fieldsToOmit != nil {
 		for _, field := range *fieldsToOmit {

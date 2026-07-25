@@ -432,29 +432,6 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 			Status:  400,
 		}
 	}
-	if len(code) != 10 {
-		return nil, &response.APIError{
-			Code:    "INVALID_QR",
-			Message: "URL path parameter 'qrcode' must have length of 10",
-			Status:  400,
-		}
-	}
-	numbers := []string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9"}
-	for _, r := range code {
-		isDigit := false
-		for _, num := range numbers {
-			if string(r) == num {
-				isDigit = true
-			}
-		}
-		if !isDigit {
-			return nil, &response.APIError{
-				Code:    "INVALID_QR",
-				Message: "URL path parameter 'qrcode' contains non-number character(s)",
-				Status:  400,
-			}
-		}
-	}
 
 	eventIdErr := uuid.Validate(eventId)
 	if eventIdErr != nil {
@@ -480,7 +457,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 
 	// Request for participant profile
 	CUNEXGetQRURL := "https://culab-svc.azurewebsites.net/Service.svc/qrcodeinfo_for_all"
-	clientId := s.cfg.LLEConfig.ClientId
+	clientId := s.cfg.LLEConfig.QRClientID
 	if clientId == "" {
 		s.logger.Error().Str("Error", "Missing env config 'LLEClientId'")
 		return nil, &response.APIError{
@@ -489,7 +466,7 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 			Status:  500,
 		}
 	}
-	clientSecret := s.cfg.LLEConfig.ClientSecret
+	clientSecret := s.cfg.LLEConfig.QRClientSecret
 	if clientSecret == "" {
 		s.logger.Error().Str("Error", "Missing env config 'LLEClientSecret'")
 		return nil, &response.APIError{
@@ -577,9 +554,16 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	}
 
 	// Format participant info from CU NEX API to fit our uses
-	refIdUInt, convertErr := strconv.ParseUint(CUNEXSuccess.RefId, 10, 64)
+	if CUNEXSuccess.RefId == nil || strings.TrimSpace(*CUNEXSuccess.RefId) == "" {
+		return nil, &response.APIError{
+			Code:    response.ErrInternalError,
+			Message: "Missing refID from CU NEX GET qrcode",
+			Status:  502,
+		}
+	}
+	refIdUInt, convertErr := strconv.ParseUint(*CUNEXSuccess.RefId, 10, 64)
 	if convertErr != nil {
-		s.logger.Error().Err(convertErr).Str("Error", fmt.Sprintf("Invalid refID returned from CU NEX GET qrcode; could not convert %s to uint64", CUNEXSuccess.RefId))
+		s.logger.Error().Err(convertErr).Str("Error", "Invalid refID returned from CU NEX GET qrcode")
 		return nil, &response.APIError{
 			Code:    response.ErrInternalError,
 			Message: "Invalid refID returned from CU NEX GET qrcode",
@@ -587,20 +571,23 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		}
 	}
 
-	tempCode, err := strconv.ParseUint(CUNEXSuccess.FacultyCode, 10, 8)
-	if err != nil {
-		return nil, &response.APIError{
-			Code:    response.ErrInternalError,
-			Message: "Invalid facultyCode returned from CU NEX GET qrcode",
-			Status:  500,
+	var orgCode uint8
+	if CUNEXSuccess.FacultyCode != nil && strings.TrimSpace(*CUNEXSuccess.FacultyCode) != "" {
+		tempCode, err := strconv.ParseUint(*CUNEXSuccess.FacultyCode, 10, 8)
+		if err != nil {
+			return nil, &response.APIError{
+				Code:    response.ErrInternalError,
+				Message: "Invalid facultyCode returned from CU NEX GET qrcode",
+				Status:  502,
+			}
 		}
+		orgCode = uint8(tempCode)
 	}
-	orgCode := uint8(tempCode)
 
 	// Insert participant now to allow inserting them into EventParticipants later
 	var (
-		orgTH string
-		orgEN string
+		orgTH *string
+		orgEN *string
 	)
 	switch CUNEXSuccess.UserType {
 	case entity.STUDENTS:
@@ -608,8 +595,8 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 		orgEN = CUNEXSuccess.FacultyNameEN
 
 	case entity.STAFFS:
-		orgTH = CUNEXSuccess.DepartmentNameTH
-		orgEN = CUNEXSuccess.DepartmentNameEN
+		orgTH = firstNonBlank(CUNEXSuccess.DepartmentNameTH, CUNEXSuccess.FacultyNameTH)
+		orgEN = firstNonBlank(CUNEXSuccess.DepartmentNameEN, CUNEXSuccess.FacultyNameEN)
 
 	default:
 		s.logger.Error().Str("Error", fmt.Sprintf("Invalid userType returned from CU NEX GET qrcode: %s", CUNEXSuccess.UserType))
@@ -621,14 +608,14 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	}
 
 	userToUpsert := entity.User{
-		RefID:           refIdUInt,
-		FirstnameTH:     CUNEXSuccess.FirstNameTH,
-		SurnameTH:       CUNEXSuccess.LastNameTH,
-		FirstnameEN:     CUNEXSuccess.FirstNameEN,
-		SurnameEN:       CUNEXSuccess.LastNameEN,
-		FacultyNameTH:   orgTH,
-		FacultyNameEN:   orgEN,
-		ProfileImageURL: CUNEXSuccess.ProfileImageUrl,
+		RefID:         refIdUInt,
+		UserType:      CUNEXSuccess.UserType,
+		FirstnameTH:   CUNEXSuccess.FirstNameTH,
+		SurnameTH:     CUNEXSuccess.LastNameTH,
+		FirstnameEN:   CUNEXSuccess.FirstNameEN,
+		SurnameEN:     CUNEXSuccess.LastNameEN,
+		FacultyNameTH: orgTH,
+		FacultyNameEN: orgEN,
 	}
 	notToUpdate := []string{"title_th", "title_en"}
 	user, upsertErr := s.repo.Auth.UpsertUserByRefId(&userToUpsert, &notToUpdate, ctx)
@@ -751,19 +738,19 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	for _, field := range event.RevealedFields {
 		switch field {
 		case entity.ParticipantName:
-			responseBody.FirstnameTH = &CUNEXSuccess.FirstNameTH
-			responseBody.FirstnameEN = &CUNEXSuccess.FirstNameEN
-			responseBody.TitleTH = &user.TitleTH
-			responseBody.SurnameTH = &CUNEXSuccess.LastNameTH
-			responseBody.SurnameEN = &CUNEXSuccess.LastNameEN
-			responseBody.TitleEN = &user.TitleEN
+			responseBody.FirstnameTH = CUNEXSuccess.FirstNameTH
+			responseBody.FirstnameEN = CUNEXSuccess.FirstNameEN
+			responseBody.TitleTH = user.TitleTH
+			responseBody.SurnameTH = CUNEXSuccess.LastNameTH
+			responseBody.SurnameEN = CUNEXSuccess.LastNameEN
+			responseBody.TitleEN = user.TitleEN
 
 		case entity.ParticipantOrganization:
-			responseBody.OrganizationTH = &orgTH
-			responseBody.OrganizationEN = &orgEN
+			responseBody.OrganizationTH = orgTH
+			responseBody.OrganizationEN = orgEN
 
 		case entity.ParticipantPhoto:
-			responseBody.ProfileImageUrl = &CUNEXSuccess.ProfileImageUrl
+			responseBody.ProfileImageUrl = CUNEXSuccess.ProfileImageUrl
 
 		case entity.ParticipantRefID:
 			temp := s.FormatRefIdToStr(refIdUInt)
@@ -772,6 +759,15 @@ func (s *service) PostParticipantService(code string, eventId string, userId str
 	}
 
 	return &responseBody, nil
+}
+
+func firstNonBlank(values ...*string) *string {
+	for _, value := range values {
+		if value != nil && strings.TrimSpace(*value) != "" {
+			return value
+		}
+	}
+	return nil
 }
 
 // returns (status, checkInTime, rowId (if duplication found), error)
@@ -868,17 +864,17 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		for _, user := range result.EventUser {
 			u := user.User
 			usersDTO = append(usersDTO, dtoRes.GetOneEventUser{
-				RefID:           s.FormatRefIdToStr(u.RefID),
-				FirstnameTH:     u.FirstnameTH,
-				SurnameTH:       u.SurnameTH,
-				TitleTH:         u.TitleTH,
-				FacultyNameTH:   u.FacultyNameTH,
-				FirstnameEN:     u.FirstnameEN,
-				SurnameEN:       u.SurnameEN,
-				TitleEN:         u.TitleEN,
-				FacultyNameEN:   u.FacultyNameEN,
-				ProfileImageURL: u.ProfileImageURL,
-				Role:            string(user.Role),
+				RefID:         s.FormatRefIdToStr(u.RefID),
+				UserType:      string(u.UserType),
+				FirstnameTH:   u.FirstnameTH,
+				SurnameTH:     u.SurnameTH,
+				TitleTH:       u.TitleTH,
+				FacultyNameTH: u.FacultyNameTH,
+				FirstnameEN:   u.FirstnameEN,
+				SurnameEN:     u.SurnameEN,
+				TitleEN:       u.TitleEN,
+				FacultyNameEN: u.FacultyNameEN,
+				Role:          string(user.Role),
 			})
 		}
 	}
@@ -918,16 +914,16 @@ func (s *service) GetOneEventService(eventIdStr string, userIdStr string, ctx co
 		for _, wl := range result.EventWhitelist {
 			wlUser := wl.User
 			whitelistDTO = append(whitelistDTO, dtoRes.GetOneEventWhitelist{
-				RefID:           s.FormatRefIdToStr(wlUser.RefID),
-				FirstnameTH:     wlUser.FirstnameTH,
-				SurnameTH:       wlUser.SurnameTH,
-				TitleTH:         wlUser.TitleTH,
-				FacultyNameTH:   wlUser.FacultyNameTH,
-				FirstnameEN:     wlUser.FirstnameEN,
-				SurnameEN:       wlUser.SurnameEN,
-				TitleEN:         wlUser.TitleEN,
-				FacultyNameEN:   wlUser.FacultyNameEN,
-				ProfileImageURL: wlUser.ProfileImageURL,
+				RefID:         s.FormatRefIdToStr(wlUser.RefID),
+				UserType:      string(wlUser.UserType),
+				FirstnameTH:   wlUser.FirstnameTH,
+				SurnameTH:     wlUser.SurnameTH,
+				TitleTH:       wlUser.TitleTH,
+				FacultyNameTH: wlUser.FacultyNameTH,
+				FirstnameEN:   wlUser.FirstnameEN,
+				SurnameEN:     wlUser.SurnameEN,
+				TitleEN:       wlUser.TitleEN,
+				FacultyNameEN: wlUser.FacultyNameEN,
 			})
 		}
 	}

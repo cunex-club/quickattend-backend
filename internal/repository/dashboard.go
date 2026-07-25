@@ -88,9 +88,6 @@ func (r *repository) GetEventDashboardData(ctx context.Context, eventID uuid.UUI
 	}, nil
 }
 
-// Student classification rule: a user is a student iff CHAR_LENGTH(ref_id) == 10.
-// Anyone else (shorter *or* longer) is counted as staff.
-
 // getEligibleCount returns the total number of eligible attendees for a
 // WHITELIST-type event: the distinct union of confirmed whitelist rows,
 // pending whitelist rows, and users who have already been scanned in.
@@ -136,8 +133,8 @@ func (r *repository) getParticipantSummary(ctx context.Context, eventID uuid.UUI
 
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT
-			SUM(CASE WHEN CHAR_LENGTH(CAST(u.ref_id AS TEXT)) = 10 THEN 1 ELSE 0 END) AS total_student,
-			SUM(CASE WHEN CHAR_LENGTH(CAST(u.ref_id AS TEXT)) <> 10 THEN 1 ELSE 0 END) AS total_staff,
+				SUM(CASE WHEN u.user_type = 'student' THEN 1 ELSE 0 END) AS total_student,
+				SUM(CASE WHEN u.user_type = 'staff' THEN 1 ELSE 0 END) AS total_staff,
 			COUNT(*) AS total_all
 		FROM event_participants ep
 		JOIN users u ON u.id = ep.participant_id
@@ -155,15 +152,15 @@ func (r *repository) getOrganizationStats(ctx context.Context, eventID uuid.UUID
 
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT
-			ep.organization,
-			SUM(CASE WHEN CHAR_LENGTH(CAST(u.ref_id AS TEXT)) = 10 THEN 1 ELSE 0 END) AS student_count,
-			SUM(CASE WHEN CHAR_LENGTH(CAST(u.ref_id AS TEXT)) <> 10 THEN 1 ELSE 0 END) AS staff_count,
+				COALESCE(ep.organization, 'ไม่ระบุ') AS organization,
+				SUM(CASE WHEN u.user_type = 'student' THEN 1 ELSE 0 END) AS student_count,
+				SUM(CASE WHEN u.user_type = 'staff' THEN 1 ELSE 0 END) AS staff_count,
 			COUNT(*) AS total_count
 		FROM event_participants ep
 		JOIN users u ON u.id = ep.participant_id
 		WHERE ep.event_id = ?
-		GROUP BY ep.organization
-		ORDER BY total_count DESC, ep.organization ASC
+			GROUP BY COALESCE(ep.organization, 'ไม่ระบุ')
+			ORDER BY total_count DESC, organization ASC
 	`, eventID).Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -194,15 +191,15 @@ func (r *repository) getTimeStats(ctx context.Context, eventID uuid.UUID) ([]ent
 		scans AS (
 			SELECT
 				DATE_TRUNC('hour', ep.scanned_timestamp) AS bucket,
-				CHAR_LENGTH(CAST(u.ref_id AS TEXT)) AS ref_len
+					u.user_type
 			FROM event_participants ep
 			JOIN users u ON u.id = ep.participant_id
 			WHERE ep.event_id = ?
 		)
 		SELECT
 			TO_CHAR(b.bucket AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS time_bucket,
-			COALESCE(SUM(CASE WHEN s.ref_len = 10 THEN 1 ELSE 0 END), 0)::int AS student_count,
-			COALESCE(SUM(CASE WHEN s.ref_len <> 10 THEN 1 ELSE 0 END), 0)::int AS staff_count,
+				COALESCE(SUM(CASE WHEN s.user_type = 'student' THEN 1 ELSE 0 END), 0)::int AS student_count,
+				COALESCE(SUM(CASE WHEN s.user_type = 'staff' THEN 1 ELSE 0 END), 0)::int AS staff_count,
 			COUNT(s.bucket)::int AS total_count
 		FROM buckets b
 		LEFT JOIN scans s ON s.bucket = b.bucket

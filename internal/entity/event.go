@@ -252,7 +252,7 @@ type EventParticipants struct {
 	ScannedTimestamp time.Time       `gorm:"type:timestamptz;not null" json:"scanned_timestamp"`
 	Comment          *string         `gorm:"type:text" json:"comment"`
 	ParticipantID    datatypes.UUID  `gorm:"type:uuid;not null;index:unique_event_and_participant,unique" json:"participant_id"`
-	Organization     string          `gorm:"type:text;not null" json:"organization"`
+	Organization     *string         `gorm:"type:text" json:"organization"`
 	ScannedLocation  Point           `gorm:"type:point;not null" json:"scanned_location"`
 	ScannerID        *datatypes.UUID `gorm:"type:uuid" json:"scanner_id"`
 
@@ -265,8 +265,8 @@ type EventParticipants struct {
 
 // For retrieving result from DB in EventRepository.GetUserForCheckin
 type CheckinUserQuery struct {
-	TitleTH string `gorm:"column:title_th"`
-	TitleEN string `gorm:"column:title_en"`
+	TitleTH *string `gorm:"column:title_th"`
+	TitleEN *string `gorm:"column:title_en"`
 }
 
 // For retrieving result from DB in EventRepository.GetEventForCheckin
