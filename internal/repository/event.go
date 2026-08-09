@@ -85,9 +85,13 @@ type GetEventsArguments struct {
 	PageSize int
 	Search   string
 	Roles []string
-	Date  *time.Time
-	Sort  string
-	Ctx   context.Context
+	// RoleFilterProvided distinguishes "no role param sent" (no filtering)
+	// from "role param sent but empty" (filter down to role IS NULL only) —
+	// len(Roles) alone can't tell those apart since both are empty slices.
+	RoleFilterProvided bool
+	Date               *time.Time
+	Sort               string
+	Ctx                context.Context
 }
 
 func (r *repository) GetEventIDForCheckInRow(checkInRowId uuid.UUID, ctx context.Context) (uuid.UUID, error) {
@@ -315,7 +319,7 @@ func (r *repository) GetPastEvents(args *GetEventsArguments) (*[]entity.GetEvent
 				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
 	}
 
-	if len(args.Roles) > 0 {
+	if args.RoleFilterProvided {
 		subQuery = subQuery.Where("(filter.role IS NULL OR filter.role IN (?))", args.Roles)
 	}
 

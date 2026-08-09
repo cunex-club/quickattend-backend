@@ -144,14 +144,15 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 
 	case service.PastEvents:
 		args := service.GetEventsWithPaginationArgs{
-			UserID:   validated.UserID,
-			Page:     validated.Page,
-			PageSize: validated.PageSize,
-			Search:   validated.Search,
-			Roles:    validated.Roles,
-			Date:     validated.Date,
-			Sort:     validated.Sort,
-			Ctx:      ctx,
+			UserID:             validated.UserID,
+			Page:               validated.Page,
+			PageSize:           validated.PageSize,
+			Search:             validated.Search,
+			Roles:              validated.Roles,
+			RoleFilterProvided: validated.RoleFilterProvided,
+			Date:               validated.Date,
+			Sort:               validated.Sort,
+			Ctx:                ctx,
 		}
 
 		res, pag, err := h.Service.Event.GetPastEventsService(&args)

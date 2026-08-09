@@ -51,20 +51,22 @@ type GetEventsValidateArgsReturn struct {
 	Page     int
 	PageSize int
 	Search   string
-	Roles []string
-	Date  *time.Time
-	Sort  string
+	Roles              []string
+	RoleFilterProvided bool
+	Date               *time.Time
+	Sort               string
 }
 
 type GetEventsWithPaginationArgs struct {
-	UserID   datatypes.UUID
-	Page     int
-	PageSize int
-	Search   string
-	Roles    []string
-	Date     *time.Time
-	Sort     string
-	Ctx      context.Context
+	UserID             datatypes.UUID
+	Page               int
+	PageSize           int
+	Search             string
+	Roles              []string
+	RoleFilterProvided bool
+	Date               *time.Time
+	Sort               string
+	Ctx                context.Context
 }
 
 type GetEventsMode int
@@ -1365,14 +1367,15 @@ func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string
 	}
 
 	return &GetEventsValidateArgsReturn{
-		UserID:   userID,
-		MyEvents: mode,
-		Page:     page,
-		PageSize: size,
-		Search:   search,
-		Roles:    roles,
-		Date:     date,
-		Sort:     sort,
+		UserID:             userID,
+		MyEvents:           mode,
+		Page:               page,
+		PageSize:           size,
+		Search:             search,
+		Roles:              roles,
+		RoleFilterProvided: roleOk,
+		Date:               date,
+		Sort:               sort,
 	}, nil
 }
 
@@ -1403,14 +1406,15 @@ func (s *service) GetMyEventsService(userID datatypes.UUID, search string, ctx c
 
 func (s *service) GetPastEventsService(args *GetEventsWithPaginationArgs) (*[]dtoRes.GetEventsRes, *response.Pagination, *response.APIError) {
 	repoArgs := repository.GetEventsArguments{
-		UserID:   args.UserID,
-		Page:     args.Page,
-		PageSize: args.PageSize,
-		Search:   args.Search,
-		Roles:    args.Roles,
-		Date:     args.Date,
-		Sort:     args.Sort,
-		Ctx:      args.Ctx,
+		UserID:             args.UserID,
+		Page:               args.Page,
+		PageSize:           args.PageSize,
+		Search:             args.Search,
+		Roles:              args.Roles,
+		RoleFilterProvided: args.RoleFilterProvided,
+		Date:               args.Date,
+		Sort:               args.Sort,
+		Ctx:                args.Ctx,
 	}
 
 	res, total, hasNext, err := s.repo.Event.GetPastEvents(&repoArgs)
