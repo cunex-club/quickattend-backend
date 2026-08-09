@@ -1552,6 +1552,14 @@ func (s *service) UpdateEvent(ctx context.Context, id string, userId string, req
 		return nil, errors.New("Cannot update event; user is not owner or manager")
 	}
 
+	endTime, err := s.repo.Event.GetEventEndTime(idUUID, ctx)
+	if err != nil {
+		return nil, err
+	}
+	if time.Now().After(endTime) {
+		return nil, errors.New("Cannot update event; event has already ended")
+	}
+
 	// UpdateEvent replaces event_users wholesale from managers_and_staff below.
 	// Ownership can never be assigned through this endpoint — the client (e.g.
 	// the edit form) never includes the OWNER entry, and a MANAGER (who is

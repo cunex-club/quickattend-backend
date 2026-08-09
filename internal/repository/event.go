@@ -25,6 +25,7 @@ type EventRepository interface {
 	IsUserEventOwner(eventID uuid.UUID, userIDStr string, ctx context.Context) (bool, error)
 	GetUserRoleInEvent(eventID uuid.UUID, userID uuid.UUID, ctx context.Context) (*string, error)
 	GetEventOwnerRefID(eventID uuid.UUID, ctx context.Context) (uint64, error)
+	GetEventEndTime(eventID uuid.UUID, ctx context.Context) (time.Time, error)
 
 	// For POST participant/:qrcode. Get user info not provided by CU NEX
 	GetUserForCheckin(ctx context.Context, refID uint64) (user *entity.CheckinUserQuery, err error)
@@ -572,6 +573,20 @@ func (r *repository) GetEventOwnerRefID(eventID uuid.UUID, ctx context.Context) 
 		return 0, err
 	}
 	return refID, nil
+}
+
+func (r *repository) GetEventEndTime(eventID uuid.UUID, ctx context.Context) (time.Time, error) {
+	var endTime time.Time
+	err := r.db.WithContext(ctx).
+		Model(&entity.Event{}).
+		Select("end_time").
+		Where("id = ?", eventID).
+		Take(&endTime).Error
+
+	if err != nil {
+		return time.Time{}, err
+	}
+	return endTime, nil
 }
 
 func (r *repository) CreateEvent(ctx context.Context, payload entity.CreateEventPayload) (*dtoRes.CreateEventRes, error) {
