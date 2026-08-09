@@ -148,6 +148,9 @@ func (h *Handler) GetEvents(c *fiber.Ctx) error {
 			Page:     validated.Page,
 			PageSize: validated.PageSize,
 			Search:   validated.Search,
+			Roles:    validated.Roles,
+			Date:     validated.Date,
+			Sort:     validated.Sort,
 			Ctx:      ctx,
 		}
 

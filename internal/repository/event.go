@@ -84,7 +84,10 @@ type GetEventsArguments struct {
 	Page     int
 	PageSize int
 	Search   string
-	Ctx      context.Context
+	Roles []string
+	Date  *time.Time
+	Sort  string
+	Ctx   context.Context
 }
 
 func (r *repository) GetEventIDForCheckInRow(checkInRowId uuid.UUID, ctx context.Context) (uuid.UUID, error) {
@@ -292,7 +295,12 @@ func (r *repository) GetPastEvents(args *GetEventsArguments) (*[]entity.GetEvent
 
 	eventParticipants := withCtx.Model(&entity.EventParticipants{}).
 		Select("event_id", "NULL AS role").
-		Where("participant_id = ?", args.UserID)
+		Where("participant_id = ?", args.UserID).
+		Where(`NOT EXISTS (
+			SELECT 1 FROM event_users eu
+			WHERE eu.event_id = event_participants.event_id
+			AND eu.user_id = event_participants.participant_id
+		)`)
 
 	subQuery := withCtx.
 		Joins("(? UNION ALL ?) AS filter", eventUsers, eventParticipants).
@@ -307,18 +315,33 @@ func (r *repository) GetPastEvents(args *GetEventsArguments) (*[]entity.GetEvent
 				`, searchQuery, searchQuery, searchQuery, searchQuery, searchQuery)
 	}
 
+	if len(args.Roles) > 0 {
+		subQuery = subQuery.Where("(filter.role IS NULL OR filter.role IN (?))", args.Roles)
+	}
+
+	if args.Date != nil {
+		dayStart := *args.Date
+		dayEnd := dayStart.Add(24 * time.Hour)
+		subQuery = subQuery.Where("e.start_time >= ? AND e.start_time < ?", dayStart, dayEnd)
+	}
+
 	var count int64
 	countErr := withCtx.Raw(`SELECT COUNT(*) AS total FROM (?) AS subQuery`, subQuery).Scan(&count).Error
 	if countErr != nil {
 		return nil, -1, false, countErr
 	}
 
+	orderDirection := "DESC"
+	if args.Sort == "oldest" {
+		orderDirection = "ASC"
+	}
+
 	var rawResult []entity.GetEventsQueryResult
-	getEventsErr := withCtx.Raw(`SELECT subQuery.* FROM (?) AS subQuery
-		ORDER BY subQuery.id
+	getEventsErr := withCtx.Raw(fmt.Sprintf(`SELECT subQuery.* FROM (?) AS subQuery
+		ORDER BY subQuery.start_time %s, subQuery.id
 		OFFSET ?
 		LIMIT ?
-	`, subQuery, args.Page*args.PageSize, args.PageSize+1).Scan(&rawResult).Error
+	`, orderDirection), subQuery, args.Page*args.PageSize, args.PageSize+1).Scan(&rawResult).Error
 	if getEventsErr != nil {
 		return nil, -1, false, getEventsErr
 	}

@@ -51,6 +51,9 @@ type GetEventsValidateArgsReturn struct {
 	Page     int
 	PageSize int
 	Search   string
+	Roles []string
+	Date  *time.Time
+	Sort  string
 }
 
 type GetEventsWithPaginationArgs struct {
@@ -58,6 +61,9 @@ type GetEventsWithPaginationArgs struct {
 	Page     int
 	PageSize int
 	Search   string
+	Roles    []string
+	Date     *time.Time
+	Sort     string
 	Ctx      context.Context
 }
 
@@ -1272,6 +1278,53 @@ func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string
 		}
 	}
 
+	var roles []string
+	roleQuery, roleOk := queryParams["role"]
+	if roleOk {
+		for _, part := range strings.Split(roleQuery, ",") {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
+				continue
+			}
+			parsedRole, roleErr := entity.ParseRole(trimmed)
+			if roleErr != nil {
+				return nil, &response.APIError{
+					Code:    response.ErrBadRequest,
+					Message: "URL query parameter 'role' must be a comma-separated list of owner, manager, staff",
+					Status:  400,
+				}
+			}
+			roles = append(roles, string(parsedRole))
+		}
+	}
+
+	var date *time.Time
+	dateQuery, dateOk := queryParams["date"]
+	if dateOk {
+		parsedDate, dateErr := time.ParseInLocation("2006-01-02", dateQuery, thaiLoc)
+		if dateErr != nil {
+			return nil, &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: "URL query parameter 'date' must be in YYYY-MM-DD format",
+				Status:  400,
+			}
+		}
+		date = &parsedDate
+	}
+
+	sort := "newest"
+	sortQuery, sortOk := queryParams["sort"]
+	if sortOk {
+		if sortQuery != "newest" && sortQuery != "oldest" {
+			return nil, &response.APIError{
+				Code:    response.ErrBadRequest,
+				Message: "URL query parameter 'sort' must be 'newest' or 'oldest'",
+				Status:  400,
+			}
+		}
+		sort = sortQuery
+	}
+
 	var mode GetEventsMode
 	myeventsQuery, myeventsOk := queryParams["myevents"]
 	if !myeventsOk {
@@ -1317,6 +1370,9 @@ func (s *service) GetEventsValidateArgs(userIDStr string, queryParams map[string
 		Page:     page,
 		PageSize: size,
 		Search:   search,
+		Roles:    roles,
+		Date:     date,
+		Sort:     sort,
 	}, nil
 }
 
@@ -1351,6 +1407,9 @@ func (s *service) GetPastEventsService(args *GetEventsWithPaginationArgs) (*[]dt
 		Page:     args.Page,
 		PageSize: args.PageSize,
 		Search:   args.Search,
+		Roles:    args.Roles,
+		Date:     args.Date,
+		Sort:     args.Sort,
 		Ctx:      args.Ctx,
 	}
 
