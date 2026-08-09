@@ -1502,6 +1502,7 @@ func (s *service) getDiscoveryEventsDTOFormat(rawResult *[]entity.GetDiscoveryEv
 				EvaluationForm: deref[i].EvaluationForm,
 				LocationLat:    deref[i].LocationPoint.Y,
 				LocationLong:   deref[i].LocationPoint.X,
+				AllowAllToScan: deref[i].AllowAllToScan,
 			})
 		}
 	}

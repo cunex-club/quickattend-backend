@@ -357,7 +357,7 @@ func (r *repository) GetDiscoveryEvents(args *GetEventsArguments) (*[]entity.Get
 	withCtx := r.db.WithContext(args.Ctx)
 
 	subQuery := withCtx.Table("events e").Select("e.id", "e.name", "e.organizer", "e.description", "e.start_time",
-		"e.end_time", "e.location", "e.evaluation_form", "e.location_point").
+		"e.end_time", "e.location", "e.evaluation_form", "e.location_point", "e.allow_all_to_scan").
 		Where(`NOT EXISTS (
 			SELECT 1 FROM event_users eu WHERE eu.event_id = e.id
 			AND eu.user_id = ?

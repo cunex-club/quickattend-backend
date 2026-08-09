@@ -356,4 +356,5 @@ type GetDiscoveryEvents struct {
 	Location       string         `gorm:"column:location"`
 	EvaluationForm *string        `gorm:"column:evaluation_form"`
 	LocationPoint  Point          `gorm:"column:location_point"`
+	AllowAllToScan bool           `gorm:"column:allow_all_to_scan"`
 }

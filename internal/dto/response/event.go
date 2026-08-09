@@ -134,4 +134,5 @@ type GetDiscoveryEventsRes struct {
 	EvaluationForm *string   `json:"evaluation_form"`
 	LocationLat    float64   `json:"location_lat"`
 	LocationLong   float64   `json:"location_long"`
+	AllowAllToScan bool      `json:"allow_all_to_scan"`
 }
