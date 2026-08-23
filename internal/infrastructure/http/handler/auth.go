@@ -73,7 +73,7 @@ func (h *Handler) AuthCunex(c *fiber.Ctx) error {
 		MaxAge:   sessionCookieMaxAge,
 	})
 
-	return response.OK(c, fiber.Map{"authenticated": true})
+	return response.OK(c, res)
 }
 
 func (h *Handler) AuthUser(c *fiber.Ctx) error {
