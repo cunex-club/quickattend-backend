@@ -46,6 +46,7 @@ type EventRepository interface {
 	CreateEvent(ctx context.Context, payload entity.CreateEventPayload) (*dtoRes.CreateEventRes, error)
 	UpdateEvent(ctx context.Context, id string, payload entity.CreateEventPayload) (*dtoRes.UpdateEventRes, error)
 	GetScannedParticipantsForExport(ctx context.Context, eventID datatypes.UUID) (*entity.EventParticipantExportData, error)
+	GetRecentScannedParticipants(ctx context.Context, eventID datatypes.UUID, limit int) ([]entity.RecentScannedParticipantRow, error)
 }
 
 func (r *repository) GetScannedParticipantsForExport(ctx context.Context, eventID datatypes.UUID) (*entity.EventParticipantExportData, error) {
@@ -78,6 +79,21 @@ func (r *repository) GetScannedParticipantsForExport(ctx context.Context, eventI
 		StartTime: event.StartTime,
 		Rows:      rows,
 	}, nil
+}
+
+func (r *repository) GetRecentScannedParticipants(ctx context.Context, eventID datatypes.UUID, limit int) ([]entity.RecentScannedParticipantRow, error) {
+	rows := make([]entity.RecentScannedParticipantRow, 0)
+	err := r.db.WithContext(ctx).Table("event_participants AS ep").
+		Select(`ep.scanned_timestamp,
+			u.ref_id,
+			u.title_th, u.firstname_th, u.surname_th,
+			u.title_en, u.firstname_en, u.surname_en`).
+		Joins("JOIN users u ON u.id = ep.participant_id").
+		Where("ep.event_id = ?", eventID).
+		Order("ep.scanned_timestamp DESC").
+		Limit(limit).
+		Scan(&rows).Error
+	return rows, err
 }
 
 type GetEventsArguments struct {

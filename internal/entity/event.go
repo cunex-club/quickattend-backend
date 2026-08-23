@@ -322,6 +322,17 @@ type EventParticipantExportData struct {
 	Rows      []EventParticipantExportRow
 }
 
+type RecentScannedParticipantRow struct {
+	ScannedTimestamp time.Time `gorm:"column:scanned_timestamp"`
+	RefID            uint64    `gorm:"column:ref_id"`
+	TitleTH          *string   `gorm:"column:title_th"`
+	FirstnameTH      *string   `gorm:"column:firstname_th"`
+	SurnameTH        *string   `gorm:"column:surname_th"`
+	TitleEN          *string   `gorm:"column:title_en"`
+	FirstnameEN      *string   `gorm:"column:firstname_en"`
+	SurnameEN        *string   `gorm:"column:surname_en"`
+}
+
 // ====================================================
 
 // for getting My Events and Past Events from DB in GET /events

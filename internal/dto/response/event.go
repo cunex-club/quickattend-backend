@@ -34,6 +34,17 @@ type PostParticipantRes struct {
 	ProfileImageUrl *string   `json:"profile_image_url"`
 }
 
+type RecentParticipantRes struct {
+	RefID       uint64    `json:"ref_id"`
+	TitleTH     *string   `json:"title_th"`
+	FirstnameTH *string   `json:"firstname_th"`
+	SurnameTH   *string   `json:"surname_th"`
+	TitleEN     *string   `json:"title_en"`
+	FirstnameEN *string   `json:"firstname_en"`
+	SurnameEN   *string   `json:"surname_en"`
+	CheckInTime time.Time `json:"check_in_time"`
+}
+
 type GetOneEventAgenda struct {
 	ActivityName string    `json:"activity_name"`
 	StartTime    time.Time `json:"start_time"`

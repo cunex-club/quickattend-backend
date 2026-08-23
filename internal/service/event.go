@@ -43,6 +43,7 @@ type EventService interface {
 	GetDiscoveryEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetDiscoveryEventsRes, pagination *response.Pagination, err *response.APIError)
 	GetPastEventsService(args *GetEventsWithPaginationArgs) (res *[]dtoRes.GetEventsRes, pagination *response.Pagination, err *response.APIError)
 	ExportEventParticipants(ctx context.Context, eventID string, userID string) (filename string, content []byte, err *response.APIError)
+	GetRecentParticipants(ctx context.Context, eventID string, userID string) (data []dtoRes.RecentParticipantRes, err *response.APIError)
 }
 
 type GetEventsValidateArgsReturn struct {
@@ -897,6 +898,48 @@ func (s *service) ExportEventParticipants(ctx context.Context, eventID string, u
 	name := sanitizeExportFilename(data.EventName)
 	date := data.StartTime.In(thaiLoc).Format("20060102")
 	return fmt.Sprintf("%s_attendance_%s.xlsx", name, date), content, nil
+}
+
+// recentParticipantsLimit mirrors the frontend's recent-scans panel size.
+const recentParticipantsLimit = 8
+
+func (s *service) GetRecentParticipants(ctx context.Context, eventID string, userID string) ([]dtoRes.RecentParticipantRes, *response.APIError) {
+	eventUUID, err := uuid.Parse(eventID)
+	if err != nil {
+		return nil, &response.APIError{Code: response.ErrBadRequest, Message: "invalid event id", Status: 400}
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, &response.APIError{Code: response.ErrBadRequest, Message: "invalid user id", Status: 400}
+	}
+
+	role, err := s.repo.Event.GetUserRoleInEvent(eventUUID, userUUID, ctx)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to check permission", Status: 500}
+	}
+	if role == nil || (*role != string(entity.OWNER) && *role != string(entity.MANAGER)) {
+		return nil, &response.APIError{Code: response.ErrForbidden, Message: "only event owners and managers can view recent participants", Status: 403}
+	}
+
+	rows, err := s.repo.Event.GetRecentScannedParticipants(ctx, datatypes.UUID(eventUUID), recentParticipantsLimit)
+	if err != nil {
+		return nil, &response.APIError{Code: response.ErrInternalError, Message: "failed to load recent participants", Status: 500}
+	}
+
+	data := make([]dtoRes.RecentParticipantRes, 0, len(rows))
+	for _, row := range rows {
+		data = append(data, dtoRes.RecentParticipantRes{
+			RefID:       row.RefID,
+			TitleTH:     row.TitleTH,
+			FirstnameTH: row.FirstnameTH,
+			SurnameTH:   row.SurnameTH,
+			TitleEN:     row.TitleEN,
+			FirstnameEN: row.FirstnameEN,
+			SurnameEN:   row.SurnameEN,
+			CheckInTime: row.ScannedTimestamp,
+		})
+	}
+	return data, nil
 }
 
 func buildParticipantWorkbook(data *entity.EventParticipantExportData) ([]byte, error) {
