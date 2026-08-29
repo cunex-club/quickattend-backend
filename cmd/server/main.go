@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/cookiejar"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/middleware"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/http/router"
 	"github.com/cunex-club/quickattend-backend/internal/infrastructure/logger"
+	"github.com/cunex-club/quickattend-backend/internal/infrastructure/scheduler"
 	"github.com/cunex-club/quickattend-backend/internal/repository"
 	"github.com/cunex-club/quickattend-backend/internal/service"
 	"github.com/go-playground/validator/v10"
@@ -67,6 +69,16 @@ func main() {
 	gqlResolver := &gql.Resolver{Service: &services}
 
 	router.SetupRoutes(app, handlers, mw, gqlResolver)
+
+	go func() {
+		scheduler.RunParticipantPurge(context.Background(), repos, cfg.EventRetentionDays, &log.Logger)
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			scheduler.RunParticipantPurge(context.Background(), repos, cfg.EventRetentionDays, &log.Logger)
+		}
+	}()
+
 	log.Info().Msg("Starting server on :8000")
 	if err := app.Listen(":8000"); err != nil {
 		log.Fatal().Err(err).Msg("Server failed to start")

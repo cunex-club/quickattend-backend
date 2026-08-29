@@ -122,6 +122,20 @@ CREATE TABLE "event_user_pendings" (
         REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
 );
 
+CREATE TABLE "event_participant_stats" (
+    "event_id" uuid PRIMARY KEY,
+    "total_participants" int NOT NULL,
+    "total_student" int NOT NULL,
+    "total_staff" int NOT NULL,
+    "total_eligible" int,
+    "organization_stats" jsonb NOT NULL,
+    "time_series_stats" jsonb NOT NULL,
+    "created_at" timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT "fk_event_participant_stats_event" FOREIGN KEY ("event_id")
+        REFERENCES "events"("id") ON UPDATE CASCADE ON DELETE CASCADE
+);
+
 CREATE INDEX idx_events_end_time ON events (end_time);
 CREATE INDEX idx_events_name_trgm ON events USING GIN (name gin_trgm_ops);
 CREATE INDEX idx_events_organizer_trgm ON events USING GIN (organizer gin_trgm_ops);

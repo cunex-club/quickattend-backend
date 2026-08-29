@@ -2,16 +2,23 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"time"
 
 	dtoRes "github.com/cunex-club/quickattend-backend/internal/dto/response"
 	"github.com/cunex-club/quickattend-backend/internal/entity"
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DashboardRepository interface {
 	GetRegistrationSummary(ctx context.Context, eventID uuid.UUID) (*dtoRes.RegistrationSummary, error)
 	GetEventDashboardData(ctx context.Context, eventID uuid.UUID) (*dtoRes.EventDashboard, error)
+	// SnapshotEventStats persists anonymized totals for eventID so they survive PurgeStaleParticipants.
+	SnapshotEventStats(ctx context.Context, eventID uuid.UUID) error
 }
 
 func (r *repository) GetRegistrationSummary(ctx context.Context, eventID uuid.UUID) (*dtoRes.RegistrationSummary, error) {
@@ -44,6 +51,13 @@ func (r *repository) GetEventDashboardData(ctx context.Context, eventID uuid.UUI
 	}
 	if time.Now().UTC().Before(startTime.UTC()) {
 		return nil, entity.ErrEventNotStarted
+	}
+
+	// Raw rows may already be purged for old events — use the snapshot if one exists.
+	if snapshot, ok, err := r.getParticipantStatsSnapshot(ctx, eventID); err != nil {
+		return nil, err
+	} else if ok {
+		return snapshot, nil
 	}
 
 	summary, err := r.GetRegistrationSummary(ctx, eventID)
@@ -211,4 +225,86 @@ func (r *repository) getTimeStats(ctx context.Context, eventID uuid.UUID) ([]ent
 	}
 
 	return rows, nil
+}
+
+// getParticipantStatsSnapshot returns the persisted event_participant_stats
+// row for eventID as an EventDashboard, if one exists. ok is false (with a
+// nil error) when no snapshot has been written yet.
+func (r *repository) getParticipantStatsSnapshot(ctx context.Context, eventID uuid.UUID) (*dtoRes.EventDashboard, bool, error) {
+	var row entity.EventParticipantStats
+	err := r.db.WithContext(ctx).
+		Where("event_id = ?", eventID).
+		Take(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+
+	var orgStats []dtoRes.OrganizationStat
+	if err := json.Unmarshal(row.OrganizationStats, &orgStats); err != nil {
+		return nil, false, err
+	}
+	var timeStats []dtoRes.TimeStat
+	if err := json.Unmarshal(row.TimeSeriesStats, &timeStats); err != nil {
+		return nil, false, err
+	}
+
+	return &dtoRes.EventDashboard{
+		Summary: dtoRes.RegistrationSummary{
+			TotalEligible: row.TotalEligible,
+			TotalStudent:  row.TotalStudent,
+			TotalStaff:    row.TotalStaff,
+			TotalAll:      row.TotalParticipants,
+		},
+		OrganizationStats: orgStats,
+		TimeSeriesStats:   timeStats,
+	}, true, nil
+}
+
+// SnapshotEventStats computes this event's anonymized totals via the same 4 queries GetEventDashboardData uses, then upserts them into event_participant_stats.
+func (r *repository) SnapshotEventStats(ctx context.Context, eventID uuid.UUID) error {
+	summary, err := r.getParticipantSummary(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	totalEligible, err := r.getEligibleCount(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	orgRows, err := r.getOrganizationStats(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	timeRows, err := r.getTimeStats(ctx, eventID)
+	if err != nil {
+		return err
+	}
+
+	orgJSON, err := json.Marshal(orgRows)
+	if err != nil {
+		return err
+	}
+	timeJSON, err := json.Marshal(timeRows)
+	if err != nil {
+		return err
+	}
+
+	stats := entity.EventParticipantStats{
+		EventID:           datatypes.UUID(eventID),
+		TotalParticipants: summary.TotalAll,
+		TotalStudent:      summary.TotalStudent,
+		TotalStaff:        summary.TotalStaff,
+		TotalEligible:     totalEligible,
+		OrganizationStats: datatypes.JSON(orgJSON),
+		TimeSeriesStats:   datatypes.JSON(timeJSON),
+	}
+
+	return r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(&stats).Error
 }

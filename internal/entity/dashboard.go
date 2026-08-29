@@ -1,5 +1,26 @@
 package entity
 
+import (
+	"time"
+
+	"gorm.io/datatypes"
+)
+
+type EventParticipantStats struct {
+	EventID           datatypes.UUID `gorm:"column:event_id"`
+	TotalParticipants int            `gorm:"column:total_participants"`
+	TotalStudent      int            `gorm:"column:total_student"`
+	TotalStaff        int            `gorm:"column:total_staff"`
+	TotalEligible      *int           `gorm:"column:total_eligible"`
+	OrganizationStats datatypes.JSON `gorm:"column:organization_stats"`
+	TimeSeriesStats   datatypes.JSON `gorm:"column:time_series_stats"`
+	CreatedAt         time.Time      `gorm:"column:created_at"`
+}
+
+func (EventParticipantStats) TableName() string {
+	return "event_participant_stats"
+}
+
 type RegistrationSummary struct {
 	TotalStudent int `gorm:"column:total_student"`
 	TotalStaff   int `gorm:"column:total_staff"`

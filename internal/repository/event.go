@@ -47,6 +47,8 @@ type EventRepository interface {
 	UpdateEvent(ctx context.Context, id string, payload entity.CreateEventPayload) (*dtoRes.UpdateEventRes, error)
 	GetScannedParticipantsForExport(ctx context.Context, eventID datatypes.UUID) (*entity.EventParticipantExportData, error)
 	GetRecentScannedParticipants(ctx context.Context, eventID datatypes.UUID, limit int) ([]entity.RecentScannedParticipantRow, error)
+	// PurgeStaleParticipants hard-deletes event_participants for events past retentionDays, snapshotting first.
+	PurgeStaleParticipants(ctx context.Context, retentionDays int) (int64, error)
 }
 
 func (r *repository) GetScannedParticipantsForExport(ctx context.Context, eventID datatypes.UUID) (*entity.EventParticipantExportData, error) {
@@ -94,6 +96,41 @@ func (r *repository) GetRecentScannedParticipants(ctx context.Context, eventID d
 		Limit(limit).
 		Scan(&rows).Error
 	return rows, err
+}
+
+// PurgeStaleParticipants finds events past the retention window with no snapshot yet, then snapshots + deletes each one in its own transaction.
+func (r *repository) PurgeStaleParticipants(ctx context.Context, retentionDays int) (int64, error) {
+	var eventIDs []uuid.UUID
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT DISTINCT ep.event_id
+		FROM event_participants ep
+		JOIN events e ON e.id = ep.event_id
+		LEFT JOIN event_participant_stats eps ON eps.event_id = ep.event_id
+		WHERE e.end_time < NOW() - make_interval(days => ?)
+		AND eps.event_id IS NULL
+	`, retentionDays).Scan(&eventIDs).Error
+	if err != nil {
+		return 0, err
+	}
+
+	var purged int64
+	var errs []error
+	for _, eventID := range eventIDs {
+		txErr := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			txRepo := &repository{db: tx}
+			if err := txRepo.SnapshotEventStats(ctx, eventID); err != nil {
+				return err
+			}
+			return tx.Where("event_id = ?", eventID).Delete(&entity.EventParticipants{}).Error
+		})
+		if txErr != nil {
+			errs = append(errs, fmt.Errorf("purge event %s: %w", eventID, txErr))
+			continue
+		}
+		purged++
+	}
+
+	return purged, errors.Join(errs...)
 }
 
 type GetEventsArguments struct {
@@ -257,6 +294,24 @@ func (r *repository) GetOneEvent(eventId datatypes.UUID, userId datatypes.UUID, 
 		Error
 	if errCount != nil {
 		return nil, errCount
+	}
+
+	// registerCount is 0 both when nobody attended and when the raw rows
+	// were already hard-deleted by PurgeStaleParticipants — fall back to the
+	// snapshot to tell those two cases apart.
+	if registerCount == 0 {
+		var snapshotTotal int
+		errSnapshot := withCtx.Model(&entity.EventParticipantStats{}).
+			Select("total_participants").
+			Where("event_id = ?", eventId).
+			Take(&snapshotTotal).
+			Error
+		if errSnapshot != nil && !errors.Is(errSnapshot, gorm.ErrRecordNotFound) {
+			return nil, errSnapshot
+		}
+		if errSnapshot == nil {
+			registerCount = uint16(snapshotTotal)
+		}
 	}
 
 	var role *string

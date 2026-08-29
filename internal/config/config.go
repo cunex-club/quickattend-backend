@@ -12,6 +12,7 @@ type Config struct {
 	JWTSecret       string `env:"JWT_SECRET,required"`
 	FrontendHomeURL string `env:"FRONTEND_HOME_URL" envDefault:"https://quickattend.cunex.club/"`
 	AllowedOrigins  string `env:"ALLOWED_ORIGINS" envDefault:"https://quickattend.cunex.club"`
+	EventRetentionDays int `env:"EVENT_RETENTION_DAYS" envDefault:"90"`
 
 	DatabaseConfig DatabaseConfig
 	LLEConfig      LLEConfig
